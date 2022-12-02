@@ -73,9 +73,7 @@ enum { kISOStandardBlockSize = 512 };
 		//Note: Not drAlBlkSiz, per TN1150—the VBM is specifically always based on 512-byte blocks.
 		ImpNextMultipleOfSize(vbmMinimumNumBytes, kISOStandardBlockSize)
 	);
-	off_t vbmFinalNumBytes = vbmEndPos - vbmStartPos;
-	//TODO: That “+ kISOStandardBlockSize” shouldn't be necessary, but everything after the VBM is (at least on the Descent 1 CD-ROM) 512 bytes later than vbmSize alone thinks it should be. I haven't been able to figure out any way that it's wrong; IM:F defines the VBM as being drNmAlBlks bits long, rounded up to a block.
-	vbmFinalNumBytes += kISOStandardBlockSize;
+	off_t const vbmFinalNumBytes = vbmEndPos - vbmStartPos;
 	ImpPrintf(@"Allocation block size is 0x%llx (0x200 * %.1f)", L(_mdb->drAlBlkSiz), L(_mdb->drAlBlkSiz) / 512.0);
 	ImpPrintf(@"Clump size is 0x%llx (0x200 * %.1f; ABS * %.1f)", L(_mdb->drClpSiz), L(_mdb->drClpSiz) / 512.0, L(_mdb->drClpSiz) / (double)L(_mdb->drAlBlkSiz));
 	ImpPrintf(@"VBM starts at 0x%llx, runs for 0x%llx (%.1f blocks), ends at 0x%llx", vbmStartPos, vbmFinalNumBytes, vbmFinalNumBytes / (double)L(_mdb->drAlBlkSiz), vbmEndPos);
@@ -98,6 +96,8 @@ enum { kISOStandardBlockSize = 512 };
 		+
 		_volumeBitmapData.length
 	);
+	//TODO: Should probably find a better place to compute this (maybe just axe the ivar and compute it when needed, since it turns out to be unnecessary).
+	_offsetOfFirstAllocationBlock = L(_mdb->drAlBlSt) * kISOStandardBlockSize;
 
 	return true;
 }
