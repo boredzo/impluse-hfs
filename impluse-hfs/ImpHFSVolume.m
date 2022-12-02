@@ -21,7 +21,6 @@ enum { kISOStandardBlockSize = 512 };
 	NSData *_mdbData;
 	struct HFSMasterDirectoryBlock const *_mdb;
 	NSMutableData *_volumeBitmapData;
-	off_t _offsetOfFirstAllocationBlock;
 }
 
 - (bool) readBootBlocksFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
@@ -89,15 +88,6 @@ enum { kISOStandardBlockSize = 512 };
 	}
 
 	_volumeBitmapData = volumeBitmap;
-	_offsetOfFirstAllocationBlock = (
-		_bootBlocksData.length
-		+
-		_mdbData.length
-		+
-		_volumeBitmapData.length
-	);
-	//TODO: Should probably find a better place to compute this (maybe just axe the ivar and compute it when needed, since it turns out to be unnecessary).
-	_offsetOfFirstAllocationBlock = L(_mdb->drAlBlSt) * kISOStandardBlockSize;
 
 	return true;
 }
@@ -152,7 +142,8 @@ enum { kISOStandardBlockSize = 512 };
 	extent:(struct HFSExtentDescriptor const *_Nonnull const)hfsExt
 	error:(NSError *_Nullable *_Nonnull const)outError
 {
-	off_t const readStart = self.volumeStartOffset + _offsetOfFirstAllocationBlock + L(hfsExt->startBlock) * L(_mdb->drAlBlkSiz);
+	off_t const offsetOfFirstAllocationBlock = L(_mdb->drAlBlSt) * kISOStandardBlockSize;
+	off_t const readStart = self.volumeStartOffset + offsetOfFirstAllocationBlock + L(hfsExt->startBlock) * L(_mdb->drAlBlkSiz);
 	ImpPrintf(@"Reading %lu bytes (%lu blocks) from source volume starting at %llu bytes (extent: [ start #%u, %u blocks ])", intoData.length, intoData.length / L(_mdb->drAlBlkSiz), readStart, L(hfsExt->startBlock), L(hfsExt->blockCount));
 	ssize_t const amtRead = pread(readFD, intoData.mutableBytes + offset, intoData.length - offset, readStart);
 	if (amtRead < 0) {
