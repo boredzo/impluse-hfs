@@ -24,4 +24,9 @@ static inline size_t ImpNextMultipleOfSize(size_t const size, size_t const facto
 	}
 }
 
+enum {
+	///Size of the blocks used for the boot blocks, volume header, and VBM. Allocation blocks (used for the catalog file, extents file, and user data) use a different size, indicated by drAlBlkSiz in the volume header.
+	kISOStandardBlockSize = 512
+};
+
 #endif /* ImpSizeUtilities_h */

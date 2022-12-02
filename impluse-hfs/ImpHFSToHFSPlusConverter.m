@@ -11,14 +11,13 @@
 #import <CoreServices/CoreServices.h>
 
 #import "ImpByteOrder.h"
+#import "ImpSizeUtilities.h"
 #import "ImpHFSVolume.h"
 #import "ImpHFSPlusVolume.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeHeaderNode.h"
 #import "ImpBTreeIndexNode.h"
 #import "ImpExtentSeries.h"
-
-enum { kISOStandardBlockSize = 512 };
 
 static char const *_Nullable const ImpExplainOSStatus(OSStatus const err) {
 #pragma clang diagnostic push

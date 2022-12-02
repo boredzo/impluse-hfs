@@ -13,7 +13,6 @@
 #import "ImpBTreeFile.h"
 
 #import <hfs/hfs_format.h>
-enum { kISOStandardBlockSize = 512 };
 
 @implementation ImpHFSVolume
 {
