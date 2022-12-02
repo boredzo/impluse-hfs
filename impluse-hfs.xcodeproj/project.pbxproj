@@ -7,7 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		31077AD1293849EE00066789 /* ImpBTreeIndexNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 31077AD0293849EE00066789 /* ImpBTreeIndexNode.m */; };
+		31077AD42939587400066789 /* NSData+ImpHexDump.m in Sources */ = {isa = PBXBuildFile; fileRef = 31077AD32939587300066789 /* NSData+ImpHexDump.m */; };
 		314EFFDB2932CF3700CE74E9 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFDA2932CF3700CE74E9 /* main.m */; };
+		314EFFE4293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFE3293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m */; };
+		314EFFE72933160800CE74E9 /* ImpHFSVolume.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFE62933160800CE74E9 /* ImpHFSVolume.m */; };
+		314EFFEA29332FEA00CE74E9 /* ImpHFSPlusVolume.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFE929332FEA00CE74E9 /* ImpHFSPlusVolume.m */; };
+		314EFFED29346AB300CE74E9 /* ImpBTreeFile.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFEC29346AB300CE74E9 /* ImpBTreeFile.m */; };
+		314EFFF0293486BB00CE74E9 /* ImpBTreeNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFEF293486BB00CE74E9 /* ImpBTreeNode.m */; };
+		314EFFF3293510CE00CE74E9 /* ImpBTreeHeaderNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFF2293510CE00CE74E9 /* ImpBTreeHeaderNode.m */; };
+		314EFFF72936D80D00CE74E9 /* ImpExtentSeries.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFF62936D80D00CE74E9 /* ImpExtentSeries.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -23,8 +32,30 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		31077ACE2937C5E500066789 /* ImpSizeUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpSizeUtilities.h; sourceTree = "<group>"; };
+		31077ACF293849EE00066789 /* ImpBTreeIndexNode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpBTreeIndexNode.h; sourceTree = "<group>"; };
+		31077AD0293849EE00066789 /* ImpBTreeIndexNode.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpBTreeIndexNode.m; sourceTree = "<group>"; };
+		31077AD22939587300066789 /* NSData+ImpHexDump.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "NSData+ImpHexDump.h"; sourceTree = "<group>"; };
+		31077AD32939587300066789 /* NSData+ImpHexDump.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSData+ImpHexDump.m"; sourceTree = "<group>"; };
 		314EFFD72932CF3700CE74E9 /* impluse-hfs */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "impluse-hfs"; sourceTree = BUILT_PRODUCTS_DIR; };
 		314EFFDA2932CF3700CE74E9 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		314EFFE12932CF5B00CE74E9 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		314EFFE2293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpHFSToHFSPlusConverter.h; sourceTree = "<group>"; };
+		314EFFE3293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpHFSToHFSPlusConverter.m; sourceTree = "<group>"; };
+		314EFFE52933160800CE74E9 /* ImpHFSVolume.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpHFSVolume.h; sourceTree = "<group>"; };
+		314EFFE62933160800CE74E9 /* ImpHFSVolume.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpHFSVolume.m; sourceTree = "<group>"; };
+		314EFFE829332FEA00CE74E9 /* ImpHFSPlusVolume.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpHFSPlusVolume.h; sourceTree = "<group>"; };
+		314EFFE929332FEA00CE74E9 /* ImpHFSPlusVolume.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpHFSPlusVolume.m; sourceTree = "<group>"; };
+		314EFFEB29346AB300CE74E9 /* ImpBTreeFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpBTreeFile.h; sourceTree = "<group>"; };
+		314EFFEC29346AB300CE74E9 /* ImpBTreeFile.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpBTreeFile.m; sourceTree = "<group>"; };
+		314EFFEE293486BB00CE74E9 /* ImpBTreeNode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpBTreeNode.h; sourceTree = "<group>"; };
+		314EFFEF293486BB00CE74E9 /* ImpBTreeNode.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpBTreeNode.m; sourceTree = "<group>"; };
+		314EFFF1293510CE00CE74E9 /* ImpBTreeHeaderNode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpBTreeHeaderNode.h; sourceTree = "<group>"; };
+		314EFFF2293510CE00CE74E9 /* ImpBTreeHeaderNode.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpBTreeHeaderNode.m; sourceTree = "<group>"; };
+		314EFFF4293542AE00CE74E9 /* NOTES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = NOTES.md; sourceTree = "<group>"; };
+		314EFFF52936D80D00CE74E9 /* ImpExtentSeries.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpExtentSeries.h; sourceTree = "<group>"; };
+		314EFFF62936D80D00CE74E9 /* ImpExtentSeries.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpExtentSeries.m; sourceTree = "<group>"; };
+		314EFFF829370DF700CE74E9 /* ImpByteOrder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpByteOrder.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -41,6 +72,8 @@
 		314EFFCE2932CF3700CE74E9 = {
 			isa = PBXGroup;
 			children = (
+				314EFFE12932CF5B00CE74E9 /* README.md */,
+				314EFFF4293542AE00CE74E9 /* NOTES.md */,
 				314EFFD92932CF3700CE74E9 /* impluse-hfs */,
 				314EFFD82932CF3700CE74E9 /* Products */,
 			);
@@ -58,6 +91,26 @@
 			isa = PBXGroup;
 			children = (
 				314EFFDA2932CF3700CE74E9 /* main.m */,
+				314EFFF829370DF700CE74E9 /* ImpByteOrder.h */,
+				31077ACE2937C5E500066789 /* ImpSizeUtilities.h */,
+				31077AD22939587300066789 /* NSData+ImpHexDump.h */,
+				31077AD32939587300066789 /* NSData+ImpHexDump.m */,
+				314EFFE52933160800CE74E9 /* ImpHFSVolume.h */,
+				314EFFE62933160800CE74E9 /* ImpHFSVolume.m */,
+				314EFFE829332FEA00CE74E9 /* ImpHFSPlusVolume.h */,
+				314EFFE929332FEA00CE74E9 /* ImpHFSPlusVolume.m */,
+				314EFFEB29346AB300CE74E9 /* ImpBTreeFile.h */,
+				314EFFEC29346AB300CE74E9 /* ImpBTreeFile.m */,
+				314EFFEE293486BB00CE74E9 /* ImpBTreeNode.h */,
+				314EFFEF293486BB00CE74E9 /* ImpBTreeNode.m */,
+				314EFFF1293510CE00CE74E9 /* ImpBTreeHeaderNode.h */,
+				314EFFF2293510CE00CE74E9 /* ImpBTreeHeaderNode.m */,
+				31077ACF293849EE00066789 /* ImpBTreeIndexNode.h */,
+				31077AD0293849EE00066789 /* ImpBTreeIndexNode.m */,
+				314EFFF52936D80D00CE74E9 /* ImpExtentSeries.h */,
+				314EFFF62936D80D00CE74E9 /* ImpExtentSeries.m */,
+				314EFFE2293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.h */,
+				314EFFE3293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m */,
 			);
 			path = "impluse-hfs";
 			sourceTree = "<group>";
@@ -119,6 +172,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				31077AD1293849EE00066789 /* ImpBTreeIndexNode.m in Sources */,
+				314EFFED29346AB300CE74E9 /* ImpBTreeFile.m in Sources */,
+				314EFFF0293486BB00CE74E9 /* ImpBTreeNode.m in Sources */,
+				31077AD42939587400066789 /* NSData+ImpHexDump.m in Sources */,
+				314EFFEA29332FEA00CE74E9 /* ImpHFSPlusVolume.m in Sources */,
+				314EFFF3293510CE00CE74E9 /* ImpBTreeHeaderNode.m in Sources */,
+				314EFFE72933160800CE74E9 /* ImpHFSVolume.m in Sources */,
+				314EFFF72936D80D00CE74E9 /* ImpExtentSeries.m in Sources */,
+				314EFFE4293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m in Sources */,
 				314EFFDB2932CF3700CE74E9 /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Bucket
+   uuid = "03AA9B0D-0D72-4CB1-A955-F9013EF8F0E3"
+   type = "1"
+   version = "2.0">
+   <Breakpoints>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.SymbolicBreakpoint">
+         <BreakpointContent
+            uuid = "5AB3B24D-C59E-4F89-AC9D-720879EF28DD"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            symbolName = "objc_enumerationMutation"
+            moduleName = "">
+            <Locations>
+               <Location
+                  uuid = "5AB3B24D-C59E-4F89-AC9D-720879EF28DD - ab80a0a2e1845c98"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "objc_enumerationMutation"
+                  moduleName = "libobjc.A.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  offsetFromSymbolStart = "0">
+               </Location>
+            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "8209BFA6-9923-47D0-9877-0B1937AE4CAD"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "impluse-hfs/ImpSizeUtilities.h"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "23"
+            endingLineNumber = "23"
+            landmarkName = "ImpNextMultipleOfSize(size, factor)"
+            landmarkType = "9">
+            <Locations>
+               <Location
+                  uuid = "8209BFA6-9923-47D0-9877-0B1937AE4CAD - e8ddd1d7473196ef"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "ImpNextMultipleOfSize"
+                  moduleName = "impluse-hfs"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/prh/Projects/impluse-hfs/impluse-hfs/ImpSizeUtilities.h"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "23"
+                  endingLineNumber = "23"
+                  offsetFromSymbolStart = "82">
+               </Location>
+               <Location
+                  uuid = "8209BFA6-9923-47D0-9877-0B1937AE4CAD - e8ddd1d7473196ef"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "ImpNextMultipleOfSize"
+                  moduleName = "impluse-hfs"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/prh/Projects/impluse-hfs/impluse-hfs/ImpSizeUtilities.h"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "23"
+                  endingLineNumber = "23"
+                  offsetFromSymbolStart = "82">
+               </Location>
+            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "2E39D73B-5886-44C8-A22A-EC6EE4E42A0A"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "impluse-hfs/ImpHFSToHFSPlusConverter.m"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "122"
+            endingLineNumber = "122"
+            landmarkName = "-hfsUniStr255ForPascalString:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "4D5072E9-0CF8-4E5A-BD12-113F58551818"
+            shouldBeEnabled = "Yes"
+            condition = "threadID == 397195747"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "impluse-hfs/ImpHFSToHFSPlusConverter.m"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "360"
+            endingLineNumber = "360"
+            landmarkName = "-performConversionOrReturnError:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+   </Breakpoints>
+</Bucket>
