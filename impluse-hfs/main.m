@@ -62,8 +62,8 @@ int main(int argc, const char * argv[]) {
 	[self printUsageToFile:stdout];
 }
 - (void) convert:(NSEnumerator <NSString *> *_Nonnull const)argsEnum {
-	NSString *_Nonnull const srcDevPath = [argsEnum nextObject];
-	NSString *_Nonnull const dstDevPath = [argsEnum nextObject];
+	NSString *_Nullable const srcDevPath = [argsEnum nextObject];
+	NSString *_Nullable const dstDevPath = [argsEnum nextObject];
 	if (! (srcDevPath != nil && dstDevPath != nil)) {
 		[self printUsageToFile:stderr];
 		self.status = EX_USAGE;
