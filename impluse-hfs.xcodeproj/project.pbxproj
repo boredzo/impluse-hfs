@@ -17,6 +17,7 @@
 		314EFFF0293486BB00CE74E9 /* ImpBTreeNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFEF293486BB00CE74E9 /* ImpBTreeNode.m */; };
 		314EFFF3293510CE00CE74E9 /* ImpBTreeHeaderNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFF2293510CE00CE74E9 /* ImpBTreeHeaderNode.m */; };
 		314EFFF72936D80D00CE74E9 /* ImpExtentSeries.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFF62936D80D00CE74E9 /* ImpExtentSeries.m */; };
+		31C6E9D62939CE7D000A87D8 /* ImpPrintf.m in Sources */ = {isa = PBXBuildFile; fileRef = 31C6E9D52939CE7D000A87D8 /* ImpPrintf.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -56,6 +57,9 @@
 		314EFFF52936D80D00CE74E9 /* ImpExtentSeries.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpExtentSeries.h; sourceTree = "<group>"; };
 		314EFFF62936D80D00CE74E9 /* ImpExtentSeries.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpExtentSeries.m; sourceTree = "<group>"; };
 		314EFFF829370DF700CE74E9 /* ImpByteOrder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpByteOrder.h; sourceTree = "<group>"; };
+		31C6E9D42939CE7D000A87D8 /* ImpPrintf.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpPrintf.h; sourceTree = "<group>"; };
+		31C6E9D52939CE7D000A87D8 /* ImpPrintf.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpPrintf.m; sourceTree = "<group>"; };
+		31C6E9D72939CF1A000A87D8 /* Prefix.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Prefix.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -90,9 +94,12 @@
 		314EFFD92932CF3700CE74E9 /* impluse-hfs */ = {
 			isa = PBXGroup;
 			children = (
+				31C6E9D72939CF1A000A87D8 /* Prefix.h */,
 				314EFFDA2932CF3700CE74E9 /* main.m */,
 				314EFFF829370DF700CE74E9 /* ImpByteOrder.h */,
 				31077ACE2937C5E500066789 /* ImpSizeUtilities.h */,
+				31C6E9D42939CE7D000A87D8 /* ImpPrintf.h */,
+				31C6E9D52939CE7D000A87D8 /* ImpPrintf.m */,
 				31077AD22939587300066789 /* NSData+ImpHexDump.h */,
 				31077AD32939587300066789 /* NSData+ImpHexDump.m */,
 				314EFFE52933160800CE74E9 /* ImpHFSVolume.h */,
@@ -182,6 +189,7 @@
 				314EFFF72936D80D00CE74E9 /* ImpExtentSeries.m in Sources */,
 				314EFFE4293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m in Sources */,
 				314EFFDB2932CF3700CE74E9 /* main.m in Sources */,
+				31C6E9D62939CE7D000A87D8 /* ImpPrintf.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -303,6 +311,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = FX6BN52BK9;
 				ENABLE_HARDENED_RUNTIME = YES;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "impluse-hfs/Prefix.h";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -313,6 +323,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = FX6BN52BK9;
 				ENABLE_HARDENED_RUNTIME = YES;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "impluse-hfs/Prefix.h";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;

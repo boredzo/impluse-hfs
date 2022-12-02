@@ -60,12 +60,29 @@ enum { kISOStandardBlockSize = 512 };
 - (bool)readAllocationBitmapFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
 	//Volume bitmap immediately follows MDB. We could look at drVBMSt, but it should always be 3.
 	//Volume bitmap *size* is drNmAlBlks bits, or (drNmAlBlks / 8) bytes.
-	size_t const vbmSize = ImpNextMultipleOfSize(L(_mdb->drNmAlBlks), 8) / 8;
-	NSLog(@"VBM size in bytes is number of blocks %u / 8 = %zu", (unsigned)L(_mdb->drNmAlBlks), vbmSize);
+	size_t const vbmMinimumNumBytes = ImpNextMultipleOfSize(L(_mdb->drNmAlBlks), 8) / 8;
+	ImpPrintf(@"VBM minimum size in bytes is number of blocks %u / 8 = 0x%zx", (unsigned)L(_mdb->drNmAlBlks), vbmMinimumNumBytes);
+	off_t const vbmStartPos = (
+		_bootBlocksData.length
+		+
+		_mdbData.length
+	);
+	off_t vbmEndPos = (
+		vbmStartPos
+		+
+		//Note: Not drAlBlkSiz, per TN1150—the VBM is specifically always based on 512-byte blocks.
+		ImpNextMultipleOfSize(vbmMinimumNumBytes, kISOStandardBlockSize)
+	);
+	off_t vbmFinalNumBytes = vbmEndPos - vbmStartPos;
 	//TODO: That “+ kISOStandardBlockSize” shouldn't be necessary, but everything after the VBM is (at least on the Descent 1 CD-ROM) 512 bytes later than vbmSize alone thinks it should be. I haven't been able to figure out any way that it's wrong; IM:F defines the VBM as being drNmAlBlks bits long, rounded up to a block.
-	NSMutableData *_Nonnull const volumeBitmap = [NSMutableData dataWithLength:ImpNextMultipleOfSize(vbmSize, kISOStandardBlockSize) + kISOStandardBlockSize];
-	//Note: Should be 1536 bytes (3.0 blocks)
-	NSLog(@"Reading %zu bytes (%zu blocks) of VBM starting from offset %lld bytes", volumeBitmap.length, volumeBitmap.length / kISOStandardBlockSize, lseek(readFD, 0, SEEK_CUR));
+	vbmFinalNumBytes += kISOStandardBlockSize;
+	ImpPrintf(@"Allocation block size is 0x%llx (0x200 * %.1f)", L(_mdb->drAlBlkSiz), L(_mdb->drAlBlkSiz) / 512.0);
+	ImpPrintf(@"Clump size is 0x%llx (0x200 * %.1f; ABS * %.1f)", L(_mdb->drClpSiz), L(_mdb->drClpSiz) / 512.0, L(_mdb->drClpSiz) / (double)L(_mdb->drAlBlkSiz));
+	ImpPrintf(@"VBM starts at 0x%llx, runs for 0x%llx (%.1f blocks), ends at 0x%llx", vbmStartPos, vbmFinalNumBytes, vbmFinalNumBytes / (double)L(_mdb->drAlBlkSiz), vbmEndPos);
+	ImpPrintf(@"First allocation block: 0x%llx", L(_mdb->drAlBlSt) * 0x200);
+
+	NSMutableData *_Nonnull const volumeBitmap = [NSMutableData dataWithLength:vbmFinalNumBytes];
+	ImpPrintf(@"Reading %zu (0x%zx) bytes (%zu blocks) of VBM starting from offset %lld bytes", volumeBitmap.length, volumeBitmap.length, volumeBitmap.length / kISOStandardBlockSize, lseek(readFD, 0, SEEK_CUR));
 	ssize_t const amtRead = read(readFD, volumeBitmap.mutableBytes, volumeBitmap.length);
 	if (amtRead < volumeBitmap.length) {
 		NSError *_Nonnull const underrunError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: @"Unexpected end of file reading source volume allocation bitmap — are you sure this is an HFS volume?" }];
@@ -95,9 +112,9 @@ enum { kISOStandardBlockSize = 512 };
 	NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
 	fmtr.numberStyle = NSNumberFormatterDecimalStyle;
 	fmtr.hasThousandSeparators = true;
-	NSLog(@"Catalog extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[0].blockCount))]);
-	NSLog(@"Catalog extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[1].blockCount))]);
-	NSLog(@"Catalog extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[2].blockCount))]);
+	ImpPrintf(@"Catalog extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[0].blockCount))]);
+	ImpPrintf(@"Catalog extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[1].blockCount))]);
+	ImpPrintf(@"Catalog extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[2].blockCount))]);
 
 	NSData *_Nullable const catalogFileData = [self readDataFromFileDescriptor:readFD extents:_mdb->drCTExtRec error:outError];
 	self.catalogBTree = [[ImpBTreeFile alloc] initWithData:catalogFileData];
@@ -114,12 +131,12 @@ enum { kISOStandardBlockSize = 512 };
 	NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
 	fmtr.numberStyle = NSNumberFormatterDecimalStyle;
 	fmtr.hasThousandSeparators = true;
-	NSLog(@"Extents overflow extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[0].blockCount))]);
-	NSLog(@"Extents overflow extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[1].blockCount))]);
-	NSLog(@"Extents overflow extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[2].blockCount))]);
+	ImpPrintf(@"Extents overflow extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[0].blockCount))]);
+	ImpPrintf(@"Extents overflow extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[1].blockCount))]);
+	ImpPrintf(@"Extents overflow extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[2].blockCount))]);
 
 	NSData *_Nullable const extentsFileData = [self readDataFromFileDescriptor:readFD extents:_mdb->drXTExtRec error:outError];
-	NSLog(@"Extents file data: %lu bytes", extentsFileData.length);
+	ImpPrintf(@"Extents file data: %lu bytes", extentsFileData.length);
 	return false;
 //	self.extentsOverflowBTree = [[ImpBTreeFile alloc] initWithData:extentsFileData];
 
@@ -136,7 +153,7 @@ enum { kISOStandardBlockSize = 512 };
 	error:(NSError *_Nullable *_Nonnull const)outError
 {
 	off_t const readStart = self.volumeStartOffset + _offsetOfFirstAllocationBlock + L(hfsExt->startBlock) * L(_mdb->drAlBlkSiz);
-	NSLog(@"Reading %lu bytes (%lu blocks) from source volume starting at %llu bytes (extent: [ start #%u, %u blocks ])", intoData.length, intoData.length / L(_mdb->drAlBlkSiz), readStart, L(hfsExt->startBlock), L(hfsExt->blockCount));
+	ImpPrintf(@"Reading %lu bytes (%lu blocks) from source volume starting at %llu bytes (extent: [ start #%u, %u blocks ])", intoData.length, intoData.length / L(_mdb->drAlBlkSiz), readStart, L(hfsExt->startBlock), L(hfsExt->blockCount));
 	ssize_t const amtRead = pread(readFD, intoData.mutableBytes + offset, intoData.length - offset, readStart);
 	if (amtRead < 0) {
 		NSError *_Nonnull const readFailedError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to read data from extent { start #%u, %u blocks }", (unsigned)L(hfsExt->startBlock), (unsigned)L(hfsExt->blockCount) ] }];
@@ -172,11 +189,11 @@ enum { kISOStandardBlockSize = 512 };
 	NSUInteger const blockSize = L(_mdb->drAlBlkSiz);
 	struct HFSExtentDescriptor const *_Nonnull hfsExt = (struct HFSExtentDescriptor const *_Nonnull)hfsExtRec;
 	NSMutableData *_Nonnull const data = [NSMutableData dataWithLength:blockSize * L(hfsExt->blockCount)];
-	NSLog(@"Reading first extent with offset %lu", 0UL);
+	ImpPrintf(@"Reading first extent with offset %lu", 0UL);
 	NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
 	fmtr.numberStyle = NSNumberFormatterDecimalStyle;
 	fmtr.hasThousandSeparators = true;
-	NSLog(@"Reading extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(hfsExt->startBlock))], [fmtr stringFromNumber:@(L(hfsExt->blockCount))]);
+	ImpPrintf(@"Reading extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(hfsExt->startBlock))], [fmtr stringFromNumber:@(L(hfsExt->blockCount))]);
 	NSData *_Nullable const success0 = [self readData:data
 		atOffset:0
 		fromFileDescriptor:readFD
@@ -185,8 +202,8 @@ enum { kISOStandardBlockSize = 512 };
 	bool successfullyReadAllNonEmptyExtents = (success0 != NULL);
 	if (success0 != NULL && L((++hfsExt)->blockCount) > 0) {
 		NSUInteger offset = data.length;
-		NSLog(@"Reading second extent with offset %lu", offset);
-		NSLog(@"Reading extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(hfsExt->startBlock))], [fmtr stringFromNumber:@(L(hfsExt->blockCount))]);
+		ImpPrintf(@"Reading second extent with offset %lu", offset);
+		ImpPrintf(@"Reading extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(hfsExt->startBlock))], [fmtr stringFromNumber:@(L(hfsExt->blockCount))]);
 		[data increaseLengthBy:blockSize * L(hfsExt->blockCount)];
 		NSData *_Nullable const success1 = [self readData:data
 			atOffset:offset
@@ -196,8 +213,8 @@ enum { kISOStandardBlockSize = 512 };
 		successfullyReadAllNonEmptyExtents = (success0 != NULL) && (success1 != NULL);
 		if (success1 != NULL && L((++hfsExt)->blockCount) > 0) {
 			offset = data.length;
-			NSLog(@"Reading third extent with offset %lu", offset);
-			NSLog(@"Reading extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(hfsExt->startBlock))], [fmtr stringFromNumber:@(L(hfsExt->blockCount))]);
+			ImpPrintf(@"Reading third extent with offset %lu", offset);
+			ImpPrintf(@"Reading extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(hfsExt->startBlock))], [fmtr stringFromNumber:@(L(hfsExt->blockCount))]);
 			[data increaseLengthBy:blockSize * L(hfsExt->blockCount)];
 			NSData *_Nullable const success2 = [self readData:data
 				atOffset:offset

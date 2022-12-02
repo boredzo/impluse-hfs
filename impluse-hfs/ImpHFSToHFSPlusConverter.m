@@ -55,12 +55,12 @@ static char const *_Nullable const ImpExplainOSStatus(OSStatus const err) {
 			((char *)encodingName.mutableBytes)[encodingNameNumBytes] = 0;
 			((char *)encodingName.mutableBytes)[encodingNameNumBytes+1] = 0;
 
-			NSLog(@"Can convert to encoding: 0x%08x %@", destEncoding, (err == noErr) ? [NSString stringWithCharacters:encodingName.mutableBytes length:encodingNameNumBytes] : @"(no name found)");
+			ImpPrintf(@"Can convert to encoding: 0x%08x %@", destEncoding, (err == noErr) ? [NSString stringWithCharacters:encodingName.mutableBytes length:encodingNameNumBytes] : @"(no name found)");
 		}
 
 		OSStatus err = TECCreateConverter(&_hfsPlusTextConverter, _hfsTextEncoding, _hfsPlusTextEncoding);
 		if (err != noErr) {
-			NSLog(@"Failed to initialize text encoding conversion: error %d/%s", err, ImpExplainOSStatus(err));
+			ImpPrintf(@"Failed to initialize text encoding conversion: error %d/%s", err, ImpExplainOSStatus(err));
 		}
 #endif
 		struct UnicodeMapping mapping = {
@@ -70,7 +70,7 @@ static char const *_Nullable const ImpExplainOSStatus(OSStatus const err) {
 		};
 		OSStatus const err = CreateTextToUnicodeInfo(&mapping, &_ttui);
 		if (err != noErr) {
-			NSLog(@"Failed to initialize Unicode conversion: error %d/%s", err, ImpExplainOSStatus(err));
+			ImpPrintf(@"Failed to initialize Unicode conversion: error %d/%s", err, ImpExplainOSStatus(err));
 		}
 	}
 	return self;
@@ -108,7 +108,7 @@ static char const *_Nullable const ImpExplainOSStatus(OSStatus const err) {
 	if (err != noErr) {
 		NSMutableData *_Nonnull const cStringData = [NSMutableData dataWithLength:*pascalString + 1];
 		memcpy(cStringData.mutableBytes, pascalString + 1, *pascalString);
-		NSLog(@"Failed to convert filename '%s' (length %u) to Unicode: error %d/%s", (char const *)cStringData.bytes, (unsigned)*pascalString, err, ImpExplainOSStatus(err));
+		ImpPrintf(@"Failed to convert filename '%s' (length %u) to Unicode: error %d/%s", (char const *)cStringData.bytes, (unsigned)*pascalString, err, ImpExplainOSStatus(err));
 		return nil;
 	} else
 #else
@@ -119,9 +119,9 @@ static char const *_Nullable const ImpExplainOSStatus(OSStatus const err) {
 		NSMutableData *_Nonnull const cStringData = [NSMutableData dataWithLength:pascalString[0]];
 		char *_Nonnull const cStringBytes = cStringData.mutableBytes;
 		memcpy(cStringBytes, pascalString + 1, *pascalString);
-		NSLog(@"Failed to convert filename '%s' (length %u) to Unicode: error %d/%s", (char const *)cStringBytes, (unsigned)*pascalString, err, ImpExplainOSStatus(err));
+		ImpPrintf(@"Failed to convert filename '%s' (length %u) to Unicode: error %d/%s", (char const *)cStringBytes, (unsigned)*pascalString, err, ImpExplainOSStatus(err));
 		if (err == kTECOutputBufferFullStatus) {
-			NSLog(@"Output buffer fill: %lu vs. buffer size %lu", (unsigned long)actualOutputLengthInBytes, outputPayloadSizeInBytes);
+			ImpPrintf(@"Output buffer fill: %lu vs. buffer size %lu", (unsigned long)actualOutputLengthInBytes, outputPayloadSizeInBytes);
 		}
 		return nil;
 	} else {
@@ -335,34 +335,34 @@ static char const *_Nullable const ImpExplainOSStatus(OSStatus const err) {
 	ImpBTreeHeaderNode *_Nonnull const headerNode = (ImpBTreeHeaderNode *_Nonnull const)firstNode;
 	printf("Header node portends %u total nodes, of which %u are free (= %u used)\n", headerNode.numberOfTotalNodes, headerNode.numberOfFreeNodes, headerNode.numberOfTotalNodes - headerNode.numberOfFreeNodes);
 	ImpBTreeNode *_Nonnull const rootNode = headerNode.rootNode;
-	NSLog(@"Root node is %@", rootNode);
+	ImpPrintf(@"Root node is %@", rootNode);
 	__block NSUInteger numNodes = 0;
 	__block NSUInteger numFiles = 0, numFolders = 0, numThreads = 0;
 	NSMutableSet *_Nonnull const nodesPreviouslyEncountered = [NSMutableSet setWithCapacity:headerNode.numberOfTotalNodes];
 	[catalog walkBreadthFirst:^(ImpBTreeNode *const  _Nonnull node) {
-		NSLog(@"Walk encountered node: %@", node);
 		if ([nodesPreviouslyEncountered containsObject:@(node.nodeNumber)]) {
 			return;
 		}
+		ImpPrintf(@"Walk encountered node: %@", node);
 		[nodesPreviouslyEncountered addObject:@(node.nodeNumber)];
 		++numNodes;
 
 		if (node.nodeType == kBTLeafNode) {
 			[node forEachCatalogRecord_file:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFile *const _Nonnull fileRec) {
-				NSLog(@"- 📄 “%@”, ID #%u (0x%x), type %@ creator %@", [self stringForPascalString:catalogKeyPtr->nodeName], L(fileRec->fileID), L(fileRec->fileID),  NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdType)), NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdCreator)));
+				ImpPrintf(@"- 📄 “%@”, ID #%u (0x%x), type %@ creator %@", [self stringForPascalString:catalogKeyPtr->nodeName], L(fileRec->fileID), L(fileRec->fileID),  NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdType)), NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdCreator)));
 				++numFiles;
 			} folder:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRec) {
-				NSLog(@"- 📁 “%@” with ID #%u, %u items", [self stringForPascalString:catalogKeyPtr->nodeName], L(folderRec->folderID), L(folderRec->valence));
+				ImpPrintf(@"- 📁 “%@” with ID #%u, %u items", [self stringForPascalString:catalogKeyPtr->nodeName], L(folderRec->folderID), L(folderRec->valence));
 				++numFolders;
 			} thread:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogThread *const _Nonnull threadRec) {
 				u_int32_t const threadID = L(threadRec->parentID);
-				NSLog(@"- 🧵 with ID #%u and name %@", threadID, [self stringForPascalString:threadRec->nodeName]);
+				ImpPrintf(@"- 🧵 with ID #%u and name %@", threadID, [self stringForPascalString:threadRec->nodeName]);
 				++numThreads;
 			}];
 		}
 	}];
-	NSLog(@"Encountered %lu nodes", numNodes);
-	NSLog(@"Encountered %lu files, %lu folders, %lu threads", numFiles, numFolders, numThreads);
+	ImpPrintf(@"Encountered %lu nodes", numNodes);
+	ImpPrintf(@"Encountered %lu files, %lu folders, %lu threads", numFiles, numFolders, numThreads);
 
 //	int const writeFD = open(self.destinationDevice.fileSystemRepresentation, O_WRONLY);
 	return false; //TEMP

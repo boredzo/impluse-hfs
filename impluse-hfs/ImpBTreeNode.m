@@ -106,7 +106,7 @@ typedef u_int16_t BTreeNodeOffset;
 	NSUInteger const length = nextRecordOffset - thisRecordOffset;
 	NSRange const recordRange = { thisRecordOffset, length };
 	NSData *_Nonnull const recordData = [_nodeData subdataWithRange:recordRange];
-	NSLog(@"Record at index %u starts at offset %lu, length %lu: <\n%@>", idx, (unsigned long)thisRecordOffset, length, recordData.hexDump_Imp);
+//	ImpPrintf(@"Record at index %u starts at offset %lu, length %lu: <\n%@>", idx, (unsigned long)thisRecordOffset, length, recordData.hexDump_Imp);
 	return recordData;
 }
 
@@ -132,7 +132,7 @@ typedef u_int16_t BTreeNodeOffset;
 		//Also, the “Descent” CD-ROM has some entries that look like folder records but have record types like 0x4100 or 0x5100. There are also thread records with a type of 0x6400 that don't have a node name filled in. If you want to include these, change the switch below to “recordType & 0x0f00”.
 		int16_t const recordType = L(*recordTypePtr) & 0xff00;
 
-		NSLog(@"Record length: %lu; offset of record type in record is %lu; record type is 0x%04x", data.length, ((ptrdiff_t)recordTypePtr) - ((ptrdiff_t)recordPtr), recordType);
+		ImpPrintf(@"Record length: %lu; offset of record type in record is %lu; record type is 0x%04x", data.length, ((ptrdiff_t)recordTypePtr) - ((ptrdiff_t)recordPtr), recordType);
 		switch (recordType /* & 0x0f00 */) {
 			case kHFSFileRecord:
 				fileRecordBlock(keyPtr, (struct HFSCatalogFile const *)dataPtr);

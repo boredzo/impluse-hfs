@@ -29,7 +29,7 @@ int main(int argc, const char * argv[]) {
 		converter.sourceDevice = [NSURL fileURLWithPath:srcDevPath isDirectory:false];
 		converter.destinationDevice = [NSURL fileURLWithPath:dstDevPath isDirectory:false];
 		converter.conversionProgressUpdateBlock = ^(float progress, NSString * _Nonnull operationDescription) {
-			NSLog(@"%u%%: %@", (unsigned)round(100.0 * progress), operationDescription);
+			ImpPrintf(@"%u%%: %@", (unsigned)round(100.0 * progress), operationDescription);
 		};
 		NSError *_Nullable error = nil;
 		bool const converted = [converter performConversionOrReturnError:&error];
