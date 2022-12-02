@@ -162,3 +162,59 @@ Whether or not any extents are consolidated, the growth of extent records means 
 Only severely fragmented files might have more than eight extents, and some of these may be eligible for consolidation, which might bring them down to eight or fewer. Files that had more than 3 extents in the HFS volume, and have 8 or fewer extents (after consolidation) in the HFS+ volume, must be removed from the extents overflow file.
 
 On HFS volumes that have an extents overflow file, its shrinkage is likely to be severe and potentially total. One benefit of this is freeing up space for the catalog file; either freeing up space entirely, or being relocatable to a smaller opening in the HFS+ volume.
+
+## Observed VBM ranges
+
+(I eventually solved this mystery. Skip to the end.)
+
+It's been a bit tricky to figure out where the VBM should begin and end. We know, based on IM:F and TN1150, that:
+
+- the VBM starts at block #3 (immediately after the volume header)
+- other than that, the VBM's size/range is not directly indicated anywhere, but it must be at least drNmAlBlks (number of allocation blocks in the volume) bits in size
+- the VBM is stored in 512-byte blocks (not allocation blocks, unlike on HFS+)
+- the VBM is contiguous (unlike on HFS+)
+
+So it starts at block #3 and runs contiguously for some number of 512-byte blocks.
+
+Knowing where the VBM _ends_ is important because that's the start of the first allocation block, which we need to know in order to reliably find the blocks that hold the catalog file, the extents overflow file, and everything else.
+
+Unfortunately, this has proven to be a game of whack-a-mole. Getting some images working keeps causing others to flake out. The following data is an attempt to find a pattern from which to develop a reliable rubric. Values are in bytes (0x200 = 512 bytes).
+
+- 40 MB Mini vMac image: VBM minimum size in bytes is number of blocks 40951 / 8 = 0x13ff; Allocation block size is 0x400 (0x200 * 2.0); Clump size is 0x1000 (0x200 * 8.0; ABS * 4.0); VBM starts at 0x600, runs for 0x1400 (5.0 blocks), ends at 0x1a00
+- Quake 3 Arena CD-ROM: VBM minimum size in bytes is number of blocks 63189 / 8 = 0x1edb; Allocation block size is 0x2000 (0x200 * 16.0); Clump size is 0x2000 (0x200 * 16.0; ABS * 1.0); VBM starts at 0x600, runs for 0x2000 (1.0 blocks), ends at 0x2600
+- Disk Copy 6.3.3: VBM minimum size in bytes is number of blocks 5113 / 8 = 0x280; Allocation block size is 0x200 (0x200 * 1.0); Clump size is 0x800 (0x200 * 4.0; ABS * 4.0); VBM starts at 0x600, runs for 0x400 (2.0 blocks), ends at 0xa00
+- Descent 1 CD-ROM (INCORRECT result): VBM minimum size in bytes is number of blocks 39984 / 8 = 0x1386; VBM minimum size in bytes is number of blocks 39984 / 8 = 4998; Allocation block size is 0x200 (0x200 * 1.0); Clump size is 0x800 (0x200 * 4.0; ABS * 4.0); VBM starts at 0x600, runs for 0x1400 (10.0 blocks), ends at 0x1a00
+- Descent 1 CD-ROM (CORRECT result): … VBM starts at 0x600, runs for 0x1600 (11.0 blocks), ends at 0x1c00
+- Journeyman Project Turbo! (INCORRECT result): VBM minimum size in bytes is number of blocks 40300 / 8 = 0x13ae; Allocation block size is 0x4200 (0x200 * 33.0); Clump size is 0x10800 (0x200 * 132.0; ABS * 4.0); VBM starts at 0x600, runs for 0x3e00 (0.9 blocks), ends at 0x4200 (This result was based on trying to pad the VBM end out to an allocation block boundary)
+- Journeyman Project Turbo! (INCORRECT result): VBM minimum size in bytes is number of blocks 40300 / 8 = 0x13ae; Allocation block size is 0x4200 (0x200 * 33.0); Clump size is 0x10800 (0x200 * 132.0; ABS * 4.0); VBM starts at 0x600, runs for 0x1400 (0.3 blocks), ends at 0x1a00
+
+The incorrect result for Descent is that we look for the extents overflow and catalog files one block earlier than where they actually are. Since the first node of a B*-tree file is the header node, finding any other kind of node there means we're looking in the wrong place. Descent's volume header says that the header node of its EO file is at allocation block 0, and the header node of its catalog file is at block 328. Empirically, the EO header node is at 0x1c00. With a hack in place to make the math work out to that, both header nodes are found and the catalog file parses successfully.
+
+I'm as yet unsure why Descent needs an extra block after where the VBM seemingly should end.
+
+I'm tempted to just iterate forward one allocation block at a time until I find a header node, but there's not actually any guarantee that either header node is at allocation block 0. Arguably I could take the lesser of the two block numbers—let's say it's allocation block #5—and call the allocation block 5 blocks behind the first wild header node block 0.
+
+I had thought it might be based on the clump size, but the Mini vMac image has the VBM neither start on a clump boundary, nor run for a whole number of clumps, nor end on a clump boundary. So much for that.
+
+As for The Journeyman Project, its catalog file appears (just from looking at the hex dump) to start possibly at 0x102400, which is 2,066 512-byte blocks into the file. (JMP's allocation block size is, as noted above, fairly huge, as it's a nearly-full CD-ROM.) Interestingly, that's 62.6 allocation blocks into the file.
+
+Perhaps the first allocation block has to be on an allocation block boundary? Certainly wouldn't help with Descent, whose allocation block size is only 512 bytes, and yet it needs an extra 512 before the first allocation block.
+
+Like Descent, JMP's catalog file immediately follows its extents file:
+
+```
+Catalog extent the first: start block #62, length 62 blocks
+Catalog extent the second: start block #0, length 0 blocks
+Extents overflow extent the first: start block #0, length 62 blocks
+Extents overflow extent the second: start block #0, length 0 blocks
+```
+
+62 allocation blocks is 0xffc00 bytes, or 1,047,552—just under 1 MiB, which is 1,048,576. (In fact, it's 1 MiB minus 1 KiB, or 1,023 KiB.)
+
+So if the catalog starts at 0x102400, then the EO file should start 0xffc00 before that, which is 0x2800. There doesn't seem to be a header node there, though.
+
+There *does* seem to be a header node at 0x2600, 0x200 earlier than 0x2800 but still much farther out than 0x1a00 (specifically, a difference of +0x0e00, or 7 * 0x200).
+
+… and then I finally noticed the `drAlBlkSt` (allocation block start) member of the volume header. It's the location of allocation block 0, in 512-byte units. It's exactly what I needed, but I missed it because I was assuming that the end of the VBM was necessarily the beginning of allocation block 0, and that's not the case.
+
+Using `drAlBlkSt` * 0x200 is exactly the reliable solution that was missing.
