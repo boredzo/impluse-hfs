@@ -33,6 +33,21 @@ TN1150 also says, regarding the last 512 bytes:
 
 >The last 512 bytes were used during Apple's CPU manufacturing process.
 
+## The volume bitmap
+
+TN1150 makes a couple of important clarifications regarding the layout of the volume bitmap on disk (which HFS+ turns into the allocation bitmap file):
+
+>Using a file allows the bitmap itself to be allocated from allocation blocks. This simplifies the design, since volumes are now comprised of only one type of block -- the allocation block. The HFS is slightly more complex because it uses 512-byte blocks to hold the allocation bitmap and allocation blocks to hold file data.
+
+This means that the volume bitmap is always in 512-byte chunks, regardless of `drAlBlkSize`.
+
+>All of the volume's structures, including the volume header, are part of one or more allocation blocks (with the possible exception of the alternate volume header, discussed below). This differs from HFS, which has several structures (including the boot blocks, master directory block, and bitmap) which are not part of any allocation block.
+
+This part has two ramifications:
+
+- The first allocation block on an HFS volume starts after the VBM. (Though, does it have to start at a position that is a multiple of the block size? That is, if the VBM's last 512-byte chunk ends on a multiple of 512 but not 1024, does there need to be padding between that point and the next allocation-block-size multiple?)
+- Including everything all the way out to the edges of the volume changes _which_ blocks have to be marked as used. Effectively, the allocation bitmap on HFS+ has a handful of new blocks, marked as used, before and after the volume contents.
+
 ## Extents
 
 An extent is basically the same thing as an NSRange: a start point and a length. An extent is measured in allocation blocks.
