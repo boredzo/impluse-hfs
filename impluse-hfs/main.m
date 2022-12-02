@@ -16,14 +16,13 @@
 @property int status;
 
 - (void) printUsageToFile:(FILE *_Nonnull const)outputFile;
+- (void) unrecognizedSubcommand:(NSString *_Nonnull const)subcommand;
 
 - (void) help:(NSEnumerator <NSString *> *_Nonnull const)argsEnum;
 - (void) convert:(NSEnumerator <NSString *> *_Nonnull const)argsEnum;
 - (void) extract:(NSEnumerator <NSString *> *_Nonnull const)argsEnum;
 
 @end
-static void usage(char const *_Nullable const argv0) {
-}
 
 int main(int argc, const char * argv[]) {
 	int status = EXIT_SUCCESS;
@@ -34,7 +33,12 @@ int main(int argc, const char * argv[]) {
 		impluse.argv0 = [argsEnum nextObject];
 
 		NSString *_Nonnull const subcommand = [argsEnum nextObject];
-		[impluse performSelector:NSSelectorFromString([subcommand stringByAppendingString:@":"]) withObject:argsEnum];
+		SEL _Nonnull const subcmdSelector = NSSelectorFromString([subcommand stringByAppendingString:@":"]);
+		if ([impluse respondsToSelector:subcmdSelector]) {
+			[impluse performSelector:subcmdSelector withObject:argsEnum];
+		} else {
+			[impluse unrecognizedSubcommand:subcommand];
+		}
 
 		status = impluse.status;
 	}
@@ -46,6 +50,12 @@ int main(int argc, const char * argv[]) {
 - (void) printUsageToFile:(FILE *_Nonnull const)outputFile {
 	fprintf(outputFile, "usage: %s convert hfs-device hfsplus-device\n", self.argv0.UTF8String ?: "impluse");
 	fprintf(outputFile, "The two paths must not be the same. The contents of hfs-device will be copied to hfsplus-device. This may take some time.\n");
+}
+
+- (void) unrecognizedSubcommand:(NSString *_Nonnull const)subcommand {
+	fprintf(stderr, "unrecognized subcommand: %s\n", subcommand.UTF8String);
+	[self printUsageToFile:stderr];
+	self.status = EX_USAGE;
 }
 
 - (void) help:(NSEnumerator <NSString *> *_Nonnull const)argsEnum {
