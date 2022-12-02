@@ -21,6 +21,7 @@ enum { kISOStandardBlockSize = 512 };
 	NSData *_mdbData;
 	struct HFSMasterDirectoryBlock const *_mdb;
 	NSMutableData *_volumeBitmapData;
+	CFBitVectorRef _bitVector;
 }
 
 - (bool) readBootBlocksFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
@@ -88,6 +89,7 @@ enum { kISOStandardBlockSize = 512 };
 	}
 
 	_volumeBitmapData = volumeBitmap;
+	_bitVector = CFBitVectorCreate(kCFAllocatorDefault, _volumeBitmapData.bytes, L(_mdb->drNmAlBlks));
 
 	return true;
 }
@@ -142,6 +144,23 @@ enum { kISOStandardBlockSize = 512 };
 	extent:(struct HFSExtentDescriptor const *_Nonnull const)hfsExt
 	error:(NSError *_Nullable *_Nonnull const)outError
 {
+	ImpPrintf(@"Checking whether extent starting at %u is allocated before reading:", L(hfsExt->startBlock));
+	int32_t firstUnallocatedBlockNumber = -1;
+	for (u_int16_t i = 0; i < L(hfsExt->blockCount); ++i) {
+		ImpPrintf(@"- #%u: %@", L(hfsExt->startBlock) + i, CFBitVectorGetBitAtIndex(_bitVector, L(hfsExt->startBlock) + i) ? @"YES" : @"NO!");
+		if (! CFBitVectorGetBitAtIndex(_bitVector, L(hfsExt->startBlock) + i)) {
+			firstUnallocatedBlockNumber = L(hfsExt->startBlock) + i;
+		}
+	}
+	if (firstUnallocatedBlockNumber > -1) {
+		//It's possible that this should be a warning, or that its level of fatality should be adjustable (particularly in situations of data recovery).
+		NSError *_Nonnull const readingIntoTheVoidError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Attempt to read block #%u, which is unallocated; this may indicate a bug in this program, or that the volume itself was corrupt (please save a copy of it using bzip2)", @""), firstUnallocatedBlockNumber] }];
+		if (outError != NULL) {
+			*outError = readingIntoTheVoidError;
+		}
+		return nil;
+	}
+
 	off_t const offsetOfFirstAllocationBlock = L(_mdb->drAlBlSt) * kISOStandardBlockSize;
 	off_t const readStart = self.volumeStartOffset + offsetOfFirstAllocationBlock + L(hfsExt->startBlock) * L(_mdb->drAlBlkSiz);
 	ImpPrintf(@"Reading %lu bytes (%lu blocks) from source volume starting at %llu bytes (extent: [ start #%u, %u blocks ])", intoData.length, intoData.length / L(_mdb->drAlBlkSiz), readStart, L(hfsExt->startBlock), L(hfsExt->blockCount));
