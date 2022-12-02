@@ -12,19 +12,13 @@
 
 #import "ImpByteOrder.h"
 #import "ImpSizeUtilities.h"
+#import "ImpErrorUtilities.h"
 #import "ImpHFSVolume.h"
 #import "ImpHFSPlusVolume.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeHeaderNode.h"
 #import "ImpBTreeIndexNode.h"
 #import "ImpExtentSeries.h"
-
-static char const *_Nullable const ImpExplainOSStatus(OSStatus const err) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-	return GetMacOSStatusCommentString(err);
-#pragma clang diagnostic pop
-}
 
 @implementation ImpHFSToHFSPlusConverter
 {
