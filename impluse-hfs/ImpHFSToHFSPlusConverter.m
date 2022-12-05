@@ -332,9 +332,9 @@
 	__block NSUInteger numNodes = 0;
 	__block NSUInteger numFiles = 0, numFolders = 0, numThreads = 0;
 	NSMutableSet *_Nonnull const nodesPreviouslyEncountered = [NSMutableSet setWithCapacity:headerNode.numberOfTotalNodes];
-	[catalog walkBreadthFirst:^(ImpBTreeNode *const  _Nonnull node) {
+	[catalog walkBreadthFirst:^bool(ImpBTreeNode *const  _Nonnull node) {
 		if ([nodesPreviouslyEncountered containsObject:@(node.nodeNumber)]) {
-			return;
+			return true;
 		}
 		ImpPrintf(@"Walk encountered node: %@", node);
 		[nodesPreviouslyEncountered addObject:@(node.nodeNumber)];
@@ -353,6 +353,7 @@
 				++numThreads;
 			}];
 		}
+		return true;
 	}];
 	ImpPrintf(@"Encountered %lu nodes", numNodes);
 	ImpPrintf(@"Encountered %lu files, %lu folders, %lu threads", numFiles, numFolders, numThreads);

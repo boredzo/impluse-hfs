@@ -19,6 +19,7 @@
 		314EFFF72936D80D00CE74E9 /* ImpExtentSeries.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFF62936D80D00CE74E9 /* ImpExtentSeries.m */; };
 		31C6E9D62939CE7D000A87D8 /* ImpPrintf.m in Sources */ = {isa = PBXBuildFile; fileRef = 31C6E9D52939CE7D000A87D8 /* ImpPrintf.m */; };
 		31F719B2293A8FD90055EEA3 /* ImpErrorUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 31F719B1293A8FD90055EEA3 /* ImpErrorUtilities.m */; };
+		31F719B8293AC4230055EEA3 /* ImpTextEncodingConverter.m in Sources */ = {isa = PBXBuildFile; fileRef = 31F719B7293AC4230055EEA3 /* ImpTextEncodingConverter.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -63,6 +64,9 @@
 		31C6E9D72939CF1A000A87D8 /* Prefix.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Prefix.h; sourceTree = "<group>"; };
 		31F719B0293A8FC90055EEA3 /* ImpErrorUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpErrorUtilities.h; sourceTree = "<group>"; };
 		31F719B1293A8FD90055EEA3 /* ImpErrorUtilities.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpErrorUtilities.m; sourceTree = "<group>"; };
+		31F719B6293AC4230055EEA3 /* ImpTextEncodingConverter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpTextEncodingConverter.h; sourceTree = "<group>"; };
+		31F719B7293AC4230055EEA3 /* ImpTextEncodingConverter.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpTextEncodingConverter.m; sourceTree = "<group>"; };
+		31F719B9293AF1F40055EEA3 /* ImpForkUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpForkUtilities.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -101,10 +105,13 @@
 				314EFFDA2932CF3700CE74E9 /* main.m */,
 				314EFFF829370DF700CE74E9 /* ImpByteOrder.h */,
 				31077ACE2937C5E500066789 /* ImpSizeUtilities.h */,
+				31F719B9293AF1F40055EEA3 /* ImpForkUtilities.h */,
 				31F719B0293A8FC90055EEA3 /* ImpErrorUtilities.h */,
 				31F719B1293A8FD90055EEA3 /* ImpErrorUtilities.m */,
 				31C6E9D42939CE7D000A87D8 /* ImpPrintf.h */,
 				31C6E9D52939CE7D000A87D8 /* ImpPrintf.m */,
+				31F719B6293AC4230055EEA3 /* ImpTextEncodingConverter.h */,
+				31F719B7293AC4230055EEA3 /* ImpTextEncodingConverter.m */,
 				31077AD22939587300066789 /* NSData+ImpHexDump.h */,
 				31077AD32939587300066789 /* NSData+ImpHexDump.m */,
 				314EFFE52933160800CE74E9 /* ImpHFSVolume.h */,
@@ -189,6 +196,7 @@
 				31F719B2293A8FD90055EEA3 /* ImpErrorUtilities.m in Sources */,
 				314EFFF0293486BB00CE74E9 /* ImpBTreeNode.m in Sources */,
 				31077AD42939587400066789 /* NSData+ImpHexDump.m in Sources */,
+				31F719B8293AC4230055EEA3 /* ImpTextEncodingConverter.m in Sources */,
 				314EFFEA29332FEA00CE74E9 /* ImpHFSPlusVolume.m in Sources */,
 				314EFFF3293510CE00CE74E9 /* ImpBTreeHeaderNode.m in Sources */,
 				314EFFE72933160800CE74E9 /* ImpHFSVolume.m in Sources */,

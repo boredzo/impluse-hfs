@@ -7,6 +7,7 @@
 
 #import <Foundation/Foundation.h>
 
+#import "ImpForkUtilities.h"
 #import "ImpBTreeNode.h"
 #import "ImpBTreeHeaderNode.h"
 
@@ -24,6 +25,24 @@
 - (NSUInteger)countByEnumeratingWithState:(NSFastEnumerationState *_Nonnull)state objects:(__unsafe_unretained id  _Nullable [_Nonnull])outObjects count:(NSUInteger)maxNumObjects;
 
 ///Starting from the root node, call the block for every node in the tree, in breadth-first order. Note that the header node is not included in this walk.
-- (NSUInteger) walkBreadthFirst:(void (^_Nonnull const)(ImpBTreeNode *_Nonnull const node))block;
+- (NSUInteger) walkBreadthFirst:(bool (^_Nonnull const)(ImpBTreeNode *_Nonnull const node))block;
+
+///Search the catalog tree for the file or folder record that defines the item with this CNID. Returns by reference the catalog key and file or folder record and returns true, or returns false without touching the pointers if no matching record is found.
+- (bool) searchCatalogTreeForItemWithParentID:(HFSCatalogNodeID)cnid
+	name:(ConstStr31Param _Nonnull)nodeName
+	getRecordKeyData:(NSData *_Nullable *_Nullable const)outRecordKeyData
+	threadRecordData:(NSData *_Nullable *_Nullable const)outThreadRecordData;
+
+///Search the catalog tree for the file or folder record that defines the item with this CNID. Returns by reference the catalog key and file or folder record and returns true, or returns false without touching the pointers if no matching record is found.
+- (bool) searchCatalogTreeForItemWithParentID:(HFSCatalogNodeID)cnid
+	name:(ConstStr31Param _Nonnull)nodeName
+	getRecordKeyData:(NSData *_Nullable *_Nullable const)outRecordKeyData
+	fileOrFolderRecordData:(NSData *_Nullable *_Nullable const)outItemRecordData;
+
+///Search for nodes matching a catalog ID, and call the block with every record under its leaf nodes, in order. Return the number of records encountered. Undefined if called on a B*-tree that isn't an extents overflow tree.
+- (NSUInteger) searchExtentsOverflowTreeForCatalogNodeID:(HFSCatalogNodeID)cnid
+	fork:(ImpForkType)forkType
+	firstExtentStart:(u_int32_t)startBlock
+	forEachRecord:(bool (^_Nonnull const)(NSData *_Nonnull const recordData))block;
 
 @end
