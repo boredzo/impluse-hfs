@@ -299,6 +299,7 @@
 }
 
 - (NSString *_Nonnull) volumeName {
+	//TODO: Use ImpTextEncodingConverter and connect this to any user-facing configuration options for HFS text encoding.
 	return CFAutorelease(CFStringCreateWithPascalStringNoCopy(kCFAllocatorDefault, _mdb->drVN, kCFStringEncodingMacRoman, kCFAllocatorNull));
 }
 - (NSUInteger) numberOfBytesPerBlock {
