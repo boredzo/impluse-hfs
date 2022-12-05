@@ -24,6 +24,12 @@
 	CFBitVectorRef _bitVector;
 }
 
+- (void) dealloc {
+	if (_bitVector != NULL) {
+		CFRelease(_bitVector);
+	}
+}
+
 - (bool) readBootBlocksFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
 	_bootBlocksData = [NSMutableData dataWithLength:kISOStandardBlockSize * 2];
 	ssize_t const amtRead = read(readFD, _bootBlocksData.mutableBytes, _bootBlocksData.length);
@@ -147,7 +153,7 @@
 	ImpPrintf(@"Checking whether extent starting at %u is allocated before reading:", L(hfsExt->startBlock));
 	int32_t firstUnallocatedBlockNumber = -1;
 	for (u_int16_t i = 0; i < L(hfsExt->blockCount); ++i) {
-		ImpPrintf(@"- #%u: %@", L(hfsExt->startBlock) + i, CFBitVectorGetBitAtIndex(_bitVector, L(hfsExt->startBlock) + i) ? @"YES" : @"NO!");
+//		ImpPrintf(@"- #%u: %@", L(hfsExt->startBlock) + i, CFBitVectorGetBitAtIndex(_bitVector, L(hfsExt->startBlock) + i) ? @"YES" : @"NO!");
 		if (! CFBitVectorGetBitAtIndex(_bitVector, L(hfsExt->startBlock) + i)) {
 			firstUnallocatedBlockNumber = L(hfsExt->startBlock) + i;
 		}
