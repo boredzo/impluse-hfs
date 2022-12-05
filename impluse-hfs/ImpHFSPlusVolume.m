@@ -25,6 +25,7 @@ enum { kISOStandardBlockSize = 512 };
 - (instancetype)init {
 	if ((self = [super init])) {
 		_bootBlocks = [NSMutableData dataWithLength:1024];
+		//TODO: What? No. Volume header comes after boot blocks. This should be an entirely separate NSMutableData.
 		_volumeHeader = [_bootBlocks subdataWithRange:(NSRange){ 0, 512 }];
 	}
 	return self;
