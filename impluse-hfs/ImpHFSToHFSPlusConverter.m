@@ -278,53 +278,7 @@
 	ImpBTreeNode *_Nonnull const firstNode = [catalog nodeAtIndex:0];
 	NSAssert(firstNode != nil, @"Empty catalog file! %@", catalog);
 	NSAssert(firstNode.nodeType == kBTHeaderNode, @"First node in catalog must be a header node, but it was actually a %@", firstNode.nodeTypeName);
-#if 0
-	//This is interesting and all, but peeks at a bunch of nodes that may not be in the tree and, as such, may or may not have data that makes any sense at all. (Particularly if it was born of a malloc or NewPtr at some point but never actually filled in or even zeroed.)
-	NSUInteger count = 0;
-	NSUInteger numLeaves = 0, numIndexen = 0, numMaps = 0, numHeaders = 0, numWeirdoes = 0;
-	for (ImpBTreeNode *_Nonnull const node in catalog) {
-		++count;
-		if (node.nodeType == kBTLeafNode) {
-			printf("Leaf node has %u records\n", node.numberOfRecords);
-			[node forEachCatalogRecord_file:^(struct HFSCatalogFile const *_Nonnull const fileRecordPtr) {
-				union typeStringifier {
-					char str[5];
-					FourCharCode fcc;
-				};
-				union typeStringifier fileType = { .fcc = L(fileRecordPtr->userInfo.fdType) };
-				union typeStringifier creator = { .fcc = L(fileRecordPtr->userInfo.fdCreator) };
-				printf("\tFound file ID #%u with type %s and creator %s\n",
-					L(fileRecordPtr->fileID),
-					fileType.str,
-					creator.str);
-			}
-			folder:^(struct HFSCatalogFolder const *_Nonnull const folderRecordPtr) {
-				printf("\tFound folder ID #%u containing an estimated %u items\n",
-					L(folderRecordPtr->folderID),
-					L(folderRecordPtr->valence));
-			}
-			thread:^(struct HFSCatalogThread const *_Nonnull const threadRecordPtr) {
-				printf("\t%s ID #%u is named %s",
-					L(threadRecordPtr->recordType) == kHFSFileThreadRecord ? "file" : "folder",
-					L(threadRecordPtr->parentID),
-					((__bridge_transfer NSString *)CFStringCreateWithPascalStringNoCopy(kCFAllocatorDefault, threadRecordPtr->nodeName, kCFStringEncodingMacRoman, kCFAllocatorNull)).UTF8String
-				);
-			}];
-			++numLeaves;
-		} else if (node.nodeType == kBTMapNode) {
-			++numMaps;
-		} else if (node.nodeType == kBTIndexNode) {
-			++numIndexen;
-		} else if (node.nodeType == kBTHeaderNode) {
-			ImpBTreeHeaderNode *_Nonnull const headerNode = (ImpBTreeHeaderNode *_Nonnull const)node;
-			printf("Header node portends %u total nodes, of which %u are free (= %u used)\n", headerNode.numberOfTotalNodes, headerNode.numberOfFreeNodes, headerNode.numberOfTotalNodes - headerNode.numberOfFreeNodes);
-			++numHeaders;
-		} else {
-			++numWeirdoes;
-		}
- 	}
-	printf("Saw %lu nodes: %lu header nodes, %lu map nodes, %lu index nodes, %lu leaf nodes, and %lu oddballs\n", count, numHeaders, numMaps, numIndexen, numLeaves, numWeirdoes);
-#endif
+
 	ImpBTreeHeaderNode *_Nonnull const headerNode = (ImpBTreeHeaderNode *_Nonnull const)firstNode;
 	printf("Header node portends %u total nodes, of which %u are free (= %u used)\n", headerNode.numberOfTotalNodes, headerNode.numberOfFreeNodes, headerNode.numberOfTotalNodes - headerNode.numberOfFreeNodes);
 	ImpBTreeNode *_Nonnull const rootNode = headerNode.rootNode;
