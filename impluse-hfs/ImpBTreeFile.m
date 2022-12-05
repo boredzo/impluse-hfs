@@ -9,6 +9,7 @@
 
 #import <hfs/hfs_format.h>
 #import "ImpByteOrder.h"
+#import "NSData+ImpSubdata.h"
 #import "ImpBTreeHeaderNode.h"
 #import "ImpBTreeIndexNode.h"
 #import "ImpTextEncodingConverter.h"
@@ -77,7 +78,7 @@
 
 	//TODO: Create all of these once, probably up front, and keep them in an array. Turn this into objectAtIndex: and the fast enumeration into fast enumeration of that array.
 	NSRange const nodeByteRange = { sizeof(struct BTreeNode) * idx, sizeof(struct BTreeNode) };
-	NSData *_Nonnull const nodeData = [_bTreeData subdataWithRange:nodeByteRange];
+	NSData *_Nonnull const nodeData = [_bTreeData dangerouslyFastSubdataWithRange_Imp:nodeByteRange];
 
 	ImpBTreeNode *_Nonnull const node = [ImpBTreeNode nodeWithTree:self data:nodeData];
 	node.nodeNumber = idx;

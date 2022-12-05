@@ -9,6 +9,7 @@
 
 #import "ImpByteOrder.h"
 #import "ImpSizeUtilities.h"
+#import "NSData+ImpSubdata.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeHeaderNode.h"
 #import "ImpBTreeIndexNode.h"
@@ -234,7 +235,7 @@ typedef u_int16_t BTreeNodeOffset;
 
 	NSUInteger const length = nextRecordOffset - thisRecordOffset;
 	NSRange const recordRange = { thisRecordOffset, length };
-	NSData *_Nonnull const recordData = [_nodeData subdataWithRange:recordRange];
+	NSData *_Nonnull const recordData = [_nodeData dangerouslyFastSubdataWithRange_Imp:recordRange];
 //	ImpPrintf(@"Record at index %u starts at offset %lu, length %lu: <\n%@>", idx, (unsigned long)thisRecordOffset, length, recordData.hexDump_Imp);
 	return recordData;
 }
@@ -249,7 +250,7 @@ typedef u_int16_t BTreeNodeOffset;
 	u_int8_t const *_Nonnull const keyLengthPtr = wholeRecordData.bytes;
 	u_int8_t keyLength = *keyLengthPtr;
 	keyLength += sizeof(u_int8_t);
-	return [wholeRecordData subdataWithRange:(NSRange){ 0, keyLength }];
+	return [wholeRecordData dangerouslyFastSubdataWithRange_Imp:(NSRange){ 0, keyLength }];
 }
 
 - (NSData *_Nullable) recordPayloadDataAtIndex:(u_int16_t)idx {
@@ -274,7 +275,7 @@ typedef u_int16_t BTreeNodeOffset;
 		--payloadRange.length;
 	}
 
-	return [wholeRecordData subdataWithRange:payloadRange];
+	return [wholeRecordData dangerouslyFastSubdataWithRange_Imp:payloadRange];
 }
 
 - (NSUInteger) forEachRecord:(bool (^_Nonnull const)(NSData *_Nonnull const data))block {

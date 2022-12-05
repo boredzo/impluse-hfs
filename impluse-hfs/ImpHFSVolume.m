@@ -9,6 +9,7 @@
 
 #import "ImpByteOrder.h"
 #import "ImpSizeUtilities.h"
+#import "NSData+ImpSubdata.h"
 #import "ImpExtentSeries.h"
 #import "ImpBTreeFile.h"
 
@@ -171,10 +172,14 @@
 		}
 		return nil;
 	}
-	@autoreleasepool {
-		NSData *_Nonnull const excerpt = [intoData subdataWithRange:(NSRange){ offset, intoData.length - offset }];
+
+	[intoData withRange:(NSRange){ offset, intoData.length - offset }
+		showSubdataToBlock_Imp:^(const void * _Nonnull bytes, NSUInteger length)
+	{
+		NSData *_Nonnull const excerpt = [[NSData alloc] initWithBytesNoCopy:(void *)bytes length:length freeWhenDone:false];
 		[excerpt writeToURL:[[NSURL fileURLWithPath:@"/tmp" isDirectory:true] URLByAppendingPathComponent:[NSString stringWithFormat:@"hfs+%llu.dat", readStart] isDirectory:false] options:0 error:NULL];
-	}
+	}];
+
 	return intoData;
 }
 
@@ -233,7 +238,7 @@
 			successfullyReadAllNonEmptyExtents = (success0 != NULL) && (success1 != NULL) && (success2 != NULL);
 		}
 	}
-	return successfullyReadAllNonEmptyExtents ? success0 : nil;
+	return successfullyReadAllNonEmptyExtents ? [success0 copy] : nil;
 }
 
 - (bool) checkExtentRecord:(HFSExtentRecord const *_Nonnull const)hfsExtRec {
