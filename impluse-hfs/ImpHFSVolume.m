@@ -123,7 +123,7 @@
 - (bool)readExtentsOverflowFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
 	//IM:F says:
 	//>All the areas on a volume are of fixed size and location, except for the catalog file and the extents overflow file. These two files can appear anywhere between the volume bitmap and the alternate master directory block (MDB). They can appear in any order and are not necessarily contiguous.
-	//So we essentially have to treat the cat file as a file.
+	//So we essentially have to treat the extents overflow file as a file.
 
 	struct HFSExtentDescriptor const *_Nonnull const eoExtDescs = _mdb->drXTExtRec;
 	NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
