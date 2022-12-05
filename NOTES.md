@@ -110,6 +110,14 @@ Thread records relate a file or folder to its parent, and also give the file or 
 
 TN1150 notes that HFS does not require a file to have a thread record, but HFS+ does.
 
+## The myth of the “catalog node ID”
+
+IM:F, TN1150, and hfs_format.h all call the item numbers borne by every file and folder in the catalog “catalog node IDs” or CNIDs. This unfortunately overloads the term “node”, also used in the context of pages in a B*-tree—particularly unfortunate given that the catalog *is* a B*-tree.
+
+CNIDs are not B*-tree node numbers. They are item numbers, orthogonal to the numbering of B*-tree nodes from the logical start of the B*-tree file. (Node 0 is the header node, node 1 is at least traditionally the root node, and all else is anarchy.)
+
+Really, they ought to be called “Catalog Item Numbers” or something. Something that doesn't use the word “node”.
+
 ## Growing the catalog file
 
 Catalog records are larger on HFS+ than on HFS:
