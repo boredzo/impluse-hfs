@@ -32,6 +32,7 @@
 - (void) getVolumeHeader:(void *_Nonnull const)outMDB;
 - (NSData *_Nonnull)volumeBitmap;
 @property(strong) ImpBTreeFile *_Nonnull catalogBTree;
+@property(strong) ImpBTreeFile *_Nonnull extentsOverflowBTree;
 
 - (NSString *_Nonnull) volumeName;
 - (NSUInteger) numberOfBytesPerBlock;
@@ -49,5 +50,12 @@
 	error:(NSError *_Nullable *_Nonnull const)outError;
 
 - (bool) checkExtentRecord:(HFSExtentRecord const *_Nonnull const)hfsExtRec;
+
+- (u_int64_t) forEachExtentInFileWithID:(HFSCatalogNodeID)cnid
+	fork:(ImpForkType)forkType
+	forkLogicalLength:(u_int64_t const)forkLength
+	startingWithExtentsRecord:(struct HFSExtentDescriptor const *_Nonnull const)hfsExtRec
+	readDataOrReturnError:(NSError *_Nullable *_Nonnull const)outError
+	block:(bool (^_Nonnull const)(NSData *_Nonnull const fileData, u_int64_t const logicalLength))block;
 
 @end
