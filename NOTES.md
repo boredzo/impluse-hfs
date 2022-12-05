@@ -242,3 +242,158 @@ The primary purpose of this tool is to convert HFS volumes to HFS+, but there ar
 - `downgrade hfsplusvol hfsvol`: Of course, once we can create HFS volumes, that's 50% of the way to being able to go the opposite direction from the one we started in. We would have to be able to parse HFS+ (structurally similar to parsing HFS), and handle the various data-loss cases, and consolidate the allocations file down to one contiguous VBM. And, of course, there's the question of how useful it is to do that, versus mounting the HFS+ disk image and then using `archive`. Maybe if HFS+ ever gets dropped in some future, APFS-only macOS.
 
 Also, not a subcommand, but it would probably be helpful to at least be able to pierce through Apple Partition Maps, if not necessarily understand them properly or deal with multiple partitions. Many whole-disk images start with an APM. Rather than make the user strip that off/extract the HFS partition, it'd be much more convenient for this tool to do that automatically. (A brute-force method would be to flip through the file 512 bytes at a time until the 'BD' signature word is encountered, then back off by 1 KiB.)
+
+## Navigating the catalog B*-tree in the debugger
+
+ImpBTreeNode has an 'inventory' method that prints out the node's keyed records, which is *very* handy for navigating the catalog manually. Here's a sample session, building the path to the “JM Turbo™” executable on the Journeyman Project Turbo! CD:
+
+```
+-- Looking for parent #44 name “JMP Turbo™”
+
+(lldb) po rootNode.inventory
+<__NSArrayM 0x1012169d0>(
+Catalog key [parent ID #1, node name “Journeyman Turbo™”]: Pointer to node #127,
+Catalog key [parent ID #155, node name “Mars Robot Down Kill.QT”]: Pointer to node #15
+)
+
+127
+
+(lldb) po [self nodeAtIndex:127].inventory
+<__NSArrayM 0x101123c90>(
+Catalog key [parent ID #1, node name “Journeyman Turbo™”]: Pointer to node #146,
+Catalog key [parent ID #26, node name “”]: Pointer to node #14,
+Catalog key [parent ID #47, node name “”]: Pointer to node #27,
+Catalog key [parent ID #75, node name “JMP type w/ mark .PRINT1”]: Pointer to node #51,
+Catalog key [parent ID #91, node name “Sepiatone”]: Pointer to node #126,
+Catalog key [parent ID #95, node name “Dr Shoots You.QT”]: Pointer to node #39,
+Catalog key [parent ID #113, node name “Space Sounds AIFF”]: Pointer to node #58
+)
+
+14
+
+(lldb) po [self nodeAtIndex:14].inventory
+<__NSArrayM 0x101216cd0>(
+Catalog key [parent ID #26, node name “”]: Pointer to node #7,
+Catalog key [parent ID #26, node name “Journeyman Looping Demo”]: Pointer to node #8,
+Catalog key [parent ID #26, node name “Pteradactyl fly.QT”]: Pointer to node #9,
+Catalog key [parent ID #36, node name “”]: Pointer to node #10,
+Catalog key [parent ID #36, node name “Notes for Extensions Mgr 2.0.1”]: Pointer to node #11,
+Catalog key [parent ID #36, node name “Sound Manager Read Me”]: Pointer to node #13
+)
+(lldb) po [self nodeAtIndex:14].nextNode.inventory
+<__NSArrayM 0x10103a480>(
+Catalog key [parent ID #47, node name “”]: Pointer to node #24,
+Catalog key [parent ID #47, node name “Journeyman Promo Images”]: Pointer to node #16,
+Catalog key [parent ID #49, node name “After Pre”]: Pointer to node #17,
+Catalog key [parent ID #49, node name “Icon
+”]: Pointer to node #18,
+Catalog key [parent ID #49, node name “Mars Lower after robot”]: Pointer to node #19,
+Catalog key [parent ID #49, node name “Norad after silo game”]: Pointer to node #20,
+Catalog key [parent ID #49, node name “Prehistoric”]: Pointer to node #21,
+Catalog key [parent ID #49, node name “TSA After RR”]: Pointer to node #22,
+Catalog key [parent ID #49, node name “TSA Main after Prehistoric”]: Pointer to node #23,
+Catalog key [parent ID #49, node name “WSC begin”]: Pointer to node #25,
+Catalog key [parent ID #75, node name “Icon
+”]: Pointer to node #26
+)
+
+13
+
+(lldb) po [self nodeAtIndex:13].inventory
+<__NSArrayM 0x10103bf60>(
+Catalog key [parent ID #36, node name “Sound Manager Read Me”]: 📄 [ID #43, type 'ttro', creator 'ttxt'],
+Catalog key [parent ID #44, node name “”]: 🧵 📁 [parent ID #2, name “Please Copy to Hard Drive”],
+Catalog key [parent ID #44, node name “Icon
+”]: 📄 [ID #45, type '', creator ''],
+Catalog key [parent ID #44, node name “JMP Turbo™”]: 📄 [ID #46, type 'APPL', creator 'PJ93']
+)
+
+Found thread record:
+Catalog key [parent ID #44, node name “”]: 🧵 📁 [parent ID #2, name “Please Copy to Hard Drive”],
+
+Found file record:
+Catalog key [parent ID #44, node name “JMP Turbo™”]: 📄 [ID #46, type 'APPL', creator 'PJ93']
+```
+
+### OBSERVATIONS
+- Conjecture: The thread record's name is always empty, which makes it always the first record with a given parent ID.
+- Because all the leaf nodes are one tier in sorted order, we can scroll backward to find the thread record.
+- Finding the thread record then gives us the parent directory's name and *its* parent directory's number.
+
+In this case, JMP Turbo™ has parent #44; the thread record for #44 says its name is “Please Copy to Hard Drive” and its parent is #2 (the root directory).
+
+```
+Looking for parent #2 name “Please Copy to Hard Drive”
+
+(lldb) po rootNode.inventory
+<__NSArrayM 0x10103e7f0>(
+Catalog key [parent ID #1, node name “Journeyman Turbo™”]: Pointer to node #127,
+Catalog key [parent ID #155, node name “Mars Robot Down Kill.QT”]: Pointer to node #15
+)
+
+127
+
+(lldb) po [self nodeAtIndex:127].inventory
+<__NSArrayM 0x101217cd0>(
+Catalog key [parent ID #1, node name “Journeyman Turbo™”]: Pointer to node #146,
+Catalog key [parent ID #26, node name “”]: Pointer to node #14,
+Catalog key [parent ID #47, node name “”]: Pointer to node #27,
+Catalog key [parent ID #75, node name “JMP type w/ mark .PRINT1”]: Pointer to node #51,
+Catalog key [parent ID #91, node name “Sepiatone”]: Pointer to node #126,
+Catalog key [parent ID #95, node name “Dr Shoots You.QT”]: Pointer to node #39,
+Catalog key [parent ID #113, node name “Space Sounds AIFF”]: Pointer to node #58
+)
+
+146
+
+(lldb) po [self nodeAtIndex:146].inventory
+<__NSArrayM 0x101126200>(
+Catalog key [parent ID #1, node name “Journeyman Turbo™”]: Pointer to node #145,
+Catalog key [parent ID #2, node name “Desktop DB”]: Pointer to node #5,
+Catalog key [parent ID #2, node name “JMP Turbo READ ME”]: Pointer to node #12,
+Catalog key [parent ID #2, node name “Please Copy to Hard Drive”]: Pointer to node #147,
+Catalog key [parent ID #2, node name “Support Files”]: Pointer to node #2,
+Catalog key [parent ID #18, node name “”]: Pointer to node #4,
+Catalog key [parent ID #18, node name “Demo Movie 05.qt CPK ms”]: Pointer to node #6
+)
+
+147
+
+(lldb) po [self nodeAtIndex:147].inventory
+<__NSArrayM 0x101040270>(
+Catalog key [parent ID #2, node name “Please Copy to Hard Drive”]: 📁 [ID #44, 2 items],
+Catalog key [parent ID #2, node name “PR Stuff”]: 📁 [ID #47, 3 items]
+)
+
+Scrolling backwards to find the thread record…
+
+(lldb) po [self nodeAtIndex:147].previousNode.inventory
+<__NSArrayM 0x1011272d0>(
+Catalog key [parent ID #2, node name “JMP Turbo READ ME”]: 📄 [ID #25, type 'TEXT', creator 'MSWD'],
+Catalog key [parent ID #2, node name “Journeyman Demo”]: 📁 [ID #26, 9 items],
+Catalog key [parent ID #2, node name “Journeyman Turbo Manual”]: 📄 [ID #422, type 'TEXT', creator '????'],
+Catalog key [parent ID #2, node name “Optional System Stuff”]: 📁 [ID #36, 7 items]
+)
+
+(lldb) po [self nodeAtIndex:147].previousNode.previousNode.inventory
+<__NSArrayM 0x1011284d0>(
+Catalog key [parent ID #2, node name “Desktop DB”]: 📄 [ID #17, type 'BTFL', creator 'DMGR'],
+Catalog key [parent ID #2, node name “Desktop DF”]: 📄 [ID #16, type 'DTFL', creator 'DMGR'],
+Catalog key [parent ID #2, node name “Desktop Folder”]: 📁 [ID #425, 0 items],
+Catalog key [parent ID #2, node name “Icon
+”]: 📄 [ID #423, type '', creator '']
+)
+
+(lldb) po [self nodeAtIndex:147].previousNode.previousNode.previousNode.inventory
+<__NSArrayM 0x10070c770>(
+Catalog key [parent ID #1, node name “Journeyman Turbo™”]: 📁 [ID #2, 15 items],
+Catalog key [parent ID #2, node name “”]: 🧵 📁 [parent ID #1, name “Journeyman Turbo™”],
+Catalog key [parent ID #2, node name “Buried in Time™ Demo”]: 📁 [ID #18, 6 items]
+)
+
+Found thread record:
+Catalog key [parent ID #2, node name “”]: 🧵 📁 [parent ID #1, name “Journeyman Turbo™”],
+```
+
+### Observations
+We don't necessarily need to look up the name of ID #2; we know it's the root directory, and HFS (unlike HFS+) encodes the volume name in the volume header.
