@@ -250,26 +250,16 @@
 
 	[self deliverProgressUpdate:0.0 operationDescription:@"Reading HFS volume structures"];
 
-	ImpHFSVolume *_Nonnull const srcVol = [ImpHFSVolume new];
-	if (! [srcVol readBootBlocksFromFileDescriptor:readFD error:outError])
+	ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD];
+	if (! [srcVol loadAndReturnError:outError])
 		return false;
-	if (! [srcVol readVolumeHeaderFromFileDescriptor:readFD error:outError])
-		return false;
+
 	struct HFSMasterDirectoryBlock mdb;
 	[srcVol getVolumeHeader:&mdb];
 	[self deliverProgressUpdate:0.01 operationDescription:[NSString stringWithFormat:@"Found HFS volume named “%@”", srcVol.volumeName]];
 	[self deliverProgressUpdate:0.01 operationDescription:[NSString stringWithFormat:@"Block size is %lu bytes; volume has %lu blocks in use, %lu free", srcVol.numberOfBytesPerBlock, srcVol.numberOfBlocksUsed, srcVol.numberOfBlocksFree]];
 	NSByteCountFormatter *_Nonnull const bcf = [NSByteCountFormatter new];
 	[self deliverProgressUpdate:0.01 operationDescription:[NSString stringWithFormat:@"Volume size is %@; %@ in use, %@ free", [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksTotal], [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksUsed], [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksFree]]];
-
-	if (! [srcVol readAllocationBitmapFromFileDescriptor:readFD error:outError])
-		return false;
-	if (! [srcVol readCatalogFileFromFileDescriptor:readFD error:outError])
-		return false;
-	if (! [srcVol readExtentsOverflowFileFromFileDescriptor:readFD error:outError])
-		;
-	if (false)
-		return false;
 
 	[self deliverProgressUpdate:0.1 operationDescription:[NSString stringWithFormat:@"Slurped catalog file: %@", srcVol.catalogBTree]];
 	fflush(stdout);

@@ -9,6 +9,7 @@
 
 #import "ImpByteOrder.h"
 #import "ImpSizeUtilities.h"
+#import "ImpForkUtilities.h"
 #import "NSData+ImpSubdata.h"
 #import "ImpExtentSeries.h"
 #import "ImpBTreeFile.h"
@@ -22,6 +23,13 @@
 	struct HFSMasterDirectoryBlock const *_mdb;
 	NSMutableData *_volumeBitmapData;
 	CFBitVectorRef _bitVector;
+}
+
+- (instancetype _Nonnull) initWithFileDescriptor:(int const)readFD {
+	if ((self = [super init])) {
+		_fileDescriptor = readFD;
+	}
+	return self;
 }
 
 - (void) dealloc {
@@ -139,6 +147,21 @@
 //	self.extentsOverflowBTree = [[ImpBTreeFile alloc] initWithData:extentsFileData];
 
 //	return (self.extentsOverflowBTree != nil);
+}
+
+- (bool)loadAndReturnError:(NSError *_Nullable *_Nonnull const)outError {
+	int const readFD = self.fileDescriptor;
+	return (
+		[self readBootBlocksFromFileDescriptor:readFD error:outError]
+		&&
+		[self readVolumeHeaderFromFileDescriptor:readFD error:outError]
+		&&
+		[self readAllocationBitmapFromFileDescriptor:readFD error:outError]
+		&&
+		[self readExtentsOverflowFileFromFileDescriptor:readFD error:outError]
+		&&
+		[self readCatalogFileFromFileDescriptor:readFD error:outError]
+	);
 }
 
 #pragma mark -
