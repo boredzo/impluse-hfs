@@ -278,10 +278,11 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	//Next, finish up the file's metadata by removing our busy markings.
 	bool wroteMetadata = false;
 
+	catInfo.nodeFlags = L(fileRec->flags);
 	catInfo.createDate.lowSeconds = L(fileRec->createDate);
 	swappedFinderInfo.fileType = L(fileRec->userInfo.fdType);
 	memcpy(catInfo.finderInfo, &swappedFinderInfo, sizeof(catInfo.finderInfo));
-	FSCatalogInfoBitmap const whichInfo2 = kFSCatInfoCreateDate | kFSCatInfoFinderInfo;
+	FSCatalogInfoBitmap const whichInfo2 = kFSCatInfoCreateDate | kFSCatInfoContentMod | kFSCatInfoFinderInfo;
 	err = FSSetCatalogInfo(&ref, whichInfo2, &catInfo);
 	if (err == noErr) {
 		wroteMetadata = true;
