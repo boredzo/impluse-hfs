@@ -165,7 +165,6 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	unsigned long long const totalForksSize = dataForkSize + rsrcForkSize;
 
 	//First thing, create the file. We can set some metadata while we're at it, so do that.
-	bool const isLocked = L(fileRec->flags) & kHFSFileLockedMask;
 	struct FileInfo const *_Nonnull const sourceFinderInfo = (struct FileInfo const *_Nonnull const)&(fileRec->userInfo);
 	struct FileInfo swappedFinderInfo = {
 		.fileType = kFirstMagicBusyFiletype,//L(sourceFinderInfo->fileType),
