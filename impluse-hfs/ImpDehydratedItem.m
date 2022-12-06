@@ -122,7 +122,6 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 			[path insertObject:name atIndex:0];
 			nextParentID = L(threadPtr->parentID);
 		}
-		NSLog(@"Catalog searches complete. Item path is: %@", [path componentsJoinedByString:@":"]);
 
 		_cachedPath = path;
 	}
