@@ -166,54 +166,6 @@
 	return [self _walkNodeAndItsSiblingsAndThenItsChildren:rootNode keepIterating:NULL block:block];
 }
 
-#if 0
-- (bool) SLOW_searchCatalogTreeForCatalogNodeID:(HFSCatalogNodeID)cnid
-	getRecordKeyData:(NSData *_Nullable *_Nullable const)outRecordKeyData
-	fileOrFolderRecordData:(NSData *_Nullable *_Nullable const)outItemRecordData
-{
-	__block bool found = false;
-
-	bool const shouldReturnKey = outRecordKeyData != NULL;
-	bool const shouldReturnItemRecord = outItemRecordData != NULL;
-
-	[self walkBreadthFirst:^(ImpBTreeNode *_Nonnull const node) {
-		if (found) return;
-		if (node.nodeType == kBTLeafNode) {
-			__block NSUInteger i = 0;
-			[node forEachRecord:^bool(NSData *_Nonnull const recordData) {
-				void const *_Nonnull const recordPtr = recordData.bytes;
-				struct HFSCatalogKey const *_Nonnull const keyPtr = recordPtr;
-				ptrdiff_t const keyLength = sizeof(keyPtr->keyLength) + L(keyPtr->keyLength);
-				//TODO: We need the same pad-byte-skipping logic here as we have in the other place. (Or we need to consolidate both implementations into one.)
-
-				struct HFSCatalogFile const *_Nonnull const fileRec = recordPtr + keyLength;
-				struct HFSCatalogFolder const *_Nonnull const folderRec = recordPtr + keyLength;
-				if ((L(fileRec->recordType) & 0xff00) == kHFSFileRecord) {
-					if (L(fileRec->fileID) == cnid) {
-						found = true;
-						if (shouldReturnKey) *outRecordKeyData = [recordData subdataWithRange:(NSRange){ 0, keyLength }];
-						if (shouldReturnItemRecord) *outItemRecordData = [recordData subdataWithRange:(NSRange){ keyLength, recordData.length - keyLength }];
-						return false;
-					}
-				} else if ((L(folderRec->recordType) & 0xff00) == kHFSFolderRecord) {
-					if (L(folderRec->folderID) == cnid) {
-						found = true;
-						if (shouldReturnKey) *outRecordKeyData = [recordData subdataWithRange:(NSRange){ 0, keyLength }];
-						if (shouldReturnItemRecord) *outItemRecordData = [recordData subdataWithRange:(NSRange){ keyLength, recordData.length - keyLength }];
-						return false;
-					}
-				}
-
-				++i;
-				return true;
-			}];
-		}
-	}];
-
-	return found;
-}
-#endif //0
-
 - (bool) searchTreeForItemWithKeyComparator:(ImpBTreeRecordKeyComparator _Nonnull const)compareKeys
 	getNode:(ImpBTreeNode *_Nullable *_Nullable const)outNode
 	recordIndex:(u_int16_t *_Nullable const)outRecordIdx
