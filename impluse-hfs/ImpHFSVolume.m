@@ -122,7 +122,7 @@
 	ImpPrintf(@"Catalog extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[1].blockCount))]);
 	ImpPrintf(@"Catalog extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[2].blockCount))]);
 
-	NSData *_Nullable const catalogFileData = [self readDataFromFileDescriptor:readFD extents:_mdb->drCTExtRec error:outError];
+	NSData *_Nullable const catalogFileData = [self readDataFromFileDescriptor:readFD extents:_mdb->drCTExtRec numExtents:kHFSExtentDensity error:outError];
 	self.catalogBTree = [[ImpBTreeFile alloc] initWithData:catalogFileData];
 
 	return (self.catalogBTree != nil);
@@ -141,7 +141,7 @@
 	ImpPrintf(@"Extents overflow extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[1].blockCount))]);
 	ImpPrintf(@"Extents overflow extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[2].blockCount))]);
 
-	NSData *_Nullable const extentsFileData = [self readDataFromFileDescriptor:readFD extents:_mdb->drXTExtRec error:outError];
+	NSData *_Nullable const extentsFileData = [self readDataFromFileDescriptor:readFD extents:_mdb->drXTExtRec numExtents:kHFSExtentDensity error:outError];
 	ImpPrintf(@"Extents file data: %lu bytes", extentsFileData.length);
 
 	self.extentsOverflowBTree = [[ImpBTreeFile alloc] initWithData:extentsFileData];
@@ -167,13 +167,13 @@
 #pragma mark -
 
 ///Returns intoData on success; nil on failure. The copy's destination starts offset bytes into the data.
-- (NSData *_Nullable) readData:(NSMutableData *_Nonnull const)intoData
+- (bool) readIntoData:(NSMutableData *_Nonnull const)intoData
 	atOffset:(NSUInteger)offset
 	fromFileDescriptor:(int const)readFD
 	extent:(struct HFSExtentDescriptor const *_Nonnull const)hfsExt
+	actualAmountRead:(u_int64_t *_Nonnull const)outAmtRead
 	error:(NSError *_Nullable *_Nonnull const)outError
 {
-	ImpPrintf(@"Checking whether extent starting at %u is allocated before reading:", L(hfsExt->startBlock));
 	int32_t firstUnallocatedBlockNumber = -1;
 	for (u_int16_t i = 0; i < L(hfsExt->blockCount); ++i) {
 //		ImpPrintf(@"- #%u: %@", L(hfsExt->startBlock) + i, CFBitVectorGetBitAtIndex(_bitVector, L(hfsExt->startBlock) + i) ? @"YES" : @"NO!");
@@ -181,13 +181,14 @@
 			firstUnallocatedBlockNumber = L(hfsExt->startBlock) + i;
 		}
 	}
+	ImpPrintf(@"Extent starting at %u is fully allocated before reading: %@", L(hfsExt->startBlock), (firstUnallocatedBlockNumber < 0) ? @"YES" : @"NO");
 	if (firstUnallocatedBlockNumber > -1) {
 		//It's possible that this should be a warning, or that its level of fatality should be adjustable (particularly in situations of data recovery).
 		NSError *_Nonnull const readingIntoTheVoidError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Attempt to read block #%u, which is unallocated; this may indicate a bug in this program, or that the volume itself was corrupt (please save a copy of it using bzip2)", @""), firstUnallocatedBlockNumber] }];
 		if (outError != NULL) {
 			*outError = readingIntoTheVoidError;
 		}
-		return nil;
+		return false;
 	}
 
 	off_t const offsetOfFirstAllocationBlock = L(_mdb->drAlBlSt) * kISOStandardBlockSize;
@@ -199,7 +200,7 @@
 		if (outError != NULL) {
 			*outError = readFailedError;
 		}
-		return nil;
+		return false;
 	}
 
 	[intoData withRange:(NSRange){ offset, intoData.length - offset }
@@ -209,65 +210,47 @@
 		[excerpt writeToURL:[[NSURL fileURLWithPath:@"/tmp" isDirectory:true] URLByAppendingPathComponent:[NSString stringWithFormat:@"hfs+%llu.dat", readStart] isDirectory:false] options:0 error:NULL];
 	}];
 
-	return intoData;
+	return true;
 }
 
-- (NSData *_Nullable) readDataFromFileDescriptor:(int const)readFD
-	extent:(struct HFSExtentDescriptor const *_Nonnull const)hfsExt
-	error:(NSError *_Nullable *_Nonnull const)outError
-{
-	NSUInteger const len = L(hfsExt->blockCount) * L(_mdb->drAlBlkSiz);
-	NSMutableData *_Nonnull const data = [NSMutableData dataWithLength:len];
-	return [self readData:data
-		atOffset:0
-		fromFileDescriptor:readFD
-		extent:hfsExt
-		error:outError];
-}
 
 - (NSData *_Nullable) readDataFromFileDescriptor:(int const)readFD
-	extents:(struct HFSExtentDescriptor const *_Nonnull const)hfsExtRec
+	extents:(struct HFSExtentDescriptor const *_Nonnull const)extents
+	numExtents:(NSUInteger const)numExtents
 	error:(NSError *_Nullable *_Nonnull const)outError
 {
 	NSUInteger const blockSize = L(_mdb->drAlBlkSiz);
-	struct HFSExtentDescriptor const *_Nonnull hfsExt = (struct HFSExtentDescriptor const *_Nonnull)hfsExtRec;
-	NSMutableData *_Nonnull const data = [NSMutableData dataWithLength:blockSize * L(hfsExt->blockCount)];
-	ImpPrintf(@"Reading first extent with offset %lu", 0UL);
+	bool successfullyReadAllNonEmptyExtents = true;
+
 	NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
 	fmtr.numberStyle = NSNumberFormatterDecimalStyle;
 	fmtr.hasThousandSeparators = true;
-	ImpPrintf(@"Reading extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(hfsExt->startBlock))], [fmtr stringFromNumber:@(L(hfsExt->blockCount))]);
-	NSData *_Nullable const success0 = [self readData:data
-		atOffset:0
-		fromFileDescriptor:readFD
-		extent:hfsExt
-		error:outError];
-	bool successfullyReadAllNonEmptyExtents = (success0 != NULL);
-	if (success0 != NULL && L((++hfsExt)->blockCount) > 0) {
-		NSUInteger offset = data.length;
-		ImpPrintf(@"Reading second extent with offset %lu", offset);
-		ImpPrintf(@"Reading extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(hfsExt->startBlock))], [fmtr stringFromNumber:@(L(hfsExt->blockCount))]);
-		[data increaseLengthBy:blockSize * L(hfsExt->blockCount)];
-		NSData *_Nullable const success1 = [self readData:data
-			atOffset:offset
-			fromFileDescriptor:readFD
-			extent:hfsExt
-			error:outError];
-		successfullyReadAllNonEmptyExtents = (success0 != NULL) && (success1 != NULL);
-		if (success1 != NULL && L((++hfsExt)->blockCount) > 0) {
-			offset = data.length;
-			ImpPrintf(@"Reading third extent with offset %lu", offset);
-			ImpPrintf(@"Reading extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(hfsExt->startBlock))], [fmtr stringFromNumber:@(L(hfsExt->blockCount))]);
-			[data increaseLengthBy:blockSize * L(hfsExt->blockCount)];
-			NSData *_Nullable const success2 = [self readData:data
-				atOffset:offset
-				fromFileDescriptor:readFD
-				extent:hfsExt
-				error:outError];
-			successfullyReadAllNonEmptyExtents = (success0 != NULL) && (success1 != NULL) && (success2 != NULL);
+
+	u_int64_t totalAmtRead = 0;
+
+	NSMutableData *_Nonnull const data = [NSMutableData data];
+	for (NSUInteger i = 0; i < numExtents; ++i) {
+		if (extents[i].blockCount == 0) {
+			break;
 		}
+
+		[data increaseLengthBy:blockSize * L(extents[i].blockCount)];
+
+		ImpPrintf(@"Reading extent #%lu: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(extents[i].startBlock))], [fmtr stringFromNumber:@(L(extents[i].blockCount))]);
+		//Note: Should never return zero because we already bailed out if blockCount is zero.
+		u_int64_t amtRead = 0;
+		bool const success = [self readIntoData:data
+			atOffset:0
+			fromFileDescriptor:readFD
+			extent:&extents[i]
+			actualAmountRead:&amtRead
+			error:outError];
+
+		totalAmtRead += amtRead;
+		successfullyReadAllNonEmptyExtents = successfullyReadAllNonEmptyExtents && success;
 	}
-	return successfullyReadAllNonEmptyExtents ? [success0 copy] : nil;
+
+	return successfullyReadAllNonEmptyExtents ? [data copy] : nil;
 }
 
 - (bool) checkExtentRecord:(HFSExtentRecord const *_Nonnull const)hfsExtRec {
@@ -341,74 +324,88 @@
 - (u_int64_t) forEachExtentInFileWithID:(HFSCatalogNodeID)cnid
 	fork:(ImpForkType)forkType
 	forkLogicalLength:(u_int64_t const)forkLength
+	startingWithExtentsRecord:(struct HFSExtentDescriptor const *_Nonnull const)initialExtRec
+	block:(u_int64_t (^_Nonnull const)(struct HFSExtentDescriptor const *_Nonnull const oneExtent, u_int64_t logicalBytesRemaining))block
+{
+	__block bool keepIterating = true;
+	__block u_int64_t logicalBytesRemaining = forkLength;
+	void (^_Nonnull const processOneExtentRecord)(struct HFSExtentDescriptor const *_Nonnull const hfsExtRec, NSUInteger const numExtents) = ^(struct HFSExtentDescriptor const *_Nonnull const hfsExtRec, NSUInteger const numExtents) {
+		for (NSUInteger i = 0; i < numExtents && keepIterating; ++i) {
+			ImpPrintf(@"Reading extent starting at block #%u, containing %u blocks", L(hfsExtRec[i].startBlock), L(hfsExtRec[i].blockCount));
+			u_int64_t const bytesConsumed = block(&hfsExtRec[i], logicalBytesRemaining);
+
+			if (bytesConsumed == 0) keepIterating = false;
+
+			if (bytesConsumed > logicalBytesRemaining) {
+				logicalBytesRemaining = 0;
+			} else {
+				logicalBytesRemaining -= bytesConsumed;
+			}
+			if (logicalBytesRemaining == 0) keepIterating = false;
+		}
+	};
+
+	//First, process the initial extents record from the catalog.
+	processOneExtentRecord(initialExtRec, kHFSExtentDensity);
+
+	//Second, if we're not done yet, consult the extents overflow B*-tree for this item.
+	if (keepIterating && logicalBytesRemaining > 0) {
+		ImpBTreeFile *_Nonnull const extentsFile = self.extentsOverflowBTree;
+		[extentsFile searchExtentsOverflowTreeForCatalogNodeID:cnid
+			fork:forkType
+			firstExtentStart:L(initialExtRec[0].startBlock)
+			forEachRecord:^bool(NSData *_Nonnull const recordData)
+		{
+			struct HFSExtentDescriptor const *_Nonnull const hfsExtRec = recordData.bytes;
+			NSUInteger const numExtentDescriptors = recordData.length / sizeof(struct HFSExtentDescriptor);
+			processOneExtentRecord(hfsExtRec, numExtentDescriptors);
+			return keepIterating;
+		}];
+	}
+
+	return forkLength - logicalBytesRemaining;
+}
+
+///For each extent in the file, call the block with the data contained in that extent and the logical length of it. The logical length will equal the physical length (block size times block count) for extents that aren't the last in the file; for the last extent, the logical length may be shorter than the physical length. For extraction, you should only use the first logicalLength bytes of the file; for conversion to HFS+, you should use the full NSData (copy the full allocation block, including unused data).
+- (u_int64_t) forEachExtentInFileWithID:(HFSCatalogNodeID)cnid
+	fork:(ImpForkType)forkType
+	forkLogicalLength:(u_int64_t const)forkLength
 	startingWithExtentsRecord:(struct HFSExtentDescriptor const *_Nonnull const)hfsExtRec
 	readDataOrReturnError:(NSError *_Nullable *_Nonnull const)outError
 	block:(bool (^_Nonnull const)(NSData *_Nonnull const forkData, u_int64_t const logicalLength))block
 {
-	__block u_int64_t totalAmountRead = 0, forkLengthRemaining = forkLength;
-	u_int64_t const blockSizeInBytes = L(_mdb->drAlBlkSiz);
-	__block bool keepReading = true;
-	bool hasReachedEnd = false;
+	__block u_int64_t totalAmountRead = 0;
+	__block bool ultimatelySucceeded = true;
+	__block NSError *_Nonnull readError = nil;
 
 	int const readFD = self.fileDescriptor;
-	for (NSUInteger i = 0; i < 3; ++i) {
-		if (L(hfsExtRec[i].blockCount) > 0) {
-			@autoreleasepool {
-				u_int64_t const physicalLength = blockSizeInBytes * L(hfsExtRec[i].blockCount);
-				u_int64_t const logicalLength = forkLengthRemaining < physicalLength
-					? forkLengthRemaining
-					: physicalLength;
+	u_int64_t const blockSize = L(_mdb->drAlBlkSiz);
+	NSMutableData *_Nonnull const data = [NSMutableData dataWithLength:blockSize * L(hfsExtRec[0].blockCount)];
+	__weak typeof(self) weakSelf = self;
 
-				NSData *_Nonnull data = [self readDataFromFileDescriptor:readFD extent:&hfsExtRec[i] error:outError];
-				if (data != nil) {
-					//If we're on the last extent, truncate this NSData to the number of bytes remaining in the file.
-					//TODO: Copy this to the extents-overflow code below. (Or, better yet, dessicate the two implementations…)
-					if (logicalLength == forkLengthRemaining) {
-						data = [data subdataWithRange:(NSRange){ 0, forkLengthRemaining }];
-					}
-
-					totalAmountRead += data.length;
-					keepReading = keepReading && block(data, logicalLength);
-					forkLengthRemaining -= logicalLength;
-				}
-			}
-			if (! keepReading) {
-				break;
-			}
+	totalAmountRead += [self forEachExtentInFileWithID:cnid
+		fork:forkType
+		forkLogicalLength:forkLength
+		startingWithExtentsRecord:hfsExtRec
+		block:^u_int64_t(const struct HFSExtentDescriptor *const  _Nonnull oneExtent, u_int64_t logicalBytesRemaining)
+	{
+		ImpPrintf(@"Reading extent starting at #%u for %u blocks; %llu bytes remain…", L(oneExtent->startBlock), L(oneExtent->blockCount), logicalBytesRemaining);
+		u_int64_t const physicalLength = blockSize * L(oneExtent->blockCount);
+		u_int64_t const logicalLength = logicalBytesRemaining < physicalLength ? logicalBytesRemaining : physicalLength;
+		u_int64_t amtRead = 0;
+		[data setLength:logicalLength];
+		bool const success = [weakSelf readIntoData:data atOffset:0 fromFileDescriptor:readFD extent:oneExtent actualAmountRead:&amtRead error:&readError];
+		if (success) {
+			bool const successfullyDelivered = block(data, MAX(amtRead, logicalBytesRemaining));
+			return successfullyDelivered ? amtRead : 0;
 		} else {
-			//Empty extent—stop here.
-			hasReachedEnd = true;
-			break;
+			ultimatelySucceeded = success;
+			return 0;
 		}
-	}
+	}];
 
-	if (keepReading && !hasReachedEnd) {
-		//We need to search the extents overflow B*-tree for this item.
-		__block NSError *_Nullable tempError = nil;
-
-		ImpBTreeFile *_Nonnull const extentsFile = self.extentsOverflowBTree;
-		[extentsFile searchExtentsOverflowTreeForCatalogNodeID:cnid
-			fork:forkType
-			firstExtentStart:L(hfsExtRec[0].startBlock)
-			forEachRecord:^bool(NSData *_Nonnull const recordData)
-		{
-			struct HFSExtentDescriptor const *_Nonnull const extDescs = recordData.bytes;
-			NSUInteger const numExtentDescriptors = recordData.length / sizeof(struct HFSExtentDescriptor);
-			for (NSUInteger i = 0; i < numExtentDescriptors; ++i) {
-				NSData *_Nonnull const forkData = [self readDataFromFileDescriptor:readFD extent:&extDescs[i] error:&tempError];
-				u_int64_t const logicalLength = forkData.length; //TEMP/TODO: Again, copy the actual logical-length logic from above.
-				totalAmountRead += forkData.length;
-				keepReading = keepReading && block(forkData, logicalLength);
-				if (! keepReading) {
-					break;
-				}
-			}
-			return keepReading;
-		}];
-
-		if (outError != NULL) {
-			*outError = tempError;
-		}
+	if (outError != NULL && readError != nil) {
+		*outError = readError;
 	}
 
 	return totalAmountRead;

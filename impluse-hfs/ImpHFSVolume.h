@@ -43,14 +43,13 @@
 #pragma mark -
 
 - (NSData *_Nullable) readDataFromFileDescriptor:(int const)readFD
-	extent:(struct HFSExtentDescriptor const *_Nonnull const)hfsExt
-	error:(NSError *_Nullable *_Nonnull const)outError;
-- (NSData *_Nullable) readDataFromFileDescriptor:(int const)readFD
 	extents:(struct HFSExtentDescriptor const *_Nonnull const)hfsExtRec
+	numExtents:(NSUInteger const)numExtents
 	error:(NSError *_Nullable *_Nonnull const)outError;
 
 - (bool) checkExtentRecord:(HFSExtentRecord const *_Nonnull const)hfsExtRec;
 
+///For every extent in the file (the initial three plus any overflow records) until an empty extent, call the block with that extent and the number of bytes remaining in the file. The block should return the number of bytes it consumed (e.g., read from the file descriptor). Returns the total number of bytes consumed.
 - (u_int64_t) forEachExtentInFileWithID:(HFSCatalogNodeID)cnid
 	fork:(ImpForkType)forkType
 	forkLogicalLength:(u_int64_t const)forkLength
