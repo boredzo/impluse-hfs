@@ -61,6 +61,20 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	return self;
 }
 
+- (NSUInteger) hash {
+	NSUInteger hash = self.name.hash << 5;
+	hash |= (self.path.count & 0xf) << 1;
+	hash |= self.isDirectory;
+	return hash;
+}
+- (BOOL) isEqual:(id)object {
+	if (self == object)
+		return true;
+	if (! [object isKindOfClass:[ImpDehydratedItem class]])
+		return false;
+	return [self.path isEqualToArray:((ImpDehydratedItem *)object).path];
+}
+
 - (bool) isDirectory {
 	return self.type == ImpDehydratedItemTypeFolder;
 }

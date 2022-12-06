@@ -123,7 +123,9 @@
 	bool const grabAnyFileWithThisName = ! [self isHFSPath:self.quarryNameOrPath];
 	NSArray <NSString *> *_Nonnull const parsedPath = [self parseHFSPath:self.quarryNameOrPath];
 
-	//TODO: If it *is* a path, trace that path through the catalog.
+	//TODO: Need to implement the smarter destination path logic promised in the help. This requires the user to specify the destination path including filename.
+	__block ImpDehydratedItem *_Nullable matchedByPath = nil;
+	NSMutableSet <ImpDehydratedItem *> *_Nonnull const matchedByName = [NSMutableSet setWithCapacity:1];
 
 	ImpBTreeFile *_Nonnull const catalog = srcVol.catalogBTree;
 	[catalog walkLeafNodes:^bool(ImpBTreeNode *_Nonnull const node) {
@@ -135,14 +137,11 @@
 			bool const nameIsEqual = [dehydratedFile.name isEqualToString:self.quarryName];
 			bool const shouldRehydrateBecauseName = (grabAnyFileWithThisName && nameIsEqual);
 			bool const shouldRehydrateBecausePath = [self isQuarryPath:parsedPath isEqualToCatalogPath:dehydratedFile.path];
-			if (shouldRehydrateBecauseName || shouldRehydrateBecausePath) {
-				//TODO: Need to implement the smarter destination path logic promised in the help. This requires the user to specify the destination path including filename.
-				ImpPrintf(@"Found an item named %@ with parent item #%u", dehydratedFile.name, dehydratedFile.parentFolderID);
-				NSString *_Nonnull const destPath = self.destinationPath ?: [dehydratedFile.name stringByReplacingOccurrencesOfString:@"/" withString:@":"];
-				rehydrated = [dehydratedFile rehydrateAtRealWorldURL:[NSURL fileURLWithPath:destPath isDirectory:false] error:outError];
-				if (! rehydrated) {
-					ImpPrintf(@"Failed to rehydrate file named %@: %@", dehydratedFile.name, *outError);
-				}
+			if (shouldRehydrateBecauseName) {
+				[matchedByName addObject:dehydratedFile];
+			}
+			if (shouldRehydrateBecausePath) {
+				matchedByPath = dehydratedFile;
 			}
 		} folder:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRec) {
 			//TODO: Implement me
@@ -152,6 +151,28 @@
 
 		return true;
 	}];
+
+	NSMutableArray <ImpDehydratedItem *> *_Nonnull const matches = [NSMutableArray arrayWithCapacity:(matchedByPath != nil) + matchedByName.count];
+	if (matchedByPath != nil) [matches addObject:matchedByPath];
+	[matches addObjectsFromArray:matchedByName.allObjects];
+
+	if (matches.count == 0) {
+		ImpPrintf(@"No such item found.");
+	} else if (matches.count > 1) {
+		ImpPrintf(@"Multiple matches found:");
+		for (ImpDehydratedItem *_Nonnull const item in matches) {
+			ImpPrintf(@"- %@", [item.path componentsJoinedByString:@":"]);
+		}
+	} else {
+		ImpDehydratedItem *_Nonnull const item = matches.firstObject;
+		ImpPrintf(@"Found an item named %@ with parent item #%u", item.name, item.parentFolderID);
+		NSString *_Nonnull const destPath = self.destinationPath ?: [item.name stringByReplacingOccurrencesOfString:@"/" withString:@":"];
+		rehydrated = [item rehydrateAtRealWorldURL:[NSURL fileURLWithPath:destPath isDirectory:false] error:outError];
+		if (! rehydrated) {
+			ImpPrintf(@"Failed to rehydrate file named %@: %@", item.name, *outError);
+		}
+	}
+
 	NSLog(@"%@", rehydrated ? @"Success!" : @"Failure");
 	return rehydrated;
 }
