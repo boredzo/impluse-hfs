@@ -424,7 +424,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		readDataOrReturnError:outError
 		block:^bool(NSData *_Nonnull const fileData, u_int64_t const logicalLength)
 	{
-		OSStatus const dataWriteErr = FSWriteFork(dataForkRefnum, fsAtMark, /*positionOffset*/ 0, fileData.length, fileData.bytes, /*actualCount*/ NULL);
+		OSStatus const dataWriteErr = FSWriteFork(dataForkRefnum, fsAtMark, noCacheMask, fileData.length, fileData.bytes, /*actualCount*/ NULL);
 		allWritesSucceeded = allWritesSucceeded && (dataWriteErr == noErr);
 		if (dataWriteErr != noErr) {
 			//TODO: NSError
@@ -445,7 +445,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		readDataOrReturnError:outError
 		block:^bool(NSData *_Nonnull const fileData, u_int64_t const logicalLength)
 	{
-		OSStatus const rsrcWriteErr = FSWriteFork(rsrcForkRefnum, fsAtMark, /*positionOffset*/ 0, fileData.length, fileData.bytes, /*actualCount*/ NULL);
+		OSStatus const rsrcWriteErr = FSWriteFork(rsrcForkRefnum, fsAtMark, noCacheMask, logicalLength, fileData.bytes, /*actualCount*/ NULL);
 		allWritesSucceeded = allWritesSucceeded && (rsrcWriteErr == noErr);
 		if (rsrcWriteErr != noErr) {
 			//TODO: NSError
