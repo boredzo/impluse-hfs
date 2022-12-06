@@ -166,6 +166,29 @@
 	return [self _walkNodeAndItsSiblingsAndThenItsChildren:rootNode keepIterating:NULL block:block];
 }
 
+- (NSUInteger) walkLeafNodes:(bool (^_Nonnull const)(ImpBTreeNode *_Nonnull const node))block {
+	ImpBTreeHeaderNode *_Nullable const headerNode = self.headerNode;
+	if (headerNode == nil) {
+		//No header node. Welp!
+		return 0;
+	}
+
+	NSUInteger numVisited = 0;
+
+	ImpBTreeNode *_Nullable firstNode = headerNode.firstLeafNode;
+	ImpBTreeNode *_Nullable node = firstNode;
+	while (node != nil) {
+		++numVisited;
+
+		bool const keepIterating = block(node);
+		if (! keepIterating) break;
+
+		node = node.nextNode;
+	}
+
+	return numVisited;
+}
+
 - (bool) searchTreeForItemWithKeyComparator:(ImpBTreeRecordKeyComparator _Nonnull const)compareKeys
 	getNode:(ImpBTreeNode *_Nullable *_Nullable const)outNode
 	recordIndex:(u_int16_t *_Nullable const)outRecordIdx

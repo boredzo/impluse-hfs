@@ -27,6 +27,9 @@
 ///Starting from the root node, call the block for every node in the tree, in breadth-first order. Note that the header node is not included in this walk.
 - (NSUInteger) walkBreadthFirst:(bool (^_Nonnull const)(ImpBTreeNode *_Nonnull const node))block;
 
+///Starting from the first leaf node, call the block for every node from that one until the last leaf node, following nextNode/fLink connections.
+- (NSUInteger) walkLeafNodes:(bool (^_Nonnull const)(ImpBTreeNode *_Nonnull const node))block;
+
 ///Search the catalog tree for the file or folder record that defines the item with this CNID. Returns by reference the catalog key and file or folder record and returns true, or returns false without touching the pointers if no matching record is found.
 - (bool) searchCatalogTreeForItemWithParentID:(HFSCatalogNodeID)cnid
 	name:(ConstStr31Param _Nonnull)nodeName
