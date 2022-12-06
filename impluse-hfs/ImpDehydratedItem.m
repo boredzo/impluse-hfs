@@ -65,6 +65,11 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	return self.type == ImpDehydratedItemTypeFolder;
 }
 
+- (HFSCatalogNodeID) parentFolderID {
+	struct HFSCatalogKey const *_Nonnull const catalogKey = (struct HFSCatalogKey const *_Nonnull const)(self.hfsCatalogKeyData.bytes);
+	return L(catalogKey->parentID);
+}
+
 - (NSString *_Nonnull const) nameFromEncoding:(TextEncoding)hfsTextEncoding {
 	ImpTextEncodingConverter *_Nonnull const tec = [ImpTextEncodingConverter converterWithHFSTextEncoding:hfsTextEncoding];
 	struct HFSCatalogKey const *_Nonnull const catalogKey = (struct HFSCatalogKey const *_Nonnull const)(self.hfsCatalogKeyData.bytes);

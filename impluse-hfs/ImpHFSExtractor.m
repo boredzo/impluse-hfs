@@ -144,7 +144,7 @@
 				bool const shouldRehydrateBecausePath = nameIsEqual && [self isQuarryPath:parsedPath isEqualToCatalogPath:dehydratedFile.path];
 				if (shouldRehydrateBecauseName || shouldRehydrateBecausePath) {
 					//TODO: Need to implement the smarter destination path logic promised in the help. This requires the user to specify the destination path including filename.
-					ImpPrintf(@"Found an item named %@", dehydratedFile.name);
+					ImpPrintf(@"Found an item named %@ with parent item #%u", dehydratedFile.name, dehydratedFile.parentFolderID);
 					NSString *_Nonnull const destPath = self.destinationPath ?: [dehydratedFile.name stringByReplacingOccurrencesOfString:@"/" withString:@":"];
 					rehydrated = [dehydratedFile rehydrateAtRealWorldURL:[NSURL fileURLWithPath:destPath isDirectory:false] error:outError];
 					if (! rehydrated) {

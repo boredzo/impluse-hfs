@@ -40,6 +40,8 @@ typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
 ///Defaults to MacRoman.
 @property TextEncoding hfsTextEncoding;
 
+@property(nonatomic) HFSCatalogNodeID parentFolderID;
+
 ///Convert the item's name from the HFS catalog using its assigned encoding into a modern Unicode name.
 - (NSString *_Nonnull const) name;
 ///Convert the item's name from the HFS catalog using this encoding into a modern Unicode name.
