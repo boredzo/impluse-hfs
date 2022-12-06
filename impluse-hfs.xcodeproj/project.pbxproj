@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 55;
+	objectVersion = 53;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -225,7 +225,7 @@
 				};
 			};
 			buildConfigurationList = 314EFFD22932CF3700CE74E9 /* Build configuration list for PBXProject "impluse-hfs" */;
-			compatibilityVersion = "Xcode 13.0";
+			compatibilityVersion = "Xcode 9.3";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -406,6 +406,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "impluse-hfs/Prefix.h";
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -418,6 +419,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "impluse-hfs/Prefix.h";
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
