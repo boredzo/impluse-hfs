@@ -189,6 +189,73 @@
 	return numVisited;
 }
 
+- (NSUInteger) forEachItemInDirectory:(HFSCatalogNodeID)dirID
+	file:(bool (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFile const *_Nonnull const fileRec))visitFile
+	folder:(bool (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFolder const *_Nonnull const folderRec))visitFolder
+{
+	__block NSUInteger numVisited = 0;
+	__block bool keepIterating = true;
+
+	//We're looking for a thread record with this CNID. Thread records have an empty name and are the first record that has this CNID in its key. All of the (zero or more) file and folder records after it that have this CNID in their key are immediate children of this folder.
+	ImpBTreeRecordKeyComparator _Nonnull const compareKeys = ^ImpBTreeComparisonResult(const void *const  _Nonnull foundKeyPtr) {
+		struct HFSCatalogKey const *_Nonnull const foundCatKeyPtr = foundKeyPtr;
+		if (dirID < L(foundCatKeyPtr->parentID)) {
+			return ImpBTreeComparisonQuarryIsLesser;
+		}
+		if (dirID > L(foundCatKeyPtr->parentID)) {
+			return ImpBTreeComparisonQuarryIsGreater;
+		}
+		//We're searching for an empty name because it's the first one with a given parent ID. Any non-empty name comes after it.
+		if (foundCatKeyPtr->nodeName[0] > 0) {
+			return ImpBTreeComparisonQuarryIsLesser;
+		}
+		return ImpBTreeComparisonQuarryIsEqual;
+	};
+
+	ImpBTreeNode *_Nullable threadRecordNode = nil;
+	u_int16_t threadRecordIdx;
+	if ([self searchTreeForItemWithKeyComparator:compareKeys getNode:&threadRecordNode recordIndex:&threadRecordIdx]) {
+		ImpBTreeNode *_Nullable node = threadRecordNode;
+		u_int16_t recordIdx = threadRecordIdx + 1;
+
+		while (keepIterating && node != nil) {
+			for (u_int16_t i = recordIdx; keepIterating && i < node.numberOfRecords; ++i) {
+				NSData *_Nonnull const keyData = [node recordKeyDataAtIndex:i];
+				struct HFSCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
+
+				if (L(keyPtr->parentID) != dirID) {
+					//We've run out of items with the parent we're looking for. Time to bail.
+					keepIterating = false;
+				} else {
+					++numVisited;
+
+					NSData *_Nonnull const payloadData = [node recordPayloadDataAtIndex:i];
+					void const *_Nonnull const payloadPtr = payloadData.bytes;
+
+					u_int8_t const *_Nonnull const recordTypePtr = payloadPtr;
+					switch (*recordTypePtr << 8) {
+						case kHFSFileRecord:
+							keepIterating = visitFile(keyPtr, payloadPtr);
+							break;
+						case kHFSFolderRecord:
+							keepIterating = visitFolder(keyPtr, payloadPtr);
+							break;
+						case kHFSFileThreadRecord:
+						case kHFSFolderThreadRecord:
+						default:
+							//Not really anything here to do anything—although, if we find a thread record *after* the thread record we should have already found, that seems sus.
+							break;
+					}
+				}
+			}
+			node = node.nextNode;
+			recordIdx = 0;
+		}
+	}
+
+	return numVisited;
+}
+
 - (bool) searchTreeForItemWithKeyComparator:(ImpBTreeRecordKeyComparator _Nonnull const)compareKeys
 	getNode:(ImpBTreeNode *_Nullable *_Nullable const)outNode
 	recordIndex:(u_int16_t *_Nullable const)outRecordIdx

@@ -30,6 +30,12 @@
 ///Starting from the first leaf node, call the block for every node from that one until the last leaf node, following nextNode/fLink connections.
 - (NSUInteger) walkLeafNodes:(bool (^_Nonnull const)(ImpBTreeNode *_Nonnull const node))block;
 
+///Given the CNID of a folder, call one of the blocks with each item in that folder. Either block can return false to stop iteration. Returns the number of items visited. If the CNID does not refer to a folder, returns 0. (This includes if it is a file.)
+///You can pass nil for either or both blocks. If you pass nil for both blocks, you'll find out how many items are actually in the folder, regardless of what its valence says.
+- (NSUInteger) forEachItemInDirectory:(HFSCatalogNodeID)dirID
+	file:(bool (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFile const *_Nonnull const fileRec))visitFile
+	folder:(bool (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFolder const *_Nonnull const folderRec))visitFolder;
+
 ///Search the catalog tree for the file or folder record that defines the item with this CNID. Returns by reference the catalog key and file or folder record and returns true, or returns false without touching the pointers if no matching record is found.
 - (bool) searchCatalogTreeForItemWithParentID:(HFSCatalogNodeID)cnid
 	name:(ConstStr31Param _Nonnull)nodeName

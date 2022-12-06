@@ -296,8 +296,97 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	return wroteData && wroteMetadata;
 }
 - (bool) rehydrateFolderAtRealWorldURL:(NSURL *_Nonnull const)realWorldURL error:(NSError *_Nullable *_Nonnull const)outError {
-	*outError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileWriteUnsupportedSchemeError userInfo:@{ NSLocalizedDescriptionKey: @"Haven't implemented folder-hierarchy rehydration yet"}];
-	return false;
+	struct HFSCatalogFolder const *_Nonnull const folderRec = (struct HFSCatalogFolder const *_Nonnull const)self.hfsFolderCatalogRecordData.bytes;
+
+	bool wroteChildren = true; //TODO: Come up with a better way to distinguish “wrote no children because the folder was empty” and “wrote no children because failure” (or, for that matter, “wrote some children but then failure”).
+	bool wroteMetadata = false;
+
+	FSRef parentRef;
+	if (CFURLGetFSRef((__bridge CFURLRef)realWorldURL.URLByDeletingLastPathComponent, &parentRef)) {
+		NSString *_Nonnull const name = realWorldURL.lastPathComponent;
+		HFSUniStr255 name255 = { .length = name.length };
+		if (name255.length > 255) name255.length = 255;
+		[name getCharacters:name255.unicode range:(NSRange){ 0, name255.length }];
+
+		struct FolderInfo const *_Nonnull const sourceFinderInfo = (struct FolderInfo const *_Nonnull const)&(folderRec->userInfo);
+		struct FolderInfo swappedFinderInfo = {
+			.windowBounds = {
+				.top = L(sourceFinderInfo->windowBounds.top),
+				.left = L(sourceFinderInfo->windowBounds.left),
+				.bottom = L(sourceFinderInfo->windowBounds.bottom),
+				.right = L(sourceFinderInfo->windowBounds.right),
+			},
+			.finderFlags = L(sourceFinderInfo->finderFlags),
+			.location = {
+				.h = L(sourceFinderInfo->location.h),
+				.v = L(sourceFinderInfo->location.v),
+			},
+			.reservedField = L(sourceFinderInfo->reservedField),
+		};
+		struct ExtendedFolderInfo const *_Nonnull const sourceExtFinderInfo = (struct ExtendedFolderInfo const *_Nonnull const)&(folderRec->finderInfo);
+		struct ExtendedFolderInfo swappedExtFinderInfo = {
+			.scrollPosition = {
+				.h = L(sourceExtFinderInfo->scrollPosition.h),
+				.v = L(sourceExtFinderInfo->scrollPosition.v),
+			},
+			.reserved1 = L(sourceExtFinderInfo->reserved1),
+			.extendedFinderFlags = L(sourceExtFinderInfo->extendedFinderFlags),
+			.reserved2 = L(sourceExtFinderInfo->reserved2),
+			.putAwayFolderID = L(sourceExtFinderInfo->putAwayFolderID),
+		};
+
+		struct FSCatalogInfo catInfo = {
+			.nodeFlags = (L(folderRec->flags) & ~kFSNodeLockedMask),
+			.createDate = {
+				.lowSeconds = kMagicBusyCreationDate,//L(fileRec->createDate),
+			},
+			.contentModDate = {
+				.lowSeconds = L(folderRec->modifyDate),
+			},
+		};
+		memcpy(&(catInfo.finderInfo), &swappedFinderInfo, sizeof(catInfo.finderInfo));
+		memcpy(&(catInfo.extFinderInfo), &swappedExtFinderInfo, sizeof(catInfo.extFinderInfo));
+		FSCatalogInfoBitmap const whichInfo = kFSCatInfoNodeFlags | kFSCatInfoCreateDate | kFSCatInfoContentMod | kFSCatInfoFinderInfo | kFSCatInfoFinderXInfo;
+
+		OSStatus err;
+		FSRef ref;
+		UInt32 newDirID;
+		err = FSCreateDirectoryUnicode(&parentRef, name255.length, name255.unicode, whichInfo, &catInfo, &ref, /*newSpec*/ NULL, &newDirID);
+
+		//TODO: I am once again asking myself to desiccate the knowledge of what encoding to use
+		ImpTextEncodingConverter *_Nonnull const tec = [ImpTextEncodingConverter converterWithHFSTextEncoding:self.hfsTextEncoding];
+
+		//For each item in the dehydrated directory, rehydrate it, too.
+		//(Ugh, this might cost a ton of FSRefs.)
+		@autoreleasepool {
+			[self.hfsVolume.catalogBTree forEachItemInDirectory:self.catalogNodeID
+			file:^bool(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFile const *_Nonnull const fileRec) {
+				ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSVolume:self.hfsVolume catalogNodeID:L(fileRec->fileID) key:keyPtr fileRecord:fileRec];
+				NSString *_Nonnull const filename = [tec stringForPascalString:keyPtr->nodeName];
+				NSURL *_Nonnull const fileURL = [realWorldURL URLByAppendingPathComponent:filename isDirectory:false];
+				ImpPrintf(@"Rehydrating descendant 📄 “%@”", filename);
+				bool const rehydrated = [dehydratedFile rehydrateFileAtRealWorldURL:fileURL error:outError];
+				ImpPrintf(@"%@ in rehydrating descendant 📄 “%@”", rehydrated ? @"Success" : @"Failure", filename);
+				return rehydrated;
+			}
+			folder:^bool(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFolder const *_Nonnull const folderRec) {
+				ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSVolume:self.hfsVolume catalogNodeID:L(folderRec->folderID) key:keyPtr folderRecord:folderRec];
+				NSString *_Nonnull const folderName = [tec stringForPascalString:keyPtr->nodeName];
+				NSURL *_Nonnull const folderURL = [realWorldURL URLByAppendingPathComponent:folderName isDirectory:true];
+				ImpPrintf(@"Rehydrating descendant 📁 “%@”", folderName);
+				bool const rehydrated = [dehydratedFolder rehydrateFolderAtRealWorldURL:folderURL error:outError];
+				ImpPrintf(@"%@ in rehydrating descendant 📁 “%@”", rehydrated ? @"Success" : @"Failure", folderName);
+				return rehydrated;
+			}];
+		}
+
+		catInfo.createDate.lowSeconds = L(folderRec->createDate);
+		FSCatalogInfoBitmap const whichInfo2 = kFSCatInfoCreateDate | kFSCatInfoContentMod;
+		err = FSSetCatalogInfo(&ref, whichInfo2, &catInfo);
+		wroteMetadata = true;
+	}
+	//TODO: Error handling
+	return (wroteChildren && wroteMetadata);
 }
 
 @end

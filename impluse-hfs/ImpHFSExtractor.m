@@ -144,7 +144,17 @@
 				matchedByPath = dehydratedFile;
 			}
 		} folder:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRec) {
-			//TODO: Implement me
+			ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSVolume:srcVol catalogNodeID:L(folderRec->folderID) key:catalogKeyPtr folderRecord:folderRec];
+//				ImpPrintf(@"We're looking for “%@” and found a file named “%@”", self.quarryName, dehydratedFile.name);
+			bool const nameIsEqual = [dehydratedFolder.name isEqualToString:self.quarryName];
+			bool const shouldRehydrateBecauseName = (grabAnyFileWithThisName && nameIsEqual);
+			bool const shouldRehydrateBecausePath = [self isQuarryPath:parsedPath isEqualToCatalogPath:dehydratedFolder.path];
+			if (shouldRehydrateBecauseName) {
+				[matchedByName addObject:dehydratedFolder];
+			}
+			if (shouldRehydrateBecausePath) {
+				matchedByPath = dehydratedFolder;
+			}
 		} thread:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogThread *const _Nonnull threadRec) {
 			//Ignore thread records.
 		}];
