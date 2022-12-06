@@ -175,6 +175,7 @@
 	error:(NSError *_Nullable *_Nonnull const)outError
 {
 	int32_t firstUnallocatedBlockNumber = -1;
+	//TODO: Optimize using CFBitVectorGetCountOfBit (start range at startBlock, check returned count >= blockCount)
 	for (u_int16_t i = 0; i < L(hfsExt->blockCount); ++i) {
 //		ImpPrintf(@"- #%u: %@", L(hfsExt->startBlock) + i, CFBitVectorGetBitAtIndex(_bitVector, L(hfsExt->startBlock) + i) ? @"YES" : @"NO!");
 		if (! CFBitVectorGetBitAtIndex(_bitVector, L(hfsExt->startBlock) + i)) {
