@@ -56,7 +56,8 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		self.hfsCatalogKeyData = [NSData dataWithBytesNoCopy:(void *)key length:sizeof(*key) freeWhenDone:false];
 		self.hfsFolderCatalogRecordData = [NSData dataWithBytesNoCopy:(void *)folderRec length:sizeof(*folderRec) freeWhenDone:false];
 
-		self.type = ImpDehydratedItemTypeFolder;
+		_parentFolderID = L(key->parentID);
+		_type = _parentFolderID == kHFSRootParentID ? ImpDehydratedItemTypeVolume : ImpDehydratedItemTypeFolder;
 	}
 	return self;
 }
@@ -76,7 +77,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 }
 
 - (bool) isDirectory {
-	return self.type == ImpDehydratedItemTypeFolder;
+	return self.type != ImpDehydratedItemTypeFile;
 }
 
 - (HFSCatalogNodeID) parentFolderID {

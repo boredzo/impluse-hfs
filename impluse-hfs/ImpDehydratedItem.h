@@ -10,8 +10,9 @@
 @class ImpHFSVolume;
 
 typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
-	ImpDehydratedItemTypeFile,
+	ImpDehydratedItemTypeFile = 1,
 	ImpDehydratedItemTypeFolder,
+	ImpDehydratedItemTypeVolume,
 };
 
 ///A dehydrated item is a file or folder that exists within a source volume.
@@ -31,6 +32,7 @@ typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
 @property(weak) ImpHFSVolume * _Nullable hfsVolume;
 @property HFSCatalogNodeID catalogNodeID;
 @property ImpDehydratedItemType type;
+///True for folders and volumes. False for files.
 @property(nonatomic, readonly) bool isDirectory;
 
 @property(copy) NSData *_Nonnull hfsCatalogKeyData;
