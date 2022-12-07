@@ -38,7 +38,7 @@ for dir_path, dir_names, file_names in os.walk(root_path):
 		if name in dir_names:
 			subdir_path = dir_path.joinpath(name)
 			children = list(subdir_path.glob('*'))
-			print('{}{} {} contains {} items'.format(' ' * depth, '📁', subdir_path.name, len(children)))
+			print('{}{} {} contains {} items'.format(' ' * depth, '📁', subdir_path.name.replace(':', '/'), len(children)))
 		elif name in file_names:
 			df_path = dir_path.joinpath(name)
 			rf_path = df_path.joinpath('..namedfork/rsrc')
@@ -53,7 +53,7 @@ for dir_path, dir_names, file_names in os.walk(root_path):
 			rf_total += rf_size
 			both_total += both_size
 
-			print('{}{} {}\t{:,}\t{:,}\t{:,}'.format(' ' * depth, '📄', name, df_size, rf_size, both_size))
+			print('{}{} {}\t{:,}\t{:,}\t{:,}'.format(' ' * depth, '📄', name.replace(':', '/'), df_size, rf_size, both_size))
 	print()
 
 print('═══════	═════════	═════════	═════════')

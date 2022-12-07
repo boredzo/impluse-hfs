@@ -226,7 +226,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	FSRef parentRef, ref;
 	bool const gotParentRef = CFURLGetFSRef((__bridge CFURLRef)realWorldURL.URLByDeletingLastPathComponent, &parentRef);
 
-	NSString *_Nonnull const name = realWorldURL.lastPathComponent;
+	NSString *_Nonnull const name = [realWorldURL.lastPathComponent stringByReplacingOccurrencesOfString:@":" withString:@"/"];
 	HFSUniStr255 name255 = { .length = name.length };
 	if (name255.length > 255) name255.length = 255;
 	[name getCharacters:name255.unicode range:(NSRange){ 0, name255.length }];
@@ -365,7 +365,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 
 	FSRef parentRef;
 	if (CFURLGetFSRef((__bridge CFURLRef)realWorldURL.URLByDeletingLastPathComponent, &parentRef)) {
-		NSString *_Nonnull const name = realWorldURL.lastPathComponent;
+		NSString *_Nonnull const name = [realWorldURL.lastPathComponent stringByReplacingOccurrencesOfString:@":" withString:@"/"];
 		HFSUniStr255 name255 = { .length = name.length };
 		if (name255.length > 255) name255.length = 255;
 		[name getCharacters:name255.unicode range:(NSRange){ 0, name255.length }];
@@ -429,17 +429,20 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		@autoreleasepool {
 			[self.hfsVolume.catalogBTree forEachItemInDirectory:self.catalogNodeID
 			file:^bool(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFile const *_Nonnull const fileRec) {
-				ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSVolume:self.hfsVolume catalogNodeID:L(fileRec->fileID) key:keyPtr fileRecord:fileRec];
-				NSString *_Nonnull const filename = [tec stringForPascalString:keyPtr->nodeName];
+				HFSCatalogNodeID const fileID = L(fileRec->fileID);
+				ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSVolume:self.hfsVolume catalogNodeID:fileID key:keyPtr fileRecord:fileRec];
+				NSString *_Nonnull const filename = [[tec stringForPascalString:keyPtr->nodeName] stringByReplacingOccurrencesOfString:@"/" withString:@":"];
 				NSURL *_Nonnull const fileURL = [realWorldURL URLByAppendingPathComponent:filename isDirectory:false];
 				ImpPrintf(@"Rehydrating descendant 📄 “%@”", filename);
 				bool const rehydrated = [dehydratedFile rehydrateFileAtRealWorldURL:fileURL error:outError];
-				ImpPrintf(@"%@ in rehydrating descendant 📄 “%@”", rehydrated ? @"Success" : @"Failure", filename);
+				if (! rehydrated) {
+					ImpPrintf(@"%@ in rehydrating descendant 📄 “%@”", rehydrated ? @"Success" : @"Failure", filename);
+				}
 				return rehydrated;
 			}
 			folder:^bool(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFolder const *_Nonnull const folderRec) {
 				ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSVolume:self.hfsVolume catalogNodeID:L(folderRec->folderID) key:keyPtr folderRecord:folderRec];
-				NSString *_Nonnull const folderName = [tec stringForPascalString:keyPtr->nodeName];
+				NSString *_Nonnull const folderName = [[tec stringForPascalString:keyPtr->nodeName] stringByReplacingOccurrencesOfString:@"/" withString:@":"];
 				NSURL *_Nonnull const folderURL = [realWorldURL URLByAppendingPathComponent:folderName isDirectory:true];
 				ImpPrintf(@"Rehydrating descendant 📁 “%@”", folderName);
 				bool const rehydrated = [dehydratedFolder rehydrateFolderAtRealWorldURL:folderURL error:outError];
@@ -452,7 +455,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		FSCatalogInfoBitmap const whichInfo2 = kFSCatInfoCreateDate | kFSCatInfoContentMod;
 		err = FSSetCatalogInfo(&ref, whichInfo2, &catInfo);
 		if (err == noErr) {
-		wroteMetadata = true;
+			wroteMetadata = true;
 		} else {
 			if (outError != NULL) {
 				*outError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Can't set metadata of directory “%@”", @""), name ]}];
