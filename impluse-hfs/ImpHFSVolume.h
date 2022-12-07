@@ -19,13 +19,7 @@
 
 @property off_t volumeStartOffset; //Defaults to 0. Set to something else if your HFS volume starts somewhere in the middle of a file (e.g., after a partition map).
 
-- (bool) readBootBlocksFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError; 
-- (bool) readVolumeHeaderFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
-- (bool)readAllocationBitmapFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
-- (bool)readCatalogFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
-- (bool)readExtentsOverflowFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
-
-///Convenience method that reads the boot blocks, volume header, allocation bitmap, extents overflow file, and catalog file, in that order.
+///Read the boot blocks, volume header, and allocation bitmap in that order, followed by the extents overflow file and catalog file.
 - (bool)loadAndReturnError:(NSError *_Nullable *_Nonnull const)outError;
 
 - (NSData *_Nonnull)bootBlocks;
