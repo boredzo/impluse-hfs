@@ -309,6 +309,9 @@
 	//TODO: Use ImpTextEncodingConverter and connect this to any user-facing configuration options for HFS text encoding.
 	return CFAutorelease(CFStringCreateWithPascalStringNoCopy(kCFAllocatorDefault, _mdb->drVN, kCFStringEncodingMacRoman, kCFAllocatorNull));
 }
+- (u_int64_t) totalSizeInBytes {
+	return self.numberOfBytesPerBlock * (u_int64_t)self.numberOfBlocksTotal;
+}
 - (NSUInteger) numberOfBytesPerBlock {
 	return L(_mdb->drAlBlkSiz);
 }
@@ -320,6 +323,12 @@
 }
 - (NSUInteger) numberOfBlocksFree {
 	return L(_mdb->drFreeBks);
+}
+- (NSUInteger) numberOfFiles {
+	return L(_mdb->drFilCnt);
+}
+- (NSUInteger) numberOfFolders {
+	return L(_mdb->drDirCnt);
 }
 
 - (u_int64_t) forEachExtentInFileWithID:(HFSCatalogNodeID)cnid

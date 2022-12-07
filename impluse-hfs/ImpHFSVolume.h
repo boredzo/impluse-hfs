@@ -29,10 +29,15 @@
 @property(strong) ImpBTreeFile *_Nonnull extentsOverflowBTree;
 
 - (NSString *_Nonnull) volumeName;
+- (u_int64_t) totalSizeInBytes;
 - (NSUInteger) numberOfBytesPerBlock;
 - (NSUInteger) numberOfBlocksTotal;
 - (NSUInteger) numberOfBlocksUsed;
 - (NSUInteger) numberOfBlocksFree;
+///Total number of files in the whole volume.
+- (NSUInteger) numberOfFiles;
+///Total number of folders in the whole volume.
+- (NSUInteger) numberOfFolders;
 
 #pragma mark -
 
