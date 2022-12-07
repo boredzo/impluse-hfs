@@ -235,17 +235,53 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 
 	HFSUniStr255 dataForkName, rsrcForkName;
 	err = FSGetDataForkName(&dataForkName);
+	if (err != noErr) {
+		if (outError != NULL) {
+			*outError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Can't get name of data fork", @"")}];
+		}
+		return false;
+	}
 	err = FSGetResourceForkName(&rsrcForkName);
+	if (err != noErr) {
+		if (outError != NULL) {
+			*outError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Can't get name of resource fork", @"")}];
+		}
+		return false;
+	}
 
 	FSIORefNum dataForkRefnum = -1, rsrcForkRefnum = -1;
 	//Create the resource fork first. If we can't do that, we can't rehydrate this file at all.
 	//TODO: Maybe only do that if the dehydrated resource fork is non-empty. If there's no resource fork to be restored, we don't need to worry if the destination is data-fork-only.
 	err = FSCreateFileAndOpenForkUnicode(&parentRef, name255.length, name255.unicode, whichInfo, &catInfo, rsrcForkName.length, rsrcForkName.unicode, fsWrPerm, &rsrcForkRefnum, &ref);
+	if (err != noErr) {
+		if (outError != NULL) {
+			*outError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Can't create file “%@” and open its resource fork for writing", @""), name ]}];
+		}
+		return false;
+	}
 //	err = FSCreateFork(&ref, dataForkName.length, dataForkName.unicode);
 	err = FSOpenFork(&ref, dataForkName.length, dataForkName.unicode, fsWrPerm, &dataForkRefnum);
+	if (err != noErr) {
+		if (outError != NULL) {
+			*outError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Can't open data fork of file “%@” for writing", @""), name ]}];
+		}
+		return false;
+	}
 
-	FSAllocateFork(dataForkRefnum, kFSAllocAllOrNothingMask | kFSAllocNoRoundUpMask, fsFromStart, /*positionOffset*/ 0, dataForkSize, /*actualCount*/ NULL);
-	FSAllocateFork(rsrcForkRefnum, kFSAllocAllOrNothingMask | kFSAllocNoRoundUpMask, fsFromStart, /*positionOffset*/ 0, rsrcForkSize, /*actualCount*/ NULL);
+	err = FSAllocateFork(dataForkRefnum, kFSAllocAllOrNothingMask | kFSAllocNoRoundUpMask, fsFromStart, /*positionOffset*/ 0, dataForkSize, /*actualCount*/ NULL);
+	if (err != noErr) {
+		if (outError != NULL) {
+			*outError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Can't extend data fork of file “%@” for writing", @""), name ]}];
+		}
+		return false;
+	}
+	err = FSAllocateFork(rsrcForkRefnum, kFSAllocAllOrNothingMask | kFSAllocNoRoundUpMask, fsFromStart, /*positionOffset*/ 0, rsrcForkSize, /*actualCount*/ NULL);
+	if (err != noErr) {
+		if (outError != NULL) {
+			*outError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Can't extend resource fork of file “%@” for writing", @""), name ]}];
+		}
+		return false;
+	}
 
 	//OK! Both forks are the lengths we need them to be. Time to start copying in data!
 
@@ -261,10 +297,16 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		OSStatus const dataWriteErr = FSWriteFork(dataForkRefnum, fsAtMark, noCacheMask, fileData.length, fileData.bytes, /*actualCount*/ NULL);
 		allWritesSucceeded = allWritesSucceeded && (dataWriteErr == noErr);
 		if (dataWriteErr != noErr) {
-			//TODO: NSError
+			writeError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Can't write to data fork of file “%@”", @""), name ]}];
 		}
 		return allWritesSucceeded;
 	}];
+	if (writeError != nil) {
+		if (outError != NULL) {
+			*outError = writeError;
+		}
+		return false;
+	}
 	if (! allWritesSucceeded) {
 		if (outError != NULL) {
 			*outError = writeError;
@@ -282,7 +324,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		OSStatus const rsrcWriteErr = FSWriteFork(rsrcForkRefnum, fsAtMark, noCacheMask, logicalLength, fileData.bytes, /*actualCount*/ NULL);
 		allWritesSucceeded = allWritesSucceeded && (rsrcWriteErr == noErr);
 		if (rsrcWriteErr != noErr) {
-			//TODO: NSError
+			writeError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Can't write to resource fork of file “%@”", @""), name ]}];
 		}
 		return allWritesSucceeded;
 	}];
@@ -372,6 +414,12 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		FSRef ref;
 		UInt32 newDirID;
 		err = FSCreateDirectoryUnicode(&parentRef, name255.length, name255.unicode, whichInfo, &catInfo, &ref, /*newSpec*/ NULL, &newDirID);
+		if (err != noErr) {
+			if (outError != NULL) {
+				*outError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Can't create directory “%@”", @""), name ]}];
+			}
+			return false;
+		}
 
 		//TODO: I am once again asking myself to desiccate the knowledge of what encoding to use
 		ImpTextEncodingConverter *_Nonnull const tec = [ImpTextEncodingConverter converterWithHFSTextEncoding:self.hfsTextEncoding];
@@ -403,9 +451,16 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		catInfo.createDate.lowSeconds = L(folderRec->createDate);
 		FSCatalogInfoBitmap const whichInfo2 = kFSCatInfoCreateDate | kFSCatInfoContentMod;
 		err = FSSetCatalogInfo(&ref, whichInfo2, &catInfo);
+		if (err == noErr) {
 		wroteMetadata = true;
+		} else {
+			if (outError != NULL) {
+				*outError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Can't set metadata of directory “%@”", @""), name ]}];
+			}
+			return false;
+		}
 	}
-	//TODO: Error handling
+
 	return (wroteChildren && wroteMetadata);
 }
 
