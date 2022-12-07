@@ -94,7 +94,6 @@ int main(int argc, const char * argv[]) {
 
 }
 - (void) extract:(NSEnumerator <NSString *> *_Nonnull const)argsEnum {
-	//TODO: Write an ImpHFSExtractor that implements at least this feature, similar to how we have ImpHFSToHFSPlusConverter for convert:.
 	NSString *_Nullable const srcDevPath = [argsEnum nextObject];
 	if (srcDevPath == nil) {
 		[self printUsageToFile:stderr];
