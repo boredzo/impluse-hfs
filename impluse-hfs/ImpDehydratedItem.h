@@ -57,4 +57,19 @@ typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
 ///Create a real file or folder with the same contents and (as much as possible) metadata as the dehydrated item. Folders get rehydrated recursively, with all of their sub-items. The item's filename will be converted to Unicode and appended to realWorldParentURL.
 - (bool) rehydrateIntoRealWorldDirectoryAtURL:(NSURL *_Nonnull const)realWorldParentURL error:(NSError *_Nullable *_Nonnull const)outError;
 
+#pragma mark Directory trees
+
+///From an HFS volume, create a hierarchy of ImpDehydratedItems representing the files and folders on that volume. Returns the root directory.
++ (instancetype _Nonnull) rootDirectoryOfHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol;
+
+///Only present on dehydrated folders created by rootDirectoryOfHFSVolume:. Contains all of the files and folders that are immediate children of this folder (i.e., whose parent is this folder).
+@property(nullable, nonatomic, readonly, copy) NSArray <ImpDehydratedItem *> *children;
+- (NSUInteger) countOfChildren;
+- (void) addChildrenObject:(ImpDehydratedItem *_Nonnull const)object;
+
+///Walk the directory hierarchy breadth-first starting from this directory, calling the block for each item encountered. Use the depth value for indentation. Results undefined if you call this directly upon a dehydrated file (rather than a folder or volume).
+- (void) walkBreadthFirst:(void (^_Nonnull const)(NSUInteger const depth, ImpDehydratedItem *_Nonnull const item))block;
+
+- (void) printDirectoryHierarchy;
+
 @end

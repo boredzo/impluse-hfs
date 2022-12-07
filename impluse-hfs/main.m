@@ -10,6 +10,7 @@
 
 #import "ImpHFSToHFSPlusConverter.h"
 #import "ImpHFSExtractor.h"
+#import "ImpHFSLister.h"
 
 @interface Impluse : NSObject
 
@@ -20,6 +21,7 @@
 - (void) unrecognizedSubcommand:(NSString *_Nonnull const)subcommand;
 
 - (void) help:(NSEnumerator <NSString *> *_Nonnull const)argsEnum;
+- (void) list:(NSEnumerator <NSString *> *_Nonnull const)argsEnum;
 - (void) convert:(NSEnumerator <NSString *> *_Nonnull const)argsEnum;
 - (void) extract:(NSEnumerator <NSString *> *_Nonnull const)argsEnum;
 
@@ -49,9 +51,14 @@ int main(int argc, const char * argv[]) {
 @implementation Impluse
 
 - (void) printUsageToFile:(FILE *_Nonnull const)outputFile {
+	fprintf(outputFile, "usage: %s list hfs-device\n", self.argv0.UTF8String ?: "impluse");
+	fprintf(outputFile, "Recursively lists the entire contents of a volume, starting from its root directory.\n");
+	fprintf(outputFile, "\n");
+
 	fprintf(outputFile, "usage: %s convert hfs-device hfsplus-device\n", self.argv0.UTF8String ?: "impluse");
 	fprintf(outputFile, "The two paths must not be the same. The contents of hfs-device will be copied to hfsplus-device. This may take some time.\n");
 	fprintf(outputFile, "\n");
+
 	fprintf(outputFile, "usage: %s extract hfs-device [name-or-path] [destination]\n", self.argv0.UTF8String ?: "impluse");
 	fprintf(outputFile, "If name-or-path is a single name: Attempt to find a file or folder uniquely bearing that name. If there are multiple matches, list their paths and then exit without extracting anything; otherwise, extract that file or folder.\n");
 	fprintf(outputFile, "If name-or-path is an HFS path (like “Macintosh HD:Applications:ResEdit”), extracts that file or folder specifically.\n");
@@ -69,6 +76,24 @@ int main(int argc, const char * argv[]) {
 
 - (void) help:(NSEnumerator <NSString *> *_Nonnull const)argsEnum {
 	[self printUsageToFile:stdout];
+}
+
+- (void) list:(NSEnumerator <NSString *> *_Nonnull const)argsEnum {
+	NSString *_Nullable const srcDevPath = [argsEnum nextObject];
+	if (srcDevPath == nil) {
+		[self printUsageToFile:stderr];
+		self.status = EX_USAGE;
+		return;
+	}
+	ImpHFSLister *_Nonnull const lister = [ImpHFSLister new];
+	lister.sourceDevice = [NSURL fileURLWithPath:srcDevPath isDirectory:false];
+
+	NSError *_Nullable error = nil;
+	bool const converted = [lister performInventoryOrReturnError:&error];
+	if (! converted) {
+		NSLog(@"Failed: %@", error.localizedDescription);
+		self.status = EXIT_FAILURE;
+	}
 }
 - (void) convert:(NSEnumerator <NSString *> *_Nonnull const)argsEnum {
 	NSString *_Nullable const srcDevPath = [argsEnum nextObject];

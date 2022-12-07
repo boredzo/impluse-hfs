@@ -13,10 +13,19 @@
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
 
+typedef NS_ENUM(u_int64_t, ImpVolumeSizeThreshold) {
+	//Rough estimates just for icon selection purposes.
+	floppyMaxSize = 2 * 1024,
+	cdMaxSize = 700 * 1048576,
+	dvdMaxSize = 10ULL * 1048576ULL * 1024ULL,
+};
+
 @interface ImpDehydratedItem ()
 
 - (bool) rehydrateFileAtRealWorldURL:(NSURL *_Nonnull const)realWorldURL error:(NSError *_Nullable *_Nonnull const)outError;
 - (bool) rehydrateFolderAtRealWorldURL:(NSURL *_Nonnull const)realWorldURL error:(NSError *_Nullable *_Nonnull const)outError;
+
+@property(nullable, nonatomic, readwrite, copy) NSArray <ImpDehydratedItem *> *children;
 
 @end
 
@@ -25,6 +34,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 @implementation ImpDehydratedItem
 {
 	NSArray <NSString *> *_cachedPath;
+	NSMutableArray <ImpDehydratedItem *> *_children;
 }
 
 - (instancetype _Nonnull) initWithHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol catalogNodeID:(HFSCatalogNodeID const)cnid {
@@ -99,6 +109,15 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 }
 - (NSDate *_Nonnull const) dateForHFSDate:(u_int32_t const)hfsDate {
 	return [NSDate dateWithTimeIntervalSinceReferenceDate:hfsDate + hfsEpochTISRD];
+}
+
+- (u_int64_t) logicalDataForkBytes {
+	struct HFSCatalogFile const *_Nonnull const fileRec = self.hfsFileCatalogRecordData.bytes;
+	return L(fileRec->dataLogicalSize);
+}
+- (u_int64_t) logicalResourceForkBytes {
+	struct HFSCatalogFile const *_Nonnull const fileRec = self.hfsFileCatalogRecordData.bytes;
+	return L(fileRec->rsrcLogicalSize);
 }
 
 ///Search the catalog for parent items until reaching the volume root, then return the path so constructed.
@@ -388,6 +407,191 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	}
 	//TODO: Error handling
 	return (wroteChildren && wroteMetadata);
+}
+
+#pragma mark Directory trees
+
+///Returns a string that represents this item when printed to the console.
+- (NSString *_Nonnull) iconEmojiString {
+	switch (self.type) {
+		case ImpDehydratedItemTypeFile:
+			return @"📄";
+		case ImpDehydratedItemTypeFolder:
+			return @"📁";
+		case ImpDehydratedItemTypeVolume:
+			if (self.hfsVolume.totalSizeInBytes <= floppyMaxSize) {
+				return @"💾";
+			} else if (self.hfsVolume.totalSizeInBytes <= cdMaxSize) {
+				return @"💿";
+			} else if (self.hfsVolume.totalSizeInBytes <= dvdMaxSize) {
+				return @"📀";
+			} else {
+				return @"🗄";
+			}
+	}
+	return @"❓";
+}
+///Returns a string that identifies a macOS icon that can be used to represent this icon in a Mac GUI. Pass this string to +[NSImage iconForFileType:].
+- (NSString *_Nonnull) iconTypeString {
+	switch (self.type) {
+		case ImpDehydratedItemTypeFile:
+			//TODO: Maybe use the generic application icon if this item has file type 'APPL'? Or, maybe just pass this file's type directly in here?
+			return NSFileTypeForHFSTypeCode(kGenericDocumentIcon);
+		case ImpDehydratedItemTypeFolder:
+			return NSFileTypeForHFSTypeCode(kGenericFolderIcon);
+		case ImpDehydratedItemTypeVolume:
+			if (self.hfsVolume.totalSizeInBytes <= floppyMaxSize) {
+				return NSFileTypeForHFSTypeCode(kGenericFloppyIcon);
+			} else if (self.hfsVolume.totalSizeInBytes <= cdMaxSize) {
+				return NSFileTypeForHFSTypeCode(kGenericCDROMIcon);
+			} else if (self.hfsVolume.totalSizeInBytes <= dvdMaxSize) {
+				//Unlike emoji, there's no DVD icon.
+				return NSFileTypeForHFSTypeCode(kGenericCDROMIcon);
+			} else {
+				return NSFileTypeForHFSTypeCode(kGenericHardDiskIcon);
+			}
+	}
+	return NSFileTypeForHFSTypeCode(kUnknownFSObjectIcon);
+}
+
+- (void) _walkBreadthFirstAtDepth:(NSUInteger)depth block:(void (^_Nonnull const)(NSUInteger const depth, ImpDehydratedItem *_Nullable const item))block
+{
+	block(depth, self);
+	++depth;
+
+	NSMutableArray <ImpDehydratedItem *> *_Nonnull const subfolders = [NSMutableArray arrayWithCapacity:self.countOfChildren];
+	for (ImpDehydratedItem *_Nonnull const item in self.children) {
+		block(depth, item);
+		if (item.isDirectory) {
+			[subfolders addObject:item];
+		}
+	}
+
+	block(depth, nil);
+
+	for (ImpDehydratedItem *_Nonnull const item in subfolders) {
+		[item _walkBreadthFirstAtDepth:depth block:block];
+	}
+}
+
+///Call the block for each item in the tree. Calls the block with nil for the item at the end of each directory.
+- (void) walkBreadthFirst:(void (^_Nonnull const)(NSUInteger const depth, ImpDehydratedItem *_Nullable const item))block {
+	[self _walkBreadthFirstAtDepth:0 block:block];
+}
+
++ (instancetype _Nonnull) rootDirectoryOfHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol {
+
+	ImpBTreeFile *_Nonnull const catalog = hfsVol.catalogBTree;
+
+	NSUInteger const totalNumItems = hfsVol.numberOfFiles + hfsVol.numberOfFolders;
+	NSMutableDictionary <NSNumber *, ImpDehydratedItem *> *_Nonnull const dehydratedFolders = [NSMutableDictionary dictionaryWithCapacity:hfsVol.numberOfFolders];
+	//This is totally a wild guess of a heuristic.
+	NSMutableArray <ImpDehydratedItem *> *_Nonnull const itemsThatNeedToBeAddedToTheirParents = [NSMutableArray arrayWithCapacity:totalNumItems / 2];
+
+	__block ImpDehydratedItem *_Nullable rootItem = nil;
+
+	[catalog walkLeafNodes:^bool(ImpBTreeNode *const  _Nonnull node) {
+		[node forEachCatalogRecord_file:^(const struct HFSCatalogKey *const  _Nonnull catalogKeyPtr, const struct HFSCatalogFile *const _Nonnull fileRec) {
+			ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSVolume:hfsVol catalogNodeID:L(fileRec->fileID) key:catalogKeyPtr fileRecord:fileRec];
+
+			ImpDehydratedItem *_Nullable const parent = dehydratedFolders[@(L(catalogKeyPtr->parentID))];
+			if (parent != nil) {
+				[parent addChildrenObject:dehydratedFile];
+			} else {
+				[itemsThatNeedToBeAddedToTheirParents addObject:dehydratedFile];
+			}
+		} folder:^(const struct HFSCatalogKey *const  _Nonnull catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRec) {
+			ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSVolume:hfsVol catalogNodeID:L(folderRec->folderID) key:catalogKeyPtr folderRecord:folderRec];
+			dehydratedFolder->_children = [NSMutableArray arrayWithCapacity:L(folderRec->valence)];
+
+			dehydratedFolders[@(dehydratedFolder.catalogNodeID)] = dehydratedFolder;
+
+			HFSCatalogNodeID const parentID = L(catalogKeyPtr->parentID);
+			if (parentID == kHFSRootParentID) {
+				rootItem = dehydratedFolder;
+			} else {
+				ImpDehydratedItem *_Nullable const parent = dehydratedFolders[@(parentID)];
+				if (parent != nil) {
+					[parent addChildrenObject:dehydratedFolder];
+				} else {
+					[itemsThatNeedToBeAddedToTheirParents addObject:dehydratedFolder];
+				}
+			}
+		} thread:^(const struct HFSCatalogKey *const  _Nonnull catalogKeyPtr, const struct HFSCatalogThread *const _Nonnull threadRec) {
+			//Not sure we have anything to do for threads?
+		}];
+		return true;
+	}];
+
+
+	for (ImpDehydratedItem *_Nonnull const item in itemsThatNeedToBeAddedToTheirParents) {
+		[dehydratedFolders[@(item.parentFolderID)] addChildrenObject:item];
+	}
+
+	return dehydratedFolders[@(kHFSRootFolderID)];
+}
+
+- (void) printDirectoryHierarchy {
+	NSMutableString *_Nonnull const spaces = [
+		@" " @" " @" " @" "
+		@" " @" " @" " @" "
+		@" " @" " @" " @" "
+		@" " @" " @" " @" "
+		mutableCopy];
+	NSString *_Nonnull(^_Nonnull const indentWithDepth)(NSUInteger const depth) = ^NSString *_Nonnull(NSUInteger const depth) {
+		if (depth > spaces.length) {
+			NSRange extendRange = { spaces.length, depth - spaces.length };
+			for (NSUInteger i = extendRange.location; i < depth; ++i) {
+				[spaces appendString:@" "];
+			}
+		}
+		return [spaces substringToIndex:depth];
+	};
+
+	ImpDehydratedItem *_Nonnull const rootDirectory = self;
+	ImpPrintf(@"Name   \tData size\tRsrc size\tTotal size");
+	ImpPrintf(@"═══════\t═════════\t═════════\t═════════");
+	NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
+	fmtr.numberStyle = NSNumberFormatterDecimalStyle;
+	fmtr.hasThousandSeparators = true;
+
+	__block u_int64_t totalDF = 0, totalRF = 0, totalTotal = 0;
+
+	__block NSUInteger lastKnownDepth = 0;
+	[rootDirectory walkBreadthFirst:^(NSUInteger const depth, ImpDehydratedItem *_Nonnull const item) {
+		if (item == nil) {
+			ImpPrintf(@"");
+			return;
+		}
+
+		lastKnownDepth = depth;
+		switch (item.type) {
+			case ImpDehydratedItemTypeFile: {
+				u_int64_t const sizeDF = item.logicalDataForkBytes, sizeRF = item.logicalResourceForkBytes, sizeTotal = sizeDF + sizeRF;
+				totalDF += sizeDF;
+				totalRF += sizeRF;
+				totalTotal += sizeTotal;
+				ImpPrintf(@"%@%@ %@\t%9@\t%9@\t%9@", indentWithDepth(depth), item.iconEmojiString, item.name, [fmtr stringFromNumber:@(sizeDF)], [fmtr stringFromNumber:@(sizeRF)], [fmtr stringFromNumber:@(sizeTotal)]);
+				break;
+			}
+			case ImpDehydratedItemTypeFolder:
+			case ImpDehydratedItemTypeVolume:
+				ImpPrintf(@"%@%@ %@ contains %u items", indentWithDepth(depth), item.iconEmojiString, item.name, [item countOfChildren]);
+				break;
+			default:
+				ImpPrintf(@"%@%@ %@", indentWithDepth(depth), item.iconEmojiString, item.name);
+				break;
+		}
+		if (depth != lastKnownDepth) ImpPrintf(@"");
+	}];
+	ImpPrintf(@"═══════\t═════════\t═════════\t═════════");
+	ImpPrintf(@"%@\t%9@\t%9@\t%9@", @"Total", [fmtr stringFromNumber:@(totalDF)], [fmtr stringFromNumber:@(totalRF)], [fmtr stringFromNumber:@(totalTotal)]);
+}
+- (NSUInteger) countOfChildren {
+	return _children.count;
+}
+- (void) addChildrenObject:(ImpDehydratedItem *_Nonnull const)object {
+	[_children addObject:object];
 }
 
 @end

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3105F1C3293FE8B30062C6F8 /* ImpHFSLister.m in Sources */ = {isa = PBXBuildFile; fileRef = 3105F1C2293FE8B30062C6F8 /* ImpHFSLister.m */; };
 		31077AD1293849EE00066789 /* ImpBTreeIndexNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 31077AD0293849EE00066789 /* ImpBTreeIndexNode.m */; };
 		31077AD42939587400066789 /* NSData+ImpHexDump.m in Sources */ = {isa = PBXBuildFile; fileRef = 31077AD32939587300066789 /* NSData+ImpHexDump.m */; };
 		314EFFDB2932CF3700CE74E9 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFDA2932CF3700CE74E9 /* main.m */; };
@@ -40,6 +41,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		3105F1C1293FE8B30062C6F8 /* ImpHFSLister.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpHFSLister.h; sourceTree = "<group>"; };
+		3105F1C2293FE8B30062C6F8 /* ImpHFSLister.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpHFSLister.m; sourceTree = "<group>"; };
 		31077ACE2937C5E500066789 /* ImpSizeUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpSizeUtilities.h; sourceTree = "<group>"; };
 		31077ACF293849EE00066789 /* ImpBTreeIndexNode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpBTreeIndexNode.h; sourceTree = "<group>"; };
 		31077AD0293849EE00066789 /* ImpBTreeIndexNode.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpBTreeIndexNode.m; sourceTree = "<group>"; };
@@ -158,6 +161,8 @@
 				314EFFE3293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m */,
 				31F719AD293A8F300055EEA3 /* ImpHFSExtractor.h */,
 				31F719AE293A8F300055EEA3 /* ImpHFSExtractor.m */,
+				3105F1C1293FE8B30062C6F8 /* ImpHFSLister.h */,
+				3105F1C2293FE8B30062C6F8 /* ImpHFSLister.m */,
 			);
 			path = "impluse-hfs";
 			sourceTree = "<group>";
@@ -266,6 +271,7 @@
 				31F719B5293ABAAB0055EEA3 /* ImpDehydratedItem.m in Sources */,
 				31F719B8293AC4230055EEA3 /* ImpTextEncodingConverter.m in Sources */,
 				314EFFEA29332FEA00CE74E9 /* ImpHFSPlusVolume.m in Sources */,
+				3105F1C3293FE8B30062C6F8 /* ImpHFSLister.m in Sources */,
 				314EFFF3293510CE00CE74E9 /* ImpBTreeHeaderNode.m in Sources */,
 				314EFFE72933160800CE74E9 /* ImpHFSVolume.m in Sources */,
 				314EFFF72936D80D00CE74E9 /* ImpExtentSeries.m in Sources */,
