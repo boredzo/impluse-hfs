@@ -39,6 +39,9 @@
 ///Total number of folders in the whole volume.
 - (NSUInteger) numberOfFolders;
 
+- (NSUInteger) catalogSizeInBytes;
+- (NSUInteger) extentsOverflowSizeInBytes;
+
 #pragma mark -
 
 - (NSData *_Nullable) readDataFromFileDescriptor:(int const)readFD

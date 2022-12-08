@@ -331,6 +331,13 @@
 	return L(_mdb->drDirCnt);
 }
 
+- (NSUInteger) catalogSizeInBytes {
+	return L(_mdb->drCTFlSize);
+}
+- (NSUInteger) extentsOverflowSizeInBytes {
+	return L(_mdb->drXTFlSize);
+}
+
 - (u_int64_t) forEachExtentInFileWithID:(HFSCatalogNodeID)cnid
 	fork:(ImpForkType)forkType
 	forkLogicalLength:(u_int64_t const)forkLength

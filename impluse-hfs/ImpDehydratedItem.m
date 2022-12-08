@@ -644,6 +644,28 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	}];
 	ImpPrintf(@"═══════\t═════════\t═════════\t═════════");
 	ImpPrintf(@"%@\t%9@\t%9@\t%9@", @"Total", [fmtr stringFromNumber:@(totalDF)], [fmtr stringFromNumber:@(totalRF)], [fmtr stringFromNumber:@(totalTotal)]);
+
+	//Lastly, report the sizes of the catalog and extents files.
+	bool const includeCatAndExt = false;
+	if (includeCatAndExt) {
+		ImpPrintf(@"═══════\t═════════\t═════════\t═════════");
+		{
+			u_int64_t const sizeDF = self.hfsVolume.catalogSizeInBytes, sizeRF = 0, sizeTotal = sizeDF + sizeRF;
+			totalDF += sizeDF;
+			totalRF += sizeRF;
+			totalTotal += sizeTotal;
+			ImpPrintf(@"%@ %@\t%9@\t%9@\t%9@", @"🗃", @"Catalog", [fmtr stringFromNumber:@(sizeDF)], [fmtr stringFromNumber:@(sizeRF)], [fmtr stringFromNumber:@(sizeTotal)]);
+		}
+		{
+			u_int64_t const sizeDF = self.hfsVolume.extentsOverflowSizeInBytes, sizeRF = 0, sizeTotal = sizeDF + sizeRF;
+			totalDF += sizeDF;
+			totalRF += sizeRF;
+			totalTotal += sizeTotal;
+			ImpPrintf(@"%@ %@\t%9@\t%9@\t%9@", @"🗃", @"Extents", [fmtr stringFromNumber:@(sizeDF)], [fmtr stringFromNumber:@(sizeRF)], [fmtr stringFromNumber:@(sizeTotal)]);
+		}
+		ImpPrintf(@"═══════\t═════════\t═════════\t═════════");
+		ImpPrintf(@"%@\t%9@\t%9@\t%9@", @"Total", [fmtr stringFromNumber:@(totalDF)], [fmtr stringFromNumber:@(totalRF)], [fmtr stringFromNumber:@(totalTotal)]);
+	}
 }
 - (NSUInteger) countOfChildren {
 	return _children.count;
