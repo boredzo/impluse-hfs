@@ -260,8 +260,6 @@
 	getNode:(ImpBTreeNode *_Nullable *_Nullable const)outNode
 	recordIndex:(u_int16_t *_Nullable const)outRecordIdx
 {
-	ImpTextEncodingConverter *_Nonnull const tec = [ImpTextEncodingConverter converterWithHFSTextEncoding:kTextEncodingMacRoman]; //TODO: Here, too, we need text encoding info.
-
 	ImpBTreeHeaderNode *_Nullable const headerNode = self.headerNode;
 	ImpBTreeNode *_Nullable const rootNode = headerNode.rootNode;
 //	ImpPrintf(@"Searching catalog file starting from root node #%u at height %u", rootNode.nodeNumber, (unsigned)rootNode.nodeHeight);

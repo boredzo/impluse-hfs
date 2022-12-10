@@ -178,11 +178,8 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 
 	//TODO: This implementation will overwrite the destination file if it already exists. The client should probably check for that and prompt for confirmation…
 
-	NSByteCountFormatter *_Nonnull const bcf = [NSByteCountFormatter new];
 	off_t const dataForkSize = L(fileRec->dataLogicalSize);
 	off_t const rsrcForkSize = L(fileRec->rsrcLogicalSize);
-	//TODO: Probably should make sure both of these are non-negative and return a read error if we find a fork with a negative size.
-	unsigned long long const totalForksSize = dataForkSize + rsrcForkSize;
 
 	//Realistically, we have to use the File Manager.
 	//The alternative is using NSURL and writing to resource forks as realWorldURL/..namedFork/rsrc. This doesn't work on APFS, for reasons unknown, and still wouldn't enable us to rehydrate certain metadata, such as the Locked checkbox.
