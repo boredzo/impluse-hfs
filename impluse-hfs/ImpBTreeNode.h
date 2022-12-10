@@ -67,7 +67,7 @@ typedef ImpBTreeComparisonResult (^ImpBTreeRecordKeyComparator)(void const *_Non
 - (ImpBTreeNode *_Nullable) searchSiblingsForBestMatchingNodeWithComparator:(ImpBTreeRecordKeyComparator _Nonnull)comparator;
 
 ///Search this node for the record with the greatest key that is less than or equal to the quarry. Returns its index. Returns -1 if the first key in this node is greater than the quarry.
-- (NSInteger) indexOfBestMatchingRecord:(ImpBTreeRecordKeyComparator _Nonnull)comparator;
+- (int16_t) indexOfBestMatchingRecord:(ImpBTreeRecordKeyComparator _Nonnull)comparator;
 
 #pragma mark Records
 

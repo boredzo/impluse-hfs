@@ -133,9 +133,9 @@ typedef u_int16_t BTreeNodeOffset;
 	return self;
 }
 
-- (NSInteger) indexOfBestMatchingRecord:(ImpBTreeRecordKeyComparator _Nonnull)comparator {
+- (int16_t) indexOfBestMatchingRecord:(ImpBTreeRecordKeyComparator _Nonnull)comparator {
 	//We *could* bisect this, but there are only likely to be a handful of records in a 512-byte node, so let's just search linearly.
-	for (NSInteger i = 0; i < self.numberOfRecords; ++i) {
+	for (u_int16_t i = 0; i < (u_int16_t)_numberOfRecords; ++i) {
 		ImpBTreeComparisonResult const comparisonResult = comparator([self recordDataAtIndex:i].bytes);
 		if (comparisonResult == ImpBTreeComparisonQuarryIsLesser) {
 			return i - 1;
@@ -148,7 +148,7 @@ typedef u_int16_t BTreeNodeOffset;
 - (void) buildRecordCache {
 	if (_recordCache == nil) {
 		_recordCache = [NSMutableArray arrayWithCapacity:_numberOfRecords];
-		for (NSUInteger i = 0; i < _numberOfRecords; ++i) {
+		for (u_int16_t i = 0; i < (u_int16_t)_numberOfRecords; ++i) {
 			[_recordCache addObject:[self recordDataAtIndex_nocache:i]];
 		}
 	}
@@ -282,7 +282,7 @@ typedef u_int16_t BTreeNodeOffset;
 	NSUInteger numVisited = 0;
 
 	bool keepIterating = true;
-	for (NSUInteger i = 0; i < _numberOfRecords; ++i) {
+	for (u_int16_t i = 0; i < (u_int16_t)_numberOfRecords; ++i) {
 		++numVisited;
 
 		NSData *_Nonnull const recordData = [self recordDataAtIndex:i];
@@ -298,7 +298,7 @@ typedef u_int16_t BTreeNodeOffset;
 	NSUInteger numVisited = 0;
 
 	bool keepIterating = true;
-	for (NSUInteger i = 0; i < _numberOfRecords; ++i) {
+	for (u_int16_t i = 0; i < (u_int16_t)_numberOfRecords; ++i) {
 		++numVisited;
 
 		NSData *_Nonnull const keyData = [self recordKeyDataAtIndex:i];

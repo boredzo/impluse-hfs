@@ -14,7 +14,7 @@
 
 @implementation ImpHFSExtractor
 
-- (void) deliverProgressUpdate:(float)progress
+- (void) deliverProgressUpdate:(double)progress
 	operationDescription:(NSString *_Nonnull)operationDescription
 {
 	if (self.extractionProgressUpdateBlock != nil) {

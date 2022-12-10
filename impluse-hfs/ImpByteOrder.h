@@ -10,7 +10,7 @@
 #define ImpByteOrder_h
 
 #define L8(x) (x)
-static inline int8_t ImpSwapInt8BigToHost(x) {
+static inline int8_t ImpSwapInt8BigToHost(int8_t x) {
 	return x;
 }
 

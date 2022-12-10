@@ -8,7 +8,7 @@
 #import <Foundation/Foundation.h>
 
 ///progress is a value from 0.0 to 1.0. 1.0 means the conversion has finished. operationDescription is a string describing what work is currently being done.
-typedef void (^ImpExtractionProgressUpdateBlock)(float progress, NSString *_Nonnull operationDescription);
+typedef void (^ImpExtractionProgressUpdateBlock)(double progress, NSString *_Nonnull operationDescription);
 
 @interface ImpHFSExtractor : NSObject
 

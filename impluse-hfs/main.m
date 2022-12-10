@@ -38,7 +38,11 @@ int main(int argc, const char * argv[]) {
 		NSString *_Nonnull const subcommand = [argsEnum nextObject];
 		SEL _Nonnull const subcmdSelector = NSSelectorFromString([subcommand stringByAppendingString:@":"]);
 		if ([impluse respondsToSelector:subcmdSelector]) {
+			//ARC warns because we could use performSelector:withObject: to call -release or something. We're not doing that, so take out a license to use dynamic dispatch without complaint.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
 			[impluse performSelector:subcmdSelector withObject:argsEnum];
+#pragma clang diagnostic pop
 		} else {
 			[impluse unrecognizedSubcommand:subcommand];
 		}
@@ -117,7 +121,7 @@ int main(int argc, const char * argv[]) {
 	ImpHFSToHFSPlusConverter *_Nonnull const converter = [ImpHFSToHFSPlusConverter new];
 	converter.sourceDevice = [NSURL fileURLWithPath:srcDevPath isDirectory:false];
 	converter.destinationDevice = [NSURL fileURLWithPath:dstDevPath isDirectory:false];
-	converter.conversionProgressUpdateBlock = ^(float progress, NSString * _Nonnull operationDescription) {
+	converter.conversionProgressUpdateBlock = ^(double progress, NSString * _Nonnull operationDescription) {
 		ImpPrintf(@"%u%%: %@", (unsigned)round(100.0 * progress), operationDescription);
 	};
 	NSError *_Nullable error = nil;
@@ -152,7 +156,7 @@ int main(int argc, const char * argv[]) {
 	extractor.quarryNameOrPath = quarryNameOrPath;
 	extractor.destinationPath = destinationPath;
 
-	extractor.extractionProgressUpdateBlock = ^(float progress, NSString * _Nonnull operationDescription) {
+	extractor.extractionProgressUpdateBlock = ^(double progress, NSString * _Nonnull operationDescription) {
 		ImpPrintf(@"%u%%: %@", (unsigned)round(100.0 * progress), operationDescription);
 	};
 	NSError *_Nullable error = nil;

@@ -284,7 +284,7 @@
 //			ImpPrintf(@"Presumptive leaf node is #%u at height %u. Searching for records…", nextSearchNode.nodeNumber, (unsigned)nextSearchNode.nodeHeight);
 
 			//Should be a leaf node.
-			NSInteger const recordIdx = [nextSearchNode indexOfBestMatchingRecord:compareKeys];
+			int16_t const recordIdx = [nextSearchNode indexOfBestMatchingRecord:compareKeys];
 //			ImpPrintf(@"Best matching record is #%lu", recordIdx);
 
 			//TODO: If outItemRecordData is non-NULL, we need a file or folder record—a thread record will not do.
@@ -339,7 +339,7 @@
 			NSString *_Nonnull const foundNodeName = [tec stringForPascalString:foundCatKeyPtr->nodeName];
 			nameComparison = [quarryNodeName localizedStandardCompare:foundNodeName];
 		}
-		return nameComparison;
+		return (ImpBTreeComparisonResult)nameComparison;
 	};
 
 	ImpBTreeNode *_Nullable foundNode = nil;
@@ -397,7 +397,7 @@
 			NSString *_Nonnull const foundNodeName = [tec stringForPascalString:foundCatKeyPtr->nodeName];
 			nameComparison = [quarryNodeName localizedStandardCompare:foundNodeName];
 		}
-		return nameComparison;
+		return (ImpBTreeComparisonResult)nameComparison;
 	};
 
 	ImpBTreeNode *_Nullable foundNode = nil;

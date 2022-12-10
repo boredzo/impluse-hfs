@@ -105,7 +105,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 }
 
 - (u_int32_t) hfsDateForDate:(NSDate *_Nonnull const)dateToConvert {
-	return dateToConvert.timeIntervalSinceReferenceDate - hfsEpochTISRD;
+	return (u_int32_t)(dateToConvert.timeIntervalSinceReferenceDate - hfsEpochTISRD);
 }
 - (NSDate *_Nonnull const) dateForHFSDate:(u_int32_t const)hfsDate {
 	return [NSDate dateWithTimeIntervalSinceReferenceDate:hfsDate + hfsEpochTISRD];
@@ -173,6 +173,9 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 }
 
 - (bool) rehydrateFileAtRealWorldURL:(NSURL *_Nonnull const)realWorldURL error:(NSError *_Nullable *_Nonnull const)outError {
+	ImpHFSVolume *_Nullable const volume = self.hfsVolume;
+	NSAssert(volume != nil, @"Can't rehydrate a file from no volume. This is likely an internal inconsistency error and therefore a bug.");
+
 	struct HFSCatalogFile const *_Nonnull const fileRec = (struct HFSCatalogFile const *_Nonnull const)self.hfsFileCatalogRecordData.bytes;
 
 	//TODO: This implementation will overwrite the destination file if it already exists. The client should probably check for that and prompt for confirmation…
@@ -236,7 +239,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	}
 
 	NSString *_Nonnull const name = [realWorldURL.lastPathComponent stringByReplacingOccurrencesOfString:@":" withString:@"/"];
-	HFSUniStr255 name255 = { .length = name.length };
+	HFSUniStr255 name255 = { .length = (u_int16_t)name.length };
 	if (name255.length > 255) name255.length = 255;
 	[name getCharacters:name255.unicode range:(NSRange){ 0, name255.length }];
 
@@ -296,7 +299,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 
 	__block bool allWritesSucceeded = true; //Defaults to true in case the fork is empty so we encounter no extents.
 	__block NSError *_Nullable writeError = nil;
-	[self.hfsVolume forEachExtentInFileWithID:self.catalogNodeID
+	[volume forEachExtentInFileWithID:self.catalogNodeID
 		fork:ImpForkTypeData
 		forkLogicalLength:dataForkSize
 		startingWithExtentsRecord:fileRec->dataExtents
@@ -323,7 +326,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		}
 	}
 	//Now do that again, but for the resource fork.
-	[self.hfsVolume forEachExtentInFileWithID:self.catalogNodeID
+	[volume forEachExtentInFileWithID:self.catalogNodeID
 		fork:ImpForkTypeResource
 		forkLogicalLength:rsrcForkSize
 		startingWithExtentsRecord:fileRec->rsrcExtents
@@ -369,6 +372,9 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	return wroteData && wroteMetadata;
 }
 - (bool) rehydrateFolderAtRealWorldURL:(NSURL *_Nonnull const)realWorldURL error:(NSError *_Nullable *_Nonnull const)outError {
+	ImpHFSVolume *_Nullable const volume = self.hfsVolume;
+	NSAssert(volume != nil, @"Can't rehydrate a folder from no volume. This is likely an internal inconsistency error and therefore a bug.");
+
 	struct HFSCatalogFolder const *_Nonnull const folderRec = (struct HFSCatalogFolder const *_Nonnull const)self.hfsFolderCatalogRecordData.bytes;
 
 	bool wroteChildren = true; //TODO: Come up with a better way to distinguish “wrote no children because the folder was empty” and “wrote no children because failure” (or, for that matter, “wrote some children but then failure”).
@@ -383,7 +389,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	FSRef parentRef;
 	if (CFURLGetFSRef((__bridge CFURLRef)realWorldURL.URLByDeletingLastPathComponent, &parentRef)) {
 		NSString *_Nonnull const name = [realWorldURL.lastPathComponent stringByReplacingOccurrencesOfString:@":" withString:@"/"];
-		HFSUniStr255 name255 = { .length = name.length };
+		HFSUniStr255 name255 = { .length = (u_int16_t)name.length };
 		if (name255.length > 255) name255.length = 255;
 		[name getCharacters:name255.unicode range:(NSRange){ 0, name255.length }];
 
@@ -446,10 +452,10 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		//For each item in the dehydrated directory, rehydrate it, too.
 		//(Ugh, this might cost a ton of FSRefs.)
 		@autoreleasepool {
-			[self.hfsVolume.catalogBTree forEachItemInDirectory:self.catalogNodeID
+			[volume.catalogBTree forEachItemInDirectory:self.catalogNodeID
 			file:^bool(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFile const *_Nonnull const fileRec) {
 				HFSCatalogNodeID const fileID = L(fileRec->fileID);
-				ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSVolume:self.hfsVolume catalogNodeID:fileID key:keyPtr fileRecord:fileRec];
+				ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSVolume:volume catalogNodeID:fileID key:keyPtr fileRecord:fileRec];
 				NSString *_Nonnull const filename = [[tec stringForPascalString:keyPtr->nodeName] stringByReplacingOccurrencesOfString:@"/" withString:@":"];
 				NSURL *_Nonnull const fileURL = [realWorldURL URLByAppendingPathComponent:filename isDirectory:false];
 				ImpPrintf(@"Rehydrating descendant 📄 “%@”", filename);
@@ -460,7 +466,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 				return rehydrated;
 			}
 			folder:^bool(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFolder const *_Nonnull const folderRec) {
-				ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSVolume:self.hfsVolume catalogNodeID:L(folderRec->folderID) key:keyPtr folderRecord:folderRec];
+				ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSVolume:volume catalogNodeID:L(folderRec->folderID) key:keyPtr folderRecord:folderRec];
 				NSString *_Nonnull const folderName = [[tec stringForPascalString:keyPtr->nodeName] stringByReplacingOccurrencesOfString:@"/" withString:@":"];
 				NSURL *_Nonnull const folderURL = [realWorldURL URLByAppendingPathComponent:folderName isDirectory:true];
 				ImpPrintf(@"Rehydrating descendant 📁 “%@”", folderName);
@@ -496,26 +502,32 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 
 ///Returns a string that represents this item when printed to the console.
 - (NSString *_Nonnull) iconEmojiString {
+	ImpHFSVolume *_Nullable const volume = self.hfsVolume;
+
 	switch (self.type) {
 		case ImpDehydratedItemTypeFile:
 			return @"📄";
 		case ImpDehydratedItemTypeFolder:
 			return @"📁";
 		case ImpDehydratedItemTypeVolume:
-			if (self.hfsVolume.totalSizeInBytes <= floppyMaxSize) {
-				return @"💾";
-			} else if (self.hfsVolume.totalSizeInBytes <= cdMaxSize) {
-				return @"💿";
-			} else if (self.hfsVolume.totalSizeInBytes <= dvdMaxSize) {
-				return @"📀";
-			} else {
-				return @"🗄";
+			if (volume != nil) {
+				if (volume.totalSizeInBytes <= floppyMaxSize) {
+					return @"💾";
+				} else if (volume.totalSizeInBytes <= cdMaxSize) {
+					return @"💿";
+				} else if (volume.totalSizeInBytes <= dvdMaxSize) {
+					return @"📀";
+				} else {
+					return @"🗄";
+				}
 			}
 	}
 	return @"❓";
 }
 ///Returns a string that identifies a macOS icon that can be used to represent this icon in a Mac GUI. Pass this string to +[NSImage iconForFileType:].
 - (NSString *_Nonnull) iconTypeString {
+	ImpHFSVolume *_Nullable const volume = self.hfsVolume;
+
 	switch (self.type) {
 		case ImpDehydratedItemTypeFile:
 			//TODO: Maybe use the generic application icon if this item has file type 'APPL'? Or, maybe just pass this file's type directly in here?
@@ -523,17 +535,20 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		case ImpDehydratedItemTypeFolder:
 			return NSFileTypeForHFSTypeCode(kGenericFolderIcon);
 		case ImpDehydratedItemTypeVolume:
-			if (self.hfsVolume.totalSizeInBytes <= floppyMaxSize) {
-				return NSFileTypeForHFSTypeCode(kGenericFloppyIcon);
-			} else if (self.hfsVolume.totalSizeInBytes <= cdMaxSize) {
-				return NSFileTypeForHFSTypeCode(kGenericCDROMIcon);
-			} else if (self.hfsVolume.totalSizeInBytes <= dvdMaxSize) {
-				//Unlike emoji, there's no DVD icon.
-				return NSFileTypeForHFSTypeCode(kGenericCDROMIcon);
-			} else {
-				return NSFileTypeForHFSTypeCode(kGenericHardDiskIcon);
+			if (volume != nil) {
+				if (volume.totalSizeInBytes <= floppyMaxSize) {
+					return NSFileTypeForHFSTypeCode(kGenericFloppyIcon);
+				} else if (volume.totalSizeInBytes <= cdMaxSize) {
+					return NSFileTypeForHFSTypeCode(kGenericCDROMIcon);
+				} else if (volume.totalSizeInBytes <= dvdMaxSize) {
+					//Unlike emoji, there's no DVD icon.
+					return NSFileTypeForHFSTypeCode(kGenericCDROMIcon);
+				} else {
+					return NSFileTypeForHFSTypeCode(kGenericHardDiskIcon);
+				}
 			}
 	}
+
 	return NSFileTypeForHFSTypeCode(kUnknownFSObjectIcon);
 }
 
@@ -686,16 +701,18 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	//Lastly, report the sizes of the catalog and extents files.
 	bool const includeCatAndExt = false;
 	if (includeCatAndExt) {
+		ImpHFSVolume *_Nullable const volume = self.hfsVolume;
+
 		ImpPrintf(@"═══════\t═════════\t═════════\t═════════");
 		{
-			u_int64_t const sizeDF = self.hfsVolume.catalogSizeInBytes, sizeRF = 0, sizeTotal = sizeDF + sizeRF;
+			u_int64_t const sizeDF = volume.catalogSizeInBytes, sizeRF = 0, sizeTotal = sizeDF + sizeRF;
 			totalDF += sizeDF;
 			totalRF += sizeRF;
 			totalTotal += sizeTotal;
 			ImpPrintf(@"%@ %@\t%9@\t%9@\t%9@", @"🗃", @"Catalog", [fmtr stringFromNumber:@(sizeDF)], [fmtr stringFromNumber:@(sizeRF)], [fmtr stringFromNumber:@(sizeTotal)]);
 		}
 		{
-			u_int64_t const sizeDF = self.hfsVolume.extentsOverflowSizeInBytes, sizeRF = 0, sizeTotal = sizeDF + sizeRF;
+			u_int64_t const sizeDF = volume.extentsOverflowSizeInBytes, sizeRF = 0, sizeTotal = sizeDF + sizeRF;
 			totalDF += sizeDF;
 			totalRF += sizeRF;
 			totalTotal += sizeTotal;

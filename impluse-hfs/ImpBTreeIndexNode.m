@@ -39,6 +39,8 @@
 	__block ImpBTreeNode *_Nullable result = nil;
 	__block bool foundBestMatch = false;
 
+	ImpBTreeFile *_Nullable const tree = self.tree;
+
 	[self forEachRecord:^bool(NSData *const  _Nonnull data) {
 		void const *_Nonnull const recordPtr = data.bytes;
 		void const *_Nonnull const keyPtr = recordPtr;
@@ -53,14 +55,14 @@
 		switch (order) {
 			case ImpBTreeComparisonQuarryIsEqual:
 				//Hooray, an exact match! Descend directly to this node.
-				result = [self.tree nodeAtIndex:L(*downwardNodePtr)];
+				result = [tree nodeAtIndex:L(*downwardNodePtr)];
 				foundBestMatch = true;
 				keepIterating = false;
 				break;
 
 			case ImpBTreeComparisonQuarryIsGreater:
 				//Not an exact match yet (if there even is one), but we're still in the range of eligible keys (we're searching for either an exact match or the greatest key that's less than the quarry). So this is the new greatest candidate so far, but we're not yet ready to stop the search.
-				result = [self.tree nodeAtIndex:L(*downwardNodePtr)];
+				result = [tree nodeAtIndex:L(*downwardNodePtr)];
 				break;
 
 			case ImpBTreeComparisonQuarryIsLesser:

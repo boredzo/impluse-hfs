@@ -125,7 +125,7 @@
 	}
 #endif
 	{
-		S(outputBuf[0], actualOutputLengthInBytes / sizeof(UniChar));
+		S(outputBuf[0], (u_int16_t)(actualOutputLengthInBytes / sizeof(UniChar)));
 	}
 
 	return unicodeData;
@@ -141,7 +141,7 @@
 	return unicodeString;
 }
 
-- (void) deliverProgressUpdate:(float)progress
+- (void) deliverProgressUpdate:(double)progress
 	operationDescription:(NSString *_Nonnull)operationDescription
 {
 	if (self.conversionProgressUpdateBlock != nil) {
