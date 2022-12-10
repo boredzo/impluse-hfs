@@ -25,7 +25,7 @@
 		return false;
 
 	ImpDehydratedItem *_Nonnull const rootDirectory = [ImpDehydratedItem rootDirectoryOfHFSVolume:srcVol];
-	[rootDirectory printDirectoryHierarchy];
+	[rootDirectory printDirectoryHierarchy_asPaths:self.printAbsolutePaths];
 	return true;
 }
 

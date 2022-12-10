@@ -70,6 +70,7 @@ typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
 ///Walk the directory hierarchy breadth-first starting from this directory, calling the block for each item encountered. Use the depth value for indentation. Results undefined if you call this directly upon a dehydrated file (rather than a folder or volume).
 - (void) walkBreadthFirst:(void (^_Nonnull const)(NSUInteger const depth, ImpDehydratedItem *_Nonnull const item))block;
 
-- (void) printDirectoryHierarchy;
+///Used by ImpHFSLister to print directory hierarchies to the terminal. This is, effectively, the real implementation of the list command.
+- (void) printDirectoryHierarchy_asPaths:(bool)printAbsolutePaths;
 
 @end

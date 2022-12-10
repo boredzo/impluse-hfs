@@ -615,25 +615,38 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	return dehydratedFolders[@(kHFSRootFolderID)];
 }
 
-- (void) printDirectoryHierarchy {
-	NSMutableString *_Nonnull const spaces = [
-		@" " @" " @" " @" "
-		@" " @" " @" " @" "
-		@" " @" " @" " @" "
-		@" " @" " @" " @" "
-		mutableCopy];
-	NSString *_Nonnull(^_Nonnull const indentWithDepth)(NSUInteger const depth) = ^NSString *_Nonnull(NSUInteger const depth) {
-		if (depth > spaces.length) {
-			NSRange extendRange = { spaces.length, depth - spaces.length };
-			for (NSUInteger i = extendRange.location; i < depth; ++i) {
-				[spaces appendString:@" "];
-			}
+- (void) printDirectoryHierarchy_asPaths:(bool)printAbsolutePaths {
+	NSString *_Nonnull (^firstColumnForItem)(ImpDehydratedItem *_Nonnull const item, NSUInteger const depth) = (
+		printAbsolutePaths
+		? ^NSString *_Nonnull(ImpDehydratedItem *_Nonnull const item, NSUInteger const depth)
+		{
+			NSArray <NSString *> *_Nonnull const path = item.path;
+			NSString *_Nonnull const pathStr = [path componentsJoinedByString:@":"];
+			return (item.isDirectory) ? [pathStr stringByAppendingString:@":"] : pathStr;
 		}
-		return [spaces substringToIndex:depth];
-	};
+		: ^NSString *_Nonnull(ImpDehydratedItem *_Nonnull const item, NSUInteger const depth)
+		{
+			NSMutableString *_Nonnull const spaces = [
+				@" " @" " @" " @" "
+				@" " @" " @" " @" "
+				@" " @" " @" " @" "
+				@" " @" " @" " @" "
+				mutableCopy];
+			NSString *_Nonnull(^_Nonnull const indentWithDepth)(NSUInteger const depth) = ^NSString *_Nonnull(NSUInteger const depth) {
+				if (depth > spaces.length) {
+					NSRange extendRange = { spaces.length, depth - spaces.length };
+					for (NSUInteger i = extendRange.location; i < depth; ++i) {
+						[spaces appendString:@" "];
+					}
+				}
+				return [spaces substringToIndex:depth];
+			};
+			return [NSString stringWithFormat:@"%@%@ %@", indentWithDepth(depth), item.iconEmojiString, item.name];
+		}
+	);
 
 	ImpDehydratedItem *_Nonnull const rootDirectory = self;
-	ImpPrintf(@"Name   \tData size\tRsrc size\tTotal size");
+	ImpPrintf(@"%@   \tData size\tRsrc size\tTotal size", printAbsolutePaths ? @"Path" : @"Name");
 	ImpPrintf(@"═══════\t═════════\t═════════\t═════════");
 	NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
 	fmtr.numberStyle = NSNumberFormatterDecimalStyle;
@@ -655,15 +668,15 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 				totalDF += sizeDF;
 				totalRF += sizeRF;
 				totalTotal += sizeTotal;
-				ImpPrintf(@"%@%@ %@\t%9@\t%9@\t%9@", indentWithDepth(depth), item.iconEmojiString, item.name, [fmtr stringFromNumber:@(sizeDF)], [fmtr stringFromNumber:@(sizeRF)], [fmtr stringFromNumber:@(sizeTotal)]);
+				ImpPrintf(@"%@\t%9@\t%9@\t%9@", firstColumnForItem(item, depth), [fmtr stringFromNumber:@(sizeDF)], [fmtr stringFromNumber:@(sizeRF)], [fmtr stringFromNumber:@(sizeTotal)]);
 				break;
 			}
 			case ImpDehydratedItemTypeFolder:
 			case ImpDehydratedItemTypeVolume:
-				ImpPrintf(@"%@%@ %@ contains %u items", indentWithDepth(depth), item.iconEmojiString, item.name, [item countOfChildren]);
+				ImpPrintf(@"%@ contains %u items", firstColumnForItem(item, depth), [item countOfChildren]);
 				break;
 			default:
-				ImpPrintf(@"%@%@ %@", indentWithDepth(depth), item.iconEmojiString, item.name);
+				ImpPrintf(@"%@", firstColumnForItem(item, depth));
 				break;
 		}
 		if (depth != lastKnownDepth) ImpPrintf(@"");

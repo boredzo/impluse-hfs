@@ -51,8 +51,8 @@ int main(int argc, const char * argv[]) {
 @implementation Impluse
 
 - (void) printUsageToFile:(FILE *_Nonnull const)outputFile {
-	fprintf(outputFile, "usage: %s list hfs-device\n", self.argv0.UTF8String ?: "impluse");
-	fprintf(outputFile, "Recursively lists the entire contents of a volume, starting from its root directory.\n");
+	fprintf(outputFile, "usage: %s list [--paths] hfs-device\n", self.argv0.UTF8String ?: "impluse");
+	fprintf(outputFile, "Recursively lists the entire contents of a volume, starting from its root directory. With --paths, each item is listed as its full absolute path, which you can pass to extract. Otherwise, you get a more-readable indented listing.\n");
 	fprintf(outputFile, "\n");
 
 	fprintf(outputFile, "usage: %s convert hfs-device hfsplus-device\n", self.argv0.UTF8String ?: "impluse");
@@ -79,14 +79,24 @@ int main(int argc, const char * argv[]) {
 }
 
 - (void) list:(NSEnumerator <NSString *> *_Nonnull const)argsEnum {
-	NSString *_Nullable const srcDevPath = [argsEnum nextObject];
+	bool printAbsolutePaths = false;
+	NSString *_Nullable srcDevPath = nil;
+	for (NSString *_Nonnull const arg in argsEnum) {
+		if ((srcDevPath == nil) && [arg isEqualToString:@"--paths"]) {
+			printAbsolutePaths = true;
+		} else {
+			srcDevPath = arg;
+		}
+	}
 	if (srcDevPath == nil) {
 		[self printUsageToFile:stderr];
 		self.status = EX_USAGE;
 		return;
 	}
+
 	ImpHFSLister *_Nonnull const lister = [ImpHFSLister new];
 	lister.sourceDevice = [NSURL fileURLWithPath:srcDevPath isDirectory:false];
+	lister.printAbsolutePaths = printAbsolutePaths;
 
 	NSError *_Nullable error = nil;
 	bool const converted = [lister performInventoryOrReturnError:&error];
