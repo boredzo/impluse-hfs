@@ -40,14 +40,22 @@ TN1150 makes a couple of important clarifications regarding the layout of the vo
 
 >Using a file allows the bitmap itself to be allocated from allocation blocks. This simplifies the design, since volumes are now comprised of only one type of block -- the allocation block. The HFS is slightly more complex because it uses 512-byte blocks to hold the allocation bitmap and allocation blocks to hold file data.
 
-This means that the volume bitmap is always in 512-byte chunks, regardless of `drAlBlkSize`.
+This means that the volume bitmap is always in 0x200-byte chunks, regardless of `drAlBlkSize`.
 
 >All of the volume's structures, including the volume header, are part of one or more allocation blocks (with the possible exception of the alternate volume header, discussed below). This differs from HFS, which has several structures (including the boot blocks, master directory block, and bitmap) which are not part of any allocation block.
 
 This part has two ramifications:
 
-- The first allocation block on an HFS volume starts after the VBM. (Though, does it have to start at a position that is a multiple of the block size? That is, if the VBM's last 512-byte chunk ends on a multiple of 512 but not 1024, does there need to be padding between that point and the next allocation-block-size multiple?)
+- The first allocation block on an HFS volume starts *after* the VBM. (Though, does it have to start at a position that is a multiple of the block size? That is, if the VBM's last 0x200-byte chunk ends on a multiple of 0x200 but not 0x400, does there need to be padding between that point and the next allocation-block-size multiple?)
 - Including everything all the way out to the edges of the volume changes _which_ blocks have to be marked as used. Effectively, the allocation bitmap on HFS+ has a handful of new blocks, marked as used, before and after the volume contents.
+
+Also, the allocation bitmap can't exist in the same allocation block as the volume header. For volumes with 0x200-byte blocks, this is easy enough. For volumes with larger blocks, the bitmap has to be relocated. *Everything* might have to be relocated.
+
+“Journeyman Turbo™” has an allocation block size of 16.5 K (0x4200 bytes). If we keep that block size, 15 K of the first block has to go unused. The allocation bitmap has to go somewhere, likely (though not necessarily) in block #1. The extents overflow file in the HFS volume starts at 9728 bytes; block #2 in an HFS+ volume with the same block size wouldn't start until 33792 bytes.
+
+If we're to try to keep things in the same places, we may have to change the block size and update the extents to match. It might make sense to try to force everything to 0x200; in “Journeyman Turbo™”'s case, this would necessitate multiplying all the extent values by 33, in addition to needing to add 2 to all the starts.
+
+Other divisors may be possible but might complicate placing the special files. 0x4200 could be divided by 11 rather than 33 to get 0x600-byte blocks. That could be small enough to put the boot blocks (0x400) and volume header (x200) in block #0, while still potentially being able to spend EO file reduction savings on keeping the three special files together. 
 
 ## Extents
 
