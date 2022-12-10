@@ -228,6 +228,13 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 
 	FSRef parentRef, ref;
 	bool const gotParentRef = CFURLGetFSRef((__bridge CFURLRef)realWorldURL.URLByDeletingLastPathComponent, &parentRef);
+	if (! gotParentRef) {
+		NSError *_Nonnull const noParentError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileWriteInvalidFileNameError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Couldn't look up parent for destination path %@; check for typoes", @""), realWorldURL.path] }];
+		if (outError != NULL) {
+			*outError = noParentError;
+		}
+		return false;
+	}
 
 	NSString *_Nonnull const name = [realWorldURL.lastPathComponent stringByReplacingOccurrencesOfString:@":" withString:@"/"];
 	HFSUniStr255 name255 = { .length = name.length };
