@@ -405,3 +405,37 @@ Catalog key [parent ID #2, node name “”]: 🧵 📁 [parent ID #1, name “J
 
 ### Observations
 We don't necessarily need to look up the name of ID #2; we know it's the root directory, and HFS (unlike HFS+) encodes the volume name in the volume header.
+
+## HFS+ upgrade process
+
+### What we could do when the allocation block size is 0x200
+
+This sketch might work when the allocation block size is 0x200 but won't work otherwise, for reasons discussed above in the VBM section. This sketch doesn't cover changing the block size and the adjustments required.
+
+0. Start the block copy.
+0.5. Also open the second file handle for writing at the destination that will be used for overwriting HFS bits with HFS+ bits. We need to keep a file handle open while the block copy is in progress so DiskArb doesn't try to mount the HFS volume if the block copy ends before we we've finished translating. (Particularly on older systems where HFS is still supported natively.)
+1. Translate the MDB into the HFS+ volume header.
+2. Translate the HFS extents into HFS+ extents, consolidating extents when possible and removing fork records from the extents overflow file when necessary. (Most conversions will leave the extents overflow file empty except in cases of severe fragmentation.)
+	- Extent starts also need to be adjusted.
+3. Translate the HFS catalog records in the catalog file into HFS+ catalog records.
+	- This includes not only rewriting the records in the leaf nodes, but also updating pointer nodes, as the catalog node size and catalog record sizes grew by disparate factors.
+	- Extent starts also need to be adjusted.
+4. Note the differences in the sizes of the catalog and extents overflow files. Allocate further blocks to grow these files when necessary, in the following order:
+	1. If the catalog file has grown and the EO file has shrunk, reallocate allocation blocks from the EO file to the catalog file. (In many cases, this can be done by adjusting their singular extents without any other changes.)
+	2. If both files have grown, attempt to grow them contiguously.
+	3. If they can't be grown contiguously, allocate new blocks from those available and add their extents to the relevant extent records.
+		1. Try for a single new extent of the minimum contiguous length to hold the new blocks, as early as possible in the file. (So not simply the biggest contiguous free space. Scan forward until a big-enough free space is encountered, then draw a new extent from that.)
+		2. If no single contiguous range of free blocks exists, build multiple new extents in the available free ranges, in descending order from biggest to smallest.
+4.1. Note that allocating new blocks includes setting the corresponding bit(s) in the allocations file.
+5. Write the new catalog and extents overflow files to their updated lists of extents.
+6. Write the allocations file.
+
+### When the allocation block size isn't 0x200
+
+Some volumes (larger ones) have block sizes larger than 0x200. I expect they're all multiples of 0x200, since a “physical block” is defined by IM:F to be 0x200 bytes. But they're not necessarily power-of-two multiples. “Journeyman Turbo™”'s block size is 0x4200, which is 0x200 * 33.
+
+In HFS, the volume header and volume bitmap come before the first block, whereas in HFS+, they are in the first block(s). This means that, at minimum (with 0x200-byte blocks), every extent's start needs to be changed to accommodate the shift—what was block 0 becomes block 3. For other block sizes, the shift might be larger, as the boot blocks+volume header might need to be padded out to a full allocation block. 
+
+#### Preflight checks
+
+- Is the source allocation block size a multiple of 0x200?
