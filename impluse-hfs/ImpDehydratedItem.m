@@ -184,6 +184,12 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	//TODO: Probably should make sure both of these are non-negative and return a read error if we find a fork with a negative size.
 	unsigned long long const totalForksSize = dataForkSize + rsrcForkSize;
 
+	//Realistically, we have to use the File Manager.
+	//The alternative is using NSURL and writing to resource forks as realWorldURL/..namedFork/rsrc. This doesn't work on APFS, for reasons unknown, and still wouldn't enable us to rehydrate certain metadata, such as the Locked checkbox.
+	//So we're using deprecated API for want of an alternative. That means both methods that use such API need to silence the deprecated-API warnings.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 	//First thing, create the file. We can set some metadata while we're at it, so do that.
 	struct FileInfo const *_Nonnull const sourceFinderInfo = (struct FileInfo const *_Nonnull const)&(fileRec->userInfo);
 	struct FileInfo swappedFinderInfo = {
@@ -355,6 +361,8 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		}
 	}
 
+#pragma clang diagnostic pop
+
 	return wroteData && wroteMetadata;
 }
 - (bool) rehydrateFolderAtRealWorldURL:(NSURL *_Nonnull const)realWorldURL error:(NSError *_Nullable *_Nonnull const)outError {
@@ -362,6 +370,12 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 
 	bool wroteChildren = true; //TODO: Come up with a better way to distinguish “wrote no children because the folder was empty” and “wrote no children because failure” (or, for that matter, “wrote some children but then failure”).
 	bool wroteMetadata = false;
+
+	//Realistically, we have to use the File Manager.
+	//The alternative is using NSURL, which wouldn't enable us to rehydrate certain metadata, such as the Locked checkbox. (For files, it has even more problems, noted above.)
+	//So we're using deprecated API for want of an alternative. That means both methods that use such API need to silence the deprecated-API warnings.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 	FSRef parentRef;
 	if (CFURLGetFSRef((__bridge CFURLRef)realWorldURL.URLByDeletingLastPathComponent, &parentRef)) {
@@ -463,6 +477,8 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 			return false;
 		}
 	}
+
+#pragma clang diagnostic pop
 
 	return (wroteChildren && wroteMetadata);
 }
