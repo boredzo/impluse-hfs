@@ -138,7 +138,6 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		while (nextParentID != kHFSRootParentID && [catalog searchCatalogTreeForItemWithParentID:nextParentID name:"\p" getRecordKeyData:&keyData threadRecordData:&threadRecordData]) {
 			struct HFSCatalogThread const *_Nonnull const threadPtr = threadRecordData.bytes;
 			NSString *_Nonnull const name = [tec stringForPascalString:threadPtr->nodeName];
-			ImpPrintf(@"Parent of %@ is %@", path[0], name);
 			[path insertObject:name atIndex:0];
 			nextParentID = L(threadPtr->parentID);
 		}

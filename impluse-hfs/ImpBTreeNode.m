@@ -324,8 +324,6 @@ typedef u_int16_t BTreeNodeOffset;
 		//Also, the “Descent” CD-ROM has some entries that look like folder records but have record types like 0x4100 or 0x5100. There are also thread records with a type of 0x6400 that don't have a node name filled in. If you want to include these, change the switch below to “recordType & 0x0f00”.
 		int8_t const recordType = L(*recordTypePtr);
 
-		ImpPrintf(@"Record stated key length: %lu (+%lu = %lu); offset of record type in record is %lu; record type is 0x%04x", L(keyPtr->keyLength), sizeof(keyPtr->keyLength), L(keyPtr->keyLength)+sizeof(keyPtr->keyLength), ((ptrdiff_t)recordTypePtr) - ((ptrdiff_t)keyPtr), recordType);
-
 		switch (recordType << 8) {
 			case kHFSFileRecord:
 				fileRecordBlock(keyPtr, (struct HFSCatalogFile const *)dataPtr);
