@@ -438,6 +438,8 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		//TODO: I am once again asking myself to desiccate the knowledge of what encoding to use
 		ImpTextEncodingConverter *_Nonnull const tec = [ImpTextEncodingConverter converterWithHFSTextEncoding:self.hfsTextEncoding];
 
+		__block NSError *_Nullable rehydrationError = nil;
+
 		//For each item in the dehydrated directory, rehydrate it, too.
 		//(Ugh, this might cost a ton of FSRefs.)
 		@autoreleasepool {
@@ -448,7 +450,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 				NSString *_Nonnull const filename = [[tec stringForPascalString:keyPtr->nodeName] stringByReplacingOccurrencesOfString:@"/" withString:@":"];
 				NSURL *_Nonnull const fileURL = [realWorldURL URLByAppendingPathComponent:filename isDirectory:false];
 				ImpPrintf(@"Rehydrating descendant 📄 “%@”", filename);
-				bool const rehydrated = [dehydratedFile rehydrateFileAtRealWorldURL:fileURL error:outError];
+				bool const rehydrated = [dehydratedFile rehydrateFileAtRealWorldURL:fileURL error:&rehydrationError];
 				if (! rehydrated) {
 					ImpPrintf(@"%@ in rehydrating descendant 📄 “%@”", rehydrated ? @"Success" : @"Failure", filename);
 				}
@@ -459,10 +461,14 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 				NSString *_Nonnull const folderName = [[tec stringForPascalString:keyPtr->nodeName] stringByReplacingOccurrencesOfString:@"/" withString:@":"];
 				NSURL *_Nonnull const folderURL = [realWorldURL URLByAppendingPathComponent:folderName isDirectory:true];
 				ImpPrintf(@"Rehydrating descendant 📁 “%@”", folderName);
-				bool const rehydrated = [dehydratedFolder rehydrateFolderAtRealWorldURL:folderURL error:outError];
+				bool const rehydrated = [dehydratedFolder rehydrateFolderAtRealWorldURL:folderURL error:&rehydrationError];
 				ImpPrintf(@"%@ in rehydrating descendant 📁 “%@”", rehydrated ? @"Success" : @"Failure", folderName);
 				return rehydrated;
 			}];
+		}
+
+		if (rehydrationError != nil && outError != NULL) {
+			*outError = rehydrationError;
 		}
 
 		catInfo.createDate.lowSeconds = L(folderRec->createDate);
