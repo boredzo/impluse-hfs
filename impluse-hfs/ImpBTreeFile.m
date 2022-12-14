@@ -18,7 +18,7 @@
 {
 	NSData *_Nonnull _bTreeData;
 	struct BTNodeDescriptor const *_Nonnull _nodes;
-	NSUInteger _numNodes;
+	NSUInteger _numPotentialNodes;
 	NSMutableArray *_Nullable _lastEnumeratedObjects;
 	NSMutableArray <ImpBTreeNode *> *_Nullable _nodeCache;
 }
@@ -28,11 +28,11 @@
 		_bTreeData = [bTreeFileContents copy];
 
 		_nodes = _bTreeData.bytes;
-		_numNodes = _bTreeData.length / BTreeNodeLengthHFSStandard;
+		_numPotentialNodes = _bTreeData.length / BTreeNodeLengthHFSStandard;
 
 		_nodeCache = [NSMutableArray arrayWithCapacity:_numNodes];
 		NSNull *_Nonnull const null = [NSNull null];
-		for (NSUInteger i = 0; i < _numNodes; ++i) {
+		for (NSUInteger i = 0; i < _numPotentialNodes; ++i) {
 			[_nodeCache addObject:(ImpBTreeNode *)null];
 		}
 	}
@@ -40,16 +40,16 @@
 }
 
 - (NSString *_Nonnull) description {
-	return [NSString stringWithFormat:@"<%@ %p with estimated %lu nodes>", self.class, self, self.count];
+	return [NSString stringWithFormat:@"<%@ %p with up to %lu nodes>", self.class, self, _numPotentialNodes];
 }
 
 - (NSUInteger)count {
-	return _numNodes;
+	return _numPotentialNodes;
 }
 
 ///Debugging method. Returns the number of total nodes in the tree, live or otherwise (that is, the total length in bytes of the file divided by the size of one node).
-- (NSUInteger) numberOfNodesTotal {
-	return _numNodes;
+- (NSUInteger) numberOfPotentialNodes {
+	return _numPotentialNodes;
 }
 ///Debugging method. Returns the number of nodes in the tree that are reachable: 1 for the header node, plus the number of map nodes (siblings to the header node), the number of index nodes, and the number of leaf nodes.
 - (NSUInteger) numberOfLiveNodes {
@@ -61,7 +61,7 @@
 	}
 
 	//Count up the index and leaf nodes.
-	NSMutableSet *_Nonnull const nodesAlreadyEncountered = [NSMutableSet setWithCapacity:_numNodes - count];
+	NSMutableSet *_Nonnull const nodesAlreadyEncountered = [NSMutableSet setWithCapacity:_numPotentialNodes - count];
 	[self walkBreadthFirst:^bool(ImpBTreeNode *const  _Nonnull node) {
 		[nodesAlreadyEncountered addObject:node];
 		return true;
@@ -89,7 +89,7 @@
 }
 
 - (ImpBTreeNode *_Nonnull const) nodeAtIndex:(u_int32_t const)idx {
-	if (idx >= _numNodes) {
+	if (idx >= _numPotentialNodes) {
 		//This will throw a range exception.
 		return _nodeCache[idx];
 	}
@@ -144,7 +144,7 @@
 	}
 	state->extra[0] = nextReturnedRange.location;
 	state->extra[1] = nextReturnedRange.length;
-	state->mutationsPtr = &_numNodes;
+	state->mutationsPtr = &_numPotentialNodes;
 	state->itemsPtr = outObjects;
 	return nextReturnedRange.length;
 }
