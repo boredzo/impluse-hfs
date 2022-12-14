@@ -26,7 +26,6 @@
 - (instancetype _Nullable)initWithData:(NSData *_Nonnull const)bTreeFileContents {
 	if ((self = [super init])) {
 		_bTreeData = [bTreeFileContents copy];
-		[_bTreeData writeToURL:[[NSURL fileURLWithPath:@"/tmp" isDirectory:true] URLByAppendingPathComponent:@"hfs-catalog.dat" isDirectory:false] options:0 error:NULL];
 
 		_nodes = _bTreeData.bytes;
 		_numNodes = _bTreeData.length / sizeof(struct BTreeNode);
