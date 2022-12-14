@@ -162,6 +162,61 @@ Since catalog records live in the leaf nodes of the catalog B*-tree, we may only
 
 One thing I've noticed is that there are at least some catalog files that have plenty of free nodes already, which may reduce the need to actually grow the file. (Since the destination volume is intended to be read-only, it's OK if the new catalog file ends up mostly full if it is not grown.))
 
+So catalog file growth is the product of several factors:
+
+- Catalog B*-tree *nodes* grow from 0x200 bytes to a minimum size of 0x1000.
+- Catalog *records* grow by varying fixed ratios. Each type of HFS catalog record corresponds to an HFS+ catalog record type, with a larger size.
+- Files didn't need thread records in HFS and often didn't have them. HFS+ requires them. That's another 0x40e bytes per thread record (0x206 for the key, 0x208 for the payload).
+
+0x1000 may or may not be the right node size for our purposes. The growth and proliferation of records mean bigger nodes might make sense. If we look at files and folders in terms of the main record plus the thread record, including their keys:
+
+- Files go from 0x26+0x66 = 0x8c bytes (file record only) to 0x206+0xf8+0x206+0x208 = 0x70c bytes, an over 12x increase.
+- Folders go from 0x26+0x46+0x26+0x2e = 0xc0 bytes to 0x206+0x58+0x206+0x208 = 0x66c, an eight-and-a-half-times increase.
+
+There is no perfect node size available. Averaging the above, we would want a growth factor of 10x (so 0x1400). B*-tree node sizes are required by TN1150 to be powers of two, so our choices are 0x1000 or 0x2000 (or something even larger).
+
+Nodes that are larger and hold more contents encourage more linear or binary searching of records within a single node. Nodes that are smaller relative to their contents encourage more skipping between nodes (comparing only first and last records to find the right node to search). It's hard to intuitively guess which of these would be the better performance tradeoff, and for a catalog held entirely in memory, it may not make any practical difference. I've probably already wasted more time thinking about it than it would save.
+
+Another factor is waste potential. The larger the node size, the less of it percentage-wise gets wasted.
+
+In the following examples, the usable space of a node (following the node descriptor, which is 0xe bytes in both formats) is 0x1f2 bytes for a 0x200-byte node and 0xff2 for a 0x1000-byte node.
+
+```
+“Journeyman Turbo™” contains 381 files and 29 folders
+```
+
+This volume contains 0xd05c bytes' worth of file records (assuming no thread records) and 0x15c0 bytes' worth of folder records (including thread records). Count-wise, the ratio is more than 13:1; bytes-wise, the ratio is closer to 9.5:1. 13 file records would occupy a little over three-and-a-half 0x200-byte nodes, leaving just 0xab bytes for that folder record and its thread record, necessitating a fourth node.
+
+Converting to HFS+, those 13 files would occupy 0x5b9c bytes, and the folder another 0x66c, for a total of 0x6208. The files would occupy a little under five-and-three-quarters nodes at 0x1000 bytes each; the remainder, again isn't quite enough for a folder. So we would need at least six nodes to describe these items, a growth of +50%.
+
+```
+“Mac OS 9” contains 2703 files and 490 folders
+``` 
+
+Count-wise ratio: 5.5:1 (or 11:2). Bytes-wise: 0x5c634 / 0x16f80 = just over 4:1. Let's look at 11 files to two folders.
+
+The 11 files, with no thread records, would occupy 0x604 bytes across just over 3 nodes. The fourth node would probably hold the 11th file, so 0x8c bytes, plus 0xc0 bytes * 2 for the two folders. That's 0x20c bytes, for which that node has ample room, so that's four nodes.
+
+In HFS+, the 11 files go up to 0x4d84 bytes, which would fill a little under 5 nodes. The 0xcd8 bytes for the two folders would spill into a sixth node.
+
+Again the growth, from four nodes to six, is an estimated +50%.
+
+So with each node being eight times the old size, we'll need 50% more leaf nodes. For the following calculations, I'm going to assume that the number of index nodes is relatively negligible.
+
+“Journeyman Turbo™” is using 149 nodes out of an allocated 2046. If we divided the number of nodes by eight to stay close to the old space usage of 62 (large) a-blocks, we get 256 nodes. The +50% node usage will use 224 or so out of those 256 nodes. This catalog file won't need to grow on disk.
+
+“Mac OS 9” is using 1165 nodes out of an allocated 2037. Just looking at those numbers, it's obvious that dividing by eight is a nonstarter; this catalog file will have to grow on disk. It's currently taking up 0xfea00 bytes across 97 a-blocks; 1748 nodes at 0x1000 bytes each will require 0x6d4000 bytes, already nearly a seven-fold increase. Rounded up to the a-block size of 0x2a00, we end up at 0x6d4400.
+
+Fortunately, “Mac OS 9” has 100 MB free, so it can afford the 0x5d5a00-byte (nearly 6 K) increase.
+
+If it couldn't, we could certainly take it out of the extents overflow file, which that volume isn't using:
+
+```
+Extents file is using 2 nodes out of an allocated 2037 (0.10% utilization)
+```
+
+The two nodes are the header node and maybe one leaf node, so it's basically empty. (If there are no records in the leaf node, then it's totally empty.) The extents file, like the catalog file, has a minimum node size of 0x1000 in HFS+. We can't quite shrink it *all* the way down to 0x2000, but we can shrink it down to one a-block, which is 0x2a00 bytes. That frees up 0x7f2600 bytes, which is more than enough.
+
 ## Shrinking (or even emptying) the extents overflow file
 
 HFS+ does a lot to reduce the need for overflow extents:
@@ -435,6 +490,61 @@ This sketch might work when the allocation block size is 0x200 but won't work ot
 Some volumes (larger ones) have block sizes larger than 0x200. I expect they're all multiples of 0x200, since a “physical block” is defined by IM:F to be 0x200 bytes. But they're not necessarily power-of-two multiples. “Journeyman Turbo™”'s block size is 0x4200, which is 0x200 * 33.
 
 In HFS, the volume header and volume bitmap come before the first block, whereas in HFS+, they are in the first block(s). This means that, at minimum (with 0x200-byte blocks), every extent's start needs to be changed to accommodate the shift—what was block 0 becomes block 3. For other block sizes, the shift might be larger, as the boot blocks+volume header might need to be padded out to a full allocation block. 
+
+Here's the Mac OS 9.0.4 install CD:
+
+```
+VBM minimum size in bytes is number of blocks 63096 / 8 = 0x1ecf
+Allocation block size is 0x2a00 (0x200 * 21.0)
+Clump size is 0xa800 (0x200 * 84.0; ABS * 4.0)
+VBM starts at 0x600, runs for 0x2000 (0.8 blocks), ends at 0x2600
+First allocation block: 0x2600
+Space remaining: 9370 blocks (0x6014400 bytes)
+Reading 0xfea00 bytes (1042944 bytes = 97 blocks) from source volume starting at 0x2600 bytes (extent: [ start #0, 97 blocks ])
+Extents file data: 0xfea00 bytes (97 a-blocks)
+Extents file is using 2 nodes out of an allocated 2037 (0.10% utilization)
+Reading 0xfea00 bytes (1042944 bytes = 97 blocks) from source volume starting at 0x101000 bytes (extent: [ start #97, 97 blocks ])
+Catalog file data: 0xfea00 bytes (97 a-blocks)
+Catalog file is using 1165 nodes out of an allocated 2037 (57.19% utilization)
+```
+
+If we hypothetically converted this to HFS+ with the same a-block size, the boot blocks and volume header would (by necessity) have the first a-block all to themselves, occupying the first 0x2a00 bytes of the volume. This already pushes the start of *anything else* down by 0x400 bytes.
+
+The volume bitmap is 0x1ecf bytes; with a couple more a-blocks added at the start and end, it would be 0x1ed1. (This would necessitate shifting everything down by exactly one bit, but we'll leave that aside for now.) That will fit neatly in one a-block somewhere, which is another 0x2a00 bytes, running from 0x2a00 to 0x5400.
+
+In the HFS volume, the extents file starts at 0x2600. In the HFS+ volume, it would move down by nearly 5 K to 0x5400.
+
+A key concept that emerges from all of this is the “first user allocation block”. The FUAB is the first a-block in which the catalog file, extents overflow file, attributes file (in HFS+), and user files may live. (I'm not including the allocations file for reasons which will hopefully become clear.)
+
+The purpose of the FUAB is twofold:
+
+1. Given that user data files (and the catalog and extents files) start at X offset into the HFS volume, what Y offset into the HFS+ volume do we block-copy all of that data to?
+2. What delta (in a-blocks) do we need to add to those files' extents' starts? (This delta is at least 1, for block size 0x600 and larger, if the allocations bitmap is moved down among the UABs. For block size 0x200, it is at least 3.)
+
+(It's worth noting that question #1 *may not be answerable* in terms of a single block-copy. If there are occupied UABs at or sufficiently close to the end of the volume, shifting the UABs down may push user data off the bottom edge where the alternate volume header starts. At that point, we would need to either try a smaller a-block size that might free up enough space, or if that still fails, fall back to a more-careful, file-by-file, defragmenting copy.)
+
+The FUAB in an HFS volume is the block starting at `drAlBlSt`, often but not necessarily immediately after the VBM. The FUAB in HFS+ *can be* the block starting immediately after the volume header, at 0x600, if the allocations file is moved into formerly-free UABs.
+
+The first *user* allocation block is distinct from the first allocation block in HFS+. The first allocation block is the first `blockSize` bytes of the volume, containing at least the first boot block and possibly both boot blocks + the volume header + leftover space if the block size is big enough. I'm also not counting the allocation file's a-blocks as user a-blocks; if the allocation file is kept in its HFS-style position before the first user a-block, the first user a-block need to slide downward to 
+
+HFS+ conversion that attempts to preserve positions as much as possible may need to:
+
+- allocate the first a-block to the boot blocks + volume header
+- allocate the second a-block (and possibly more blocks than that) to the allocations file
+- add bits to the allocations bitmap to reflect the new a-blocks before and after the user a-blocks; this may get tricky if there are not a multiple of eight new a-blocks
+- block-copy from the HFS volume to the HFS+ volume, with different start offsets reflecting where their FUABs start
+- generate an allocations bitmap that:
+	- shifts the bits down to add new bits for the a-blocks occupied by the boot blocks, volume header, and allocations file (formerly VBM)
+		- (the shift will be non-trivial effort since it will be a multiple of 8 only 1/8th of the time)
+		- the a-block(s) occupied by the boot blocks and volume header would be set; the allocations file a-blocks should be clear for now
+	- sets at least one new bit at the end for the alternate volume header
+	- turns off the a-blocks formerly allocated to the catalog and extents files
+	- is larger by one (1) a-block if necessary
+- allocate a-blocks anew to the allocations file, catalog file (grown), and extents file (shrunken, very likely empty even if it wasn't already)
+
+It may not make sense, for volumes with large a-block sizes, to try to keep the allocations bitmap between the volume header and UABs. Such volumes may have a larger a-block size than the size of their allocations bitmap (examples: Mac OS 9.0.4 has a-block size 0x2a00 and VBM size 0x2000; “The Journeyman Project” Turbo! has a-block size 0x4200 and VBM size 0x1400). In these cases, it may make more sense to move the FUAB offset *up* to the second a-block, and find somewhere in the middle of UAB space to put the allocations file. One weird trick—rotational media hate it.
+
+Growing the allocations bitmap may end up adding another byte to it. Adding another byte to it may (in the worst case) necessitate allocating a whole new a-block. 
 
 #### Preflight checks
 
