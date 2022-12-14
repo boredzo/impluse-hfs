@@ -47,6 +47,30 @@
 	return _numNodes;
 }
 
+///Debugging method. Returns the number of total nodes in the tree, live or otherwise (that is, the total length in bytes of the file divided by the size of one node).
+- (NSUInteger) numberOfNodesTotal {
+	return _numNodes;
+}
+///Debugging method. Returns the number of nodes in the tree that are reachable: 1 for the header node, plus the number of map nodes (siblings to the header node), the number of index nodes, and the number of leaf nodes.
+- (NSUInteger) numberOfLiveNodes {
+	__block NSUInteger count = 0;
+
+	//Count up the header node and any map nodes.
+	for (ImpBTreeNode *_Nullable node = self.headerNode; node != nil; node = node.nextNode) {
+		++count;
+	}
+
+	//Count up the index and leaf nodes.
+	NSMutableSet *_Nonnull const nodesAlreadyEncountered = [NSMutableSet setWithCapacity:_numNodes - count];
+	[self walkBreadthFirst:^bool(ImpBTreeNode *const  _Nonnull node) {
+		[nodesAlreadyEncountered addObject:node];
+		return true;
+	}];
+	count += nodesAlreadyEncountered.count;
+
+	return count;
+}
+
 - (ImpBTreeNode *_Nullable) alreadyCachedNodeAtIndex:(NSUInteger)idx {
 	return idx < _nodeCache.count
 		? _nodeCache[idx]

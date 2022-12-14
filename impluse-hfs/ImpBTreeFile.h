@@ -15,6 +15,11 @@
 
 - (instancetype _Nullable )initWithData:(NSData *_Nonnull const)bTreeFileContents;
 
+///Debugging method. Returns the number of total nodes in the tree, live or otherwise (that is, the total length in bytes of the file divided by the size of one node).
+- (NSUInteger) numberOfNodesTotal;
+///Debugging method. Returns the number of nodes in the tree that are reachable: 1 for the header node, plus the number of map nodes (siblings to the header node), the number of index nodes, and the number of leaf nodes.
+- (NSUInteger) numberOfLiveNodes;
+
 ///Returns the first node in the file if there is one and it is a header node. Otherwise, returns nil.
 - (ImpBTreeHeaderNode *_Nullable const) headerNode;
 
