@@ -23,7 +23,6 @@
 @implementation ImpHFSToHFSPlusConverter
 {
 	TextEncoding _hfsTextEncoding, _hfsPlusTextEncoding;
-	TECObjectRef _hfsPlusTextConverter;
 	TextToUnicodeInfo _ttui;
 }
 
@@ -34,28 +33,6 @@
 		_hfsTextEncoding = CreateTextEncoding(kTextEncodingMacRoman, kMacRomanDefaultVariant, kTextEncodingDefaultFormat);
 		_hfsPlusTextEncoding = CreateTextEncoding(kTextEncodingUnicodeV2_0, kUnicodeHFSPlusDecompVariant, kUnicodeUTF16BEFormat);
 
-#if USE_TEC
-		NSMutableData *_Nonnull const destEncodings = [NSMutableData dataWithLength:1048576];
-		ItemCount numDestEncodings = 0;
-		ByteCount const maxEncodingNameLen = 1048576;
-		NSMutableData *_Nonnull const encodingName = [NSMutableData dataWithLength:maxEncodingNameLen];
-		ByteCount encodingNameNumBytes = 0;
-
-		TECGetDestinationTextEncodings(CreateTextEncoding(kTextEncodingUnicodeV2_0, kUnicodeHFSPlusDecompVariant, kUnicodeUTF16Format), destEncodings.mutableBytes, destEncodings.length / sizeof(TextEncoding), &numDestEncodings);
-		for (NSUInteger i = 0; i < numDestEncodings; ++i) {
-			TextEncoding const destEncoding = ((TextEncoding *)destEncodings.bytes)[i];
-			OSStatus err = GetTextEncodingName(destEncoding, kTextEncodingFullName, kTextRegionDontCare, kTextEncodingUnicodeDefault, maxEncodingNameLen, &encodingNameNumBytes, /*actualRegion*/ NULL, /*actualEncoding*/ NULL, encodingName.mutableBytes);
-			((char *)encodingName.mutableBytes)[encodingNameNumBytes] = 0;
-			((char *)encodingName.mutableBytes)[encodingNameNumBytes+1] = 0;
-
-			ImpPrintf(@"Can convert to encoding: 0x%08x %@", destEncoding, (err == noErr) ? [NSString stringWithCharacters:encodingName.mutableBytes length:encodingNameNumBytes] : @"(no name found)");
-		}
-
-		OSStatus err = TECCreateConverter(&_hfsPlusTextConverter, _hfsTextEncoding, _hfsPlusTextEncoding);
-		if (err != noErr) {
-			ImpPrintf(@"Failed to initialize text encoding conversion: error %d/%s", err, ImpExplainOSStatus(err));
-		}
-#endif
 		struct UnicodeMapping mapping = {
 			.unicodeEncoding = _hfsPlusTextEncoding,
 			.otherEncoding = _hfsTextEncoding,
@@ -69,11 +46,7 @@
 	return self;
 }
 
-- (void)dealloc {
-	TECDisposeConverter(_hfsPlusTextConverter);
-}
-
-- (NSData *_Nonnull const)hfsUniStr255ForPascalString:(ConstStr31Param)pascalString {
+- (NSData *_Nonnull const)hfsUniStr255ForPascalString:(ConstStr31Param _Nonnull)pascalString {
 	//The length in MacRoman characters may include accented characters that HFS+ decomposition will decompose to a base character and a combining character, so we actually need to double the length *in characters*.
 	ByteCount outputPayloadSizeInBytes = (2 * *pascalString) * sizeof(UniChar);
 	//TECConvertText documentation: “Always allocate a buffer at least 32 bytes long.”
@@ -90,21 +63,6 @@
 
 	UniChar *_Nonnull const outputBuf = unicodeData.mutableBytes;
 
-#define USE_TEC 0
-#if USE_TEC
-	ByteCount actualOutputLengthInBytes = 0;
-	ConstTextPtr _Nonnull const inputBuf = pascalString + 1;
-	ByteCount const inputNumBytes = *pascalString;
-	ByteCount numBytesConverted = 0;
-	TextPtr _Nonnull const outputPayloadBuf = (TextPtr)(outputBuf + 1);
-	OSStatus const err = TECConvertText(_hfsPlusTextConverter, inputBuf, inputNumBytes, /*actualInputLength*/ &numBytesConverted, outputPayloadBuf, outputPayloadSizeInBytes, &actualOutputLengthInBytes);
-	if (err != noErr) {
-		NSMutableData *_Nonnull const cStringData = [NSMutableData dataWithLength:*pascalString + 1];
-		memcpy(cStringData.mutableBytes, pascalString + 1, *pascalString);
-		ImpPrintf(@"Failed to convert filename '%s' (length %u) to Unicode: error %d/%s", (char const *)cStringData.bytes, (unsigned)*pascalString, err, ImpExplainOSStatus(err));
-		return nil;
-	} else
-#else
 	ByteCount actualOutputLengthInBytes = 0;
 	OSStatus const err = ConvertFromPStringToUnicode(_ttui, pascalString, outputPayloadSizeInBytes, &actualOutputLengthInBytes, outputBuf + 1);
 
@@ -123,14 +81,11 @@
 		swab(outputBuf + 1, outputBuf + 1, actualOutputLengthInBytes);
 #endif
 	}
-#endif
-	{
 		S(outputBuf[0], (u_int16_t)(actualOutputLengthInBytes / sizeof(UniChar)));
-	}
 
 	return unicodeData;
 }
-- (NSString *_Nonnull const) stringForPascalString:(ConstStr31Param)pascalString {
+- (NSString *_Nonnull const) stringForPascalString:(ConstStr31Param _Nonnull)pascalString {
 	NSData *_Nonnull const unicodeData = [self hfsUniStr255ForPascalString:pascalString];
 	/* This does not seem to work.
 	 hfsUniStr255ForPascalString: needs to return UTF-16 BE so we can write it out to HFS+. But if we call CFStringCreateWithPascalString, it seems to always take the host-least-significant byte and treat it as a *byte count*. That basically means this always returns an empty string. If the length is unswapped, it returns the first half of the string.
@@ -250,7 +205,7 @@
 
 	[self deliverProgressUpdate:0.0 operationDescription:@"Reading HFS volume structures"];
 
-	ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD];
+	ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD textEncoding:self.hfsTextEncoding];
 	if (! [srcVol loadAndReturnError:outError])
 		return false;
 

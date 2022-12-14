@@ -8,12 +8,16 @@
 #import <Foundation/Foundation.h>
 
 @class ImpBTreeFile;
+@class ImpTextEncodingConverter;
 
 #import "ImpForkUtilities.h"
 
 @interface ImpHFSVolume : NSObject
 
-- (instancetype _Nonnull) initWithFileDescriptor:(int const)readFD;
+- (instancetype _Nonnull) initWithFileDescriptor:(int const)readFD textEncoding:(TextEncoding const)hfsTextEncoding;
+
+///Returns an object that can convert strings (names) between this HFS volume's 8-bit-per-character encoding and Unicode.
+@property(readonly, nonnull, strong) ImpTextEncodingConverter *textEncodingConverter;
 
 @property(readonly) int fileDescriptor;
 

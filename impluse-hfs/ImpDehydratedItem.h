@@ -39,15 +39,10 @@ typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
 @property(copy) NSData *_Nullable hfsFileCatalogRecordData;
 @property(copy) NSData *_Nullable hfsFolderCatalogRecordData;
 
-///Defaults to MacRoman.
-@property TextEncoding hfsTextEncoding;
-
 @property(nonatomic) HFSCatalogNodeID parentFolderID;
 
 ///Convert the item's name from the HFS catalog using its assigned encoding into a modern Unicode name.
 - (NSString *_Nonnull const) name;
-///Convert the item's name from the HFS catalog using this encoding into a modern Unicode name.
-- (NSString *_Nonnull const) nameFromEncoding:(TextEncoding)hfsTextEncoding;
 ///Reconstruct the path to the item from the volume's catalog. Returns an array of item names, starting with the volume name, that, if joined by colons, will form an HFS path.
 - (NSArray <NSString *> *_Nonnull const) path;
 

@@ -35,12 +35,15 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 {
 	NSArray <NSString *> *_cachedPath;
 	NSMutableArray <ImpDehydratedItem *> *_children;
+	ImpTextEncodingConverter *_tec;
 }
 
 - (instancetype _Nonnull) initWithHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol catalogNodeID:(HFSCatalogNodeID const)cnid {
 	if ((self = [super init])) {
 		self.hfsVolume = hfsVol;
 		self.catalogNodeID = cnid;
+
+		_tec = hfsVol.textEncodingConverter;
 	}
 	return self;
 }
@@ -95,13 +98,9 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	return L(catalogKey->parentID);
 }
 
-- (NSString *_Nonnull const) nameFromEncoding:(TextEncoding)hfsTextEncoding {
-	ImpTextEncodingConverter *_Nonnull const tec = [ImpTextEncodingConverter converterWithHFSTextEncoding:hfsTextEncoding];
-	struct HFSCatalogKey const *_Nonnull const catalogKey = (struct HFSCatalogKey const *_Nonnull const)(self.hfsCatalogKeyData.bytes);
-	return [tec stringForPascalString:catalogKey->nodeName];
-}
 - (NSString *_Nonnull const) name {
-	return [self nameFromEncoding:self.hfsTextEncoding];
+	struct HFSCatalogKey const *_Nonnull const catalogKey = (struct HFSCatalogKey const *_Nonnull const)(self.hfsCatalogKeyData.bytes);
+	return [_tec stringForPascalString:catalogKey->nodeName];
 }
 
 - (u_int32_t) hfsDateForDate:(NSDate *_Nonnull const)dateToConvert {
@@ -123,8 +122,6 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 ///Search the catalog for parent items until reaching the volume root, then return the path so constructed.
 - (NSArray <NSString *> *_Nonnull const) path {
 	if (_cachedPath == nil) {
-		ImpTextEncodingConverter *_Nonnull const tec = [ImpTextEncodingConverter converterWithHFSTextEncoding:self.hfsTextEncoding];
-
 		NSMutableArray <NSString *> *_Nonnull const path = [NSMutableArray arrayWithCapacity:8];
 		[path addObject:self.name];
 
@@ -137,7 +134,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		//Keep ascending directories until we reach kHFSRootParentID, which is the parent of the root directory.
 		while (nextParentID != kHFSRootParentID && [catalog searchCatalogTreeForItemWithParentID:nextParentID name:"\p" getRecordKeyData:&keyData threadRecordData:&threadRecordData]) {
 			struct HFSCatalogThread const *_Nonnull const threadPtr = threadRecordData.bytes;
-			NSString *_Nonnull const name = [tec stringForPascalString:threadPtr->nodeName];
+			NSString *_Nonnull const name = [_tec stringForPascalString:threadPtr->nodeName];
 			[path insertObject:name atIndex:0];
 			nextParentID = L(threadPtr->parentID);
 		}
@@ -444,8 +441,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 			return false;
 		}
 
-		//TODO: I am once again asking myself to desiccate the knowledge of what encoding to use
-		ImpTextEncodingConverter *_Nonnull const tec = [ImpTextEncodingConverter converterWithHFSTextEncoding:self.hfsTextEncoding];
+		ImpTextEncodingConverter *_Nonnull const tec = _tec;
 
 		__block NSError *_Nullable rehydrationError = nil;
 

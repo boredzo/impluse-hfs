@@ -20,7 +20,7 @@
 		return false;
 	}
 
-	ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD];
+	ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD textEncoding:self.hfsTextEncoding];
 	if (! [srcVol loadAndReturnError:outError])
 		return false;
 

@@ -109,7 +109,7 @@
 
 	[self deliverProgressUpdate:0.0 operationDescription:@"Reading HFS volume structures"];
 
-	ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD];
+	ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD textEncoding:self.hfsTextEncoding];
 	if (! [srcVol loadAndReturnError:outError])
 		return false;
 

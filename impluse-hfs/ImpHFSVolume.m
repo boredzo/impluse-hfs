@@ -11,10 +11,17 @@
 #import "ImpSizeUtilities.h"
 #import "ImpForkUtilities.h"
 #import "NSData+ImpSubdata.h"
+#import "ImpTextEncodingConverter.h"
 #import "ImpExtentSeries.h"
 #import "ImpBTreeFile.h"
 
 #import <hfs/hfs_format.h>
+
+@interface ImpHFSVolume ()
+
+@property(readwrite, nonnull, strong) ImpTextEncodingConverter *textEncodingConverter;
+
+@end
 
 @implementation ImpHFSVolume
 {
@@ -25,9 +32,10 @@
 	CFBitVectorRef _bitVector;
 }
 
-- (instancetype _Nonnull) initWithFileDescriptor:(int const)readFD {
+- (instancetype _Nonnull) initWithFileDescriptor:(int const)readFD textEncoding:(TextEncoding const)hfsTextEncoding {
 	if ((self = [super init])) {
 		_fileDescriptor = readFD;
+		_textEncodingConverter = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:hfsTextEncoding];
 	}
 	return self;
 }
