@@ -29,10 +29,10 @@
 ///Walks through the entire file in linear order and yields every node-space, whether or not it contains a node that is reachable from the root node. Yields NSData objects, each big enough to contain one B*-tree node. Expect to receive both valid and invalid nodes, in effectively random order (except for the header node being first).
 - (NSUInteger)countByEnumeratingWithState:(NSFastEnumerationState *_Nonnull)state objects:(__unsafe_unretained id  _Nullable [_Nonnull])outObjects count:(NSUInteger)maxNumObjects;
 
-///Starting from the root node, call the block for every node in the tree, in breadth-first order. Note that the header node is not included in this walk.
+///Starting from the root node, call the block for every node in the tree, in breadth-first order. Note that the header node and any map nodes are not included in this walk.
 - (NSUInteger) walkBreadthFirst:(bool (^_Nonnull const)(ImpBTreeNode *_Nonnull const node))block;
 
-///Starting from the first leaf node, call the block for every node from that one until the last leaf node, following nextNode/fLink connections.
+///Starting from the first leaf node, call the block for every node from that one until the last leaf node, following nextNode/fLink connections. Whereas walkBreadthFirst: visits index and leaf nodes, this method only visits leaf nodes.
 - (NSUInteger) walkLeafNodes:(bool (^_Nonnull const)(ImpBTreeNode *_Nonnull const node))block;
 
 ///Given the CNID of a folder, call one of the blocks with each item in that folder. Either block can return false to stop iteration. Returns the number of items visited. If the CNID does not refer to a folder, returns 0. (This includes if it is a file.)
