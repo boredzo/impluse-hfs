@@ -516,6 +516,7 @@
 		 - There are multiple exactly-matching records, and they start in this node and continue on into at least the next node.
 		 - There are no exactly-matching records. If our quarry was in this tree, it would be in this node, but it isn't, so it's not in the tree at all.
 		 */
+		//TODO: We still need to iterate over the records of leafNode and call the block.
 	}
 	return numRecords;
 }
