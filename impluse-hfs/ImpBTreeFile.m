@@ -17,7 +17,7 @@
 @implementation ImpBTreeFile
 {
 	NSData *_Nonnull _bTreeData;
-	struct BTreeNode const *_Nonnull _nodes;
+	struct BTNodeDescriptor const *_Nonnull _nodes;
 	NSUInteger _numNodes;
 	NSMutableArray *_Nullable _lastEnumeratedObjects;
 	NSMutableArray <ImpBTreeNode *> *_Nullable _nodeCache;
@@ -28,7 +28,7 @@
 		_bTreeData = [bTreeFileContents copy];
 
 		_nodes = _bTreeData.bytes;
-		_numNodes = _bTreeData.length / sizeof(struct BTreeNode);
+		_numNodes = _bTreeData.length / BTreeNodeLengthHFSStandard;
 
 		_nodeCache = [NSMutableArray arrayWithCapacity:_numNodes];
 		NSNull *_Nonnull const null = [NSNull null];
@@ -100,7 +100,7 @@
 	}
 
 	//TODO: Create all of these once, probably up front, and keep them in an array. Turn this into objectAtIndex: and the fast enumeration into fast enumeration of that array.
-	NSRange const nodeByteRange = { sizeof(struct BTreeNode) * idx, sizeof(struct BTreeNode) };
+	NSRange const nodeByteRange = { BTreeNodeLengthHFSStandard * idx, BTreeNodeLengthHFSStandard };
 	NSData *_Nonnull const nodeData = [_bTreeData dangerouslyFastSubdataWithRange_Imp:nodeByteRange];
 
 	ImpBTreeNode *_Nonnull const node = [ImpBTreeNode nodeWithTree:self data:nodeData];
@@ -135,7 +135,7 @@
 		[_lastEnumeratedObjects removeAllObjects];
 	}
 	for (NSUInteger	i = 0; i < nextReturnedRange.length; ++i) {
-		NSRange const nodeByteRange = { sizeof(struct BTreeNode) * ( nextReturnedRange.location + i), sizeof(struct BTreeNode) };
+		NSRange const nodeByteRange = { BTreeNodeLengthHFSStandard * ( nextReturnedRange.location + i), BTreeNodeLengthHFSStandard };
 		NSData *_Nonnull const data = [_bTreeData subdataWithRange:nodeByteRange];
 		ImpBTreeNode *_Nonnull const node = [ImpBTreeNode nodeWithTree:self data:data];
 		node.nodeNumber = (u_int32_t)(nextReturnedRange.location + i);

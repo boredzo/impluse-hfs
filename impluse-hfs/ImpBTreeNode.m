@@ -35,8 +35,8 @@ typedef u_int16_t BTreeNodeOffset;
 ///Peek at the kind of node this is, and choose an appropriate subclass based on that.
 + (Class _Nonnull) nodeClassForData:(NSData *_Nonnull const)nodeData {
 	Class nodeClass = self;
-	struct BTreeNode const *_Nonnull const nodeDescriptor = nodeData.bytes;
-	int8_t const nodeType = L(nodeDescriptor->header.kind);
+	struct BTNodeDescriptor const *_Nonnull const nodeDescriptor = nodeData.bytes;
+	int8_t const nodeType = L(nodeDescriptor->kind);
 	switch(nodeType) {
 		case kBTHeaderNode:
 			nodeClass = [ImpBTreeHeaderNode class];
@@ -62,12 +62,12 @@ typedef u_int16_t BTreeNodeOffset;
 
 		_nodeData = [nodeData copy];
 
-		struct BTreeNode const *_Nonnull const nodeDescriptor = _nodeData.bytes;
-		self.forwardLink = L(nodeDescriptor->header.fLink);
-		self.backwardLink = L(nodeDescriptor->header.bLink);
-		self.nodeType = L(nodeDescriptor->header.kind);
-		self.nodeHeight = L(nodeDescriptor->header.height);
-		self.numberOfRecords = L(nodeDescriptor->header.numRecords);
+		struct BTNodeDescriptor const *_Nonnull const nodeDescriptor = _nodeData.bytes;
+		self.forwardLink = L(nodeDescriptor->fLink);
+		self.backwardLink = L(nodeDescriptor->bLink);
+		self.nodeType = L(nodeDescriptor->kind);
+		self.nodeHeight = L(nodeDescriptor->height);
+		self.numberOfRecords = L(nodeDescriptor->numRecords);
 		//TODO: Should probably preserve the reserved field as well.
 	}
 	return self;
@@ -229,7 +229,7 @@ typedef u_int16_t BTreeNodeOffset;
 }
 - (NSData *_Nonnull) recordDataAtIndex_nocache:(u_int16_t)idx {
 	BTreeNodeOffset const *_Nonnull const offsets = _nodeData.bytes;
-	enum { maxNumOffsets = sizeof(struct BTreeNode) / sizeof(BTreeNodeOffset), lastOffsetIdx = maxNumOffsets - 1 };
+	enum { maxNumOffsets = BTreeNodeLengthHFSStandard / sizeof(BTreeNodeOffset), lastOffsetIdx = maxNumOffsets - 1 };
 	BTreeNodeOffset const thisRecordOffset = L(offsets[lastOffsetIdx - idx]);
 	BTreeNodeOffset const nextRecordOffset = L(offsets[lastOffsetIdx - (idx + 1)]);
 

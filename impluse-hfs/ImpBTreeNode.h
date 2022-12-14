@@ -8,19 +8,11 @@
 #import <Foundation/Foundation.h>
 
 enum {
-	BTreeNodeLengthStandard = 512,
-	BTreeNodeLengthExtended = 4096,
-};
+	BTreeNodeLengthHFSStandard = 0x200 * 1,
 
-///See Inside Macintosh: Files page 2-65 for info on how B*-tree nodes are lain out.
-struct BTreeNode {
-	struct BTNodeDescriptor header;
-	//TODO: Variable-length array to end this structure? Need to carry node length separately anyway, if these classes are to be used for both HFS and HFS+…
-	char payload[BTreeNodeLengthStandard - sizeof(struct BTNodeDescriptor)];
-};
-struct BTreeNodeExtended {
-	struct BTNodeDescriptor header;
-	char payload[BTreeNodeLengthExtended - sizeof(struct BTNodeDescriptor)];
+	BTreeNodeLengthHFSPlusCatalogMinimum = 0x200 * 8,
+	BTreeNodeLengthHFSPlusExtentsOverflowMinimum = 0x200 * 2,
+	BTreeNodeLengthHFSPlusAttributesMinimum = 0x200 * 8,
 };
 
 typedef NS_ENUM(int8_t, ImpBTreeComparisonResult) {
