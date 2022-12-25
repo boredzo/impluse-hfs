@@ -126,6 +126,159 @@ CNIDs are not B*-tree node numbers. They are item numbers, orthogonal to the num
 
 Really, they ought to be called “Catalog Item Numbers” or something. Something that doesn't use the word “node”.
 
+## Comparing names the HFS way
+
+HFS does not use Unicode; it uses an 8-bit encoding vaguely resembling (if not exactly) MacRoman. Comparisons are case-insensitive.
+
+On Classic Mac OS, File Manager uses `RelString`, an API in the Text Utilities, for comparisons. This API is long gone from the macOS headers as of Xcode 13.3. (There's also `EqualString`, which is similarly gone, and is only for testing equality according to HFS rules and not relative comparison.)
+
+Inside Macintosh: Text defines `RelString`'s comparison rules in table 5-2, and the preceding page 5-16:
+
+- “Since the Macintosh character set only contains characters with codes from $0 to $D8, the file system comparison rules only work correctly for character codes through $D8.”
+	- Chapter 1 defines “the Standard Roman Character Set”—which we now call MacRoman—on page 1-54. It clarifies that “the original Macintosh character set, as described in Volume I of the original Inside Macintosh” only went up to $d8 (ÿ); “Standard Roman” adds characters from $d9 (Ÿ) up through $FF.
+- Ligatures:
+	- Æ falls between Å and a
+	- æ falls between å and B
+	- Œ falls betweeen Ø and o
+	- œ falls between ø and P
+	- ß falls between s and T
+	- It's not at all clear how to make that interoperate with diacritic-stripping and case-folding.
+- Stripping of diacritics: Mostly the obvious, plus ø and º map to o, ª to a, and ç to c.
+- Case-folding: Letters are folded to the upper case.
+
+The left-to-right ordering of the table seems to suggest that ligature comparison, diacritic-stripping, and case-folding happen in that order.
+
+[Developer Q&A OPS08](https://developer.apple.com/library/archive/qa/ops/ops08.html) mentions that “due to a bug that HFS relies on, back quote sorts between "a" and "b"”.
+
+Apple's open source includes [an implementation of “`FastRelString`” in diskdev_cmds](https://opensource.apple.com/source/diskdev_cmds/diskdev_cmds-491.3/fsck_hfs.tproj/dfalib/SKeyCompare.c.auto.html). This implementation uses a precomputed table, `gCompareTable`, in [CaseFolding.h](https://opensource.apple.com/source/diskdev_cmds/diskdev_cmds-491.3/fsck_hfs.tproj/dfalib/CaseFolding.h.auto.html). The table mostly maps bytes to the same byte shifted 1 byte left; it looks like the high byte is the mapped character (for case-folding) and the low byte is some sort of disambiguator, possibly for diacritics. Let us call these bytes the “integer” and the “fraction”, respectively.
+
+This program analyzes the table and reports any non-identical mappings:
+
+```
+enum { gCompareTableLen = 256 };
+#error Replace this line with definition of gCompareTable from SKeyCompare.c
+
+int main(int argc, char *argv[]) {
+	@autoreleasepool {
+		unsigned short lastReportedIndex = 0;
+		for (unsigned short i = 0; i < gCompareTableLen; ++i) {
+			unsigned short const value = gCompareTable[i];
+			//If this isn't an identical mapping of a character to itself, report how it's different.
+			if (value != (i << 8)) {
+				if (i - lastReportedIndex > 1) {
+					printf("\n");
+				}
+
+				char const keyBuf[2] = { i, 0 };
+				NSString *_Nonnull const keyString = [[NSString alloc] initWithBytesNoCopy:keyBuf length:1 encoding:NSMacOSRomanStringEncoding freeWhenDone:false];
+				
+				char const convertedBuf[3] = { value >> 8, value & 0xff, 0 };
+				NSString *_Nonnull const convertedString = [[NSString alloc] initWithBytesNoCopy:convertedBuf length:2 encoding:NSMacOSRomanStringEncoding freeWhenDone:false];
+				printf("0x%02x '%s' => 0x%02x, 0x%02x => '%s' '%s'\n",
+					i, [keyString UTF8String],
+					value >> 8, value & 0xff,
+					[[convertedString substringToIndex:1] UTF8String], [[convertedString substringFromIndex:1] UTF8String]
+				);
+				lastReportedIndex = i;
+			}
+		}
+	}
+	return EXIT_SUCCESS;
+}
+```
+
+From the output, we can see:
+
+- As documented, '\`' gets folded to 'A', with a fraction of 0x80. It's basically 'A' and a half.
+- The lowercase ASCII letters get folded to their uppercase counterparts.
+- 0x80 through 0x9f and 0xcb through 0xcf are letters with diacritics, folded to their ASCII letters plus assorted fractions.
+- 0xa7, 0xae, 0xaf, 0xbb, 0xbc, 0xbe, and 0xbf are the entries from the ligatures table.
+- 0xc7 and 0xc8 and 0xd2 through 0xd5 are quotation marks, folded to the ASCII '"' and '''. The angled quotation marks have a higher fraction than the curly quotes, and within each pair, the closing quote has a higher fraction than the opening quote. The order is “”«»‘’.
+- Everything from 0xd9 onward is back to identity mapping. (This even includes 'Ÿ', which is 0xd9. Sure enough, IM:T table 5-2 confirms that 'ÿ' is mapped to 'y' but says nothing of 'Ÿ'.)
+
+The fractions on the diacritic characters seem to correspond to the diacritics:
+
+```
+0x6f 'o' => 0x4f, 0x00 => 'O' <nul>
+0x85 'Ö' => 0x4f, 0x08 => 'O' <control>
+0x9a 'ö' => 0x4f, 0x08 => 'O' <control>
+0x9b 'õ' => 0x4f, 0x0a => 'O' <control>
+0xcd 'Õ' => 0x4f, 0x0a => 'O' <control>
+0xaf 'Ø' => 0x4f, 0x0e => 'O' <control>
+0xbf 'ø' => 0x4f, 0x0e => 'O' <control>
+0xce 'Œ' => 0x4f, 0x14 => 'O' <unprintable>
+0xcf 'œ' => 0x4f, 0x14 => 'O' <unprintable>
+0x97 'ó' => 0x4f, 0x82 => 'O' 'Ç'
+0x98 'ò' => 0x4f, 0x84 => 'O' 'Ñ'
+0x99 'ô' => 0x4f, 0x86 => 'O' 'Ü'
+0xbc 'º' => 0x4f, 0x92 => 'O' 'í'
+```
+
+Interestingly, à seems to be misaligned, at least in this table:
+
+```
+0x88 'à' => 0x41, 0x04 => 'A' ''
+0x60 '`' => 0x41, 0x80 => 'A' 'Ä'
+0x87 'á' => 0x41, 0x82 => 'A' 'Ç'
+```
+
+That middle line is the bug mentioned in OPS08, but the first line is odd. Going by 'ò', it should have a fraction of 0x84.
+
+It seems like the high nybble of 'à''s fraction byte ended up on '\`''s fraction byte instead. I don't know whether the original `RelString` was table-based. As for whether this table is an accurate match to the original `RelString`'s behavior, it's possible to check this as a black box by calling `RelString` on original Mac OS with the following strings:
+
+- 'A', 'à'
+- 'à', '\`'
+- '\`', 'á'
+- 'à', 'á'
+
+The above table matches `RelString` if `RelString` (case-insensitive, diacritic-distinguishing) returns -1 for each of these pairs.
+
+If original `RelString` instead compares 'à' correctly (as 0x41, 0x84), it should compare _after_ á, as is the case with ò and ó. 
+
+I wrote a small test app in MPW using SIOW:
+
+```
+#include <MacTypes.h>
+#include <TextUtils.h>
+
+#include <stdio.h>
+
+int main(void) {
+	char string0[3] = { 1, 'A', 0 };
+	char string1[3] = { 1, 'à', 0 };
+	char string2[3] = { 1, '`', 0 };
+	char string3[3] = { 1, 'á', 0 };
+	printf("'%s' <=> '%s': %d\n",
+		string0 + 1, string1 + 1,
+		RelString((ConstStr255Param)string0, (ConstStr255Param)string1, false, true)
+	);
+	printf("'%s' <=> '%s': %d\n",
+		string1 + 1, string2 + 1,
+		RelString((ConstStr255Param)string1, (ConstStr255Param)string2, false, true)
+	);
+	printf("'%s' <=> '%s': %d\n",
+		string2 + 1, string3 + 1,
+		RelString((ConstStr255Param)string2, (ConstStr255Param)string3, false, true)
+	);
+	printf("'%s' <=> '%s': %d\n",
+		string1 + 1, string3 + 1,
+		RelString((ConstStr255Param)string1, (ConstStr255Param)string3, false, true)
+	);
+	return 0;
+}
+```
+
+The output of this program on Mac OS 9.0.4 is:
+
+```
+'A' <=> 'à': -1
+'à' <=> '`': -1
+'`' <=> 'á': -1
+'à' <=> 'á': -1
+```
+
+So indeed, the behavior of the open-source `FastRelString` is consistent with Mac OS 9.0.4's `RelString`.
+
 ## Growing the catalog file
 
 Catalog records are larger on HFS+ than on HFS:
