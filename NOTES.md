@@ -231,7 +231,7 @@ It seems like the high nybble of 'à''s fraction byte ended up on '\`''s fractio
 - '\`', 'á'
 - 'à', 'á'
 
-The above table matches `RelString` if `RelString` (case-insensitive, diacritic-distinguishing) returns -1 for each of these pairs.
+`FastRelString`'s table matches `RelString` if `RelString` (case-insensitive, diacritic-distinguishing) returns -1 for each of these pairs.
 
 If original `RelString` instead compares 'à' correctly (as 0x41, 0x84), it should compare _after_ á, as is the case with ò and ó. 
 
