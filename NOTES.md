@@ -283,12 +283,12 @@ So indeed, the behavior of the open-source `FastRelString` is consistent with Ma
 
 Catalog records are larger on HFS+ than on HFS:
 
-||Record type  ||HFS bytes||HFS+ bytes||Growth factor||
-||=============||=========||==========||=============||
-||File         ||102      ||248       || 2.431x      ||
-||Folder       ||70       ||88        || 1.257x      ||
-||File thread  ||46       ||520       ||11.3x        ||
-||Folder thread||46       ||520       ||11.3x        ||
+||Record type  ||HFS bytes ||HFS+ bytes ||Growth factor||
+||=============||==========||===========||=============||
+||File         ||0x66 (102)||0xf8 (248) || 2.431x      ||
+||Folder       ||0x46 (70) ||0x58 (88)  || 1.257x      ||
+||File thread  ||0x2e (46) ||0x208 (520)||11.3x        ||
+||Folder thread||0x2e (46) ||0x208 (520)||11.3x        ||
 
 (Remember that thread records include the item name. The name went from 32 bytes to hold up to 31 8-bit characters, to 512 bytes to hold up to 255 16-bit code units.)
 
@@ -369,6 +369,28 @@ Extents file is using 2 nodes out of an allocated 2037 (0.10% utilization)
 ```
 
 The two nodes are the header node and maybe one leaf node, so it's basically empty. (If there are no records in the leaf node, then it's totally empty.) The extents file, like the catalog file, has a minimum node size of 0x1000 in HFS+. We can't quite shrink it *all* the way down to 0x2000, but we can shrink it down to one a-block, which is 0x2a00 bytes. That frees up 0x7f2600 bytes, which is more than enough.
+
+### Growing the catalog file revisited: HFS+ catalog keys are variable-sized
+
+The above analysis assumes everything in the catalog has a constant size, which is not true on HFS+.
+
+Catalog keys, in particular, are variable-sized, and will never reach the maximum of 0x208 (520) bytes in a volume converted from HFS+, because most of that is the node name, which has a much higher limit in HFS+ than in HFS. An original HFS+ volume can have node names up to 0x200 (512) bytes (255 characters * 2 bytes each + 2-byte length value), whereas an HFS volume limits node names to 31 characters, which is 0x40 (64) bytes after conversion.
+
+Among catalog records, only thread records have a node name—but this, too, is variable-sized, according to hfs_format.h. Here, too our maximum size drops precipitously.
+
+Let's revisit the analysis from earlier, assuming names using all 31 characters that HFS allowed them:
+
+- The HFS+ catalog key is 0x2+0x4+0x40=0x46 bytes. The HFS+ thread record is 0x2+0x2+0x4+0x40=0x48 bytes. 
+- Files go from 0x26+0x66 = 0x8c bytes (file record only) to 0x46+0xf8+0x46+0x48 = 0x1cc bytes, an over 3x increase.
+- Folders go from 0x26+0x46+0x26+0x2e = 0xc0 bytes to 0x46+0x58+0x46+0x48 = 0x12c, a one-and-a-half-times increase.
+
+Now this looks much better. Even with the addition of file thread records, the growth of catalog nodes by a factor of 8 provides more than enough room for this growth.
+
+Of course, that assumes there's enough room on disk to accommodate the growth in node size. The good news is, even in the worst case, the catalog file only needs to grow (in bytes) by less than 4x, not the full 8x.
+
+Most of this growth is in the leaf nodes, where all the file and folder and thread records live. We might not need as many of them, because they're bigger by a larger factor than their contents; we can fit more items per node.
+
+The same is true of the index nodes, although the feasibility of removing any is still an open question, without a full B*-tree implementation. But consolidation among leaf nodes means index nodes might end up with some redundant entries (pointing to the same descendant), or just empty space.
 
 ## Shrinking (or even emptying) the extents overflow file
 
