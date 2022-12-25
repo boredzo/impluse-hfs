@@ -410,6 +410,8 @@ Only severely fragmented files might have more than eight extents, and some of t
 
 On HFS volumes that have an extents overflow file, its shrinkage is likely to be severe and potentially total. One benefit of this is freeing up space for the catalog file; either freeing up space entirely, or being relocatable to a smaller opening in the HFS+ volume.
 
+Of course, in a defragmenting conversion (not attempting to preserve data's location on disk), no file should end up overflowing a single HFS+ extent record. Between the greater ranges, the increase in the number of extents per record, and the defragmentation, almost all files will end up in one extent and the very largest files should end up in a handful of adjacent extents. The extents overflow file after such a conversion should be empty.
+
 ## Observed VBM ranges
 
 (I eventually solved this mystery. Skip to the end.)
