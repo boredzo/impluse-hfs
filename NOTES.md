@@ -748,3 +748,23 @@ HFS+ conversion that attempts to preserve positions as much as possible may need
 It may not make sense, for volumes with large a-block sizes, to try to keep the allocations bitmap between the volume header and UABs. Such volumes may have a larger a-block size than the size of their allocations bitmap (examples: Mac OS 9.0.4 has a-block size 0x2a00 and VBM size 0x2000; “The Journeyman Project” Turbo! has a-block size 0x4200 and VBM size 0x1400). In these cases, it may make more sense to move the FUAB offset *up* to the second a-block, and find somewhere in the middle of UAB space to put the allocations file. One weird trick—rotational media hate it.
 
 Growing the allocations bitmap may end up adding another byte to it. Adding another byte to it may (in the worst case) necessitate allocating a whole new a-block. 
+
+## A wild idea: Converging worlds
+
+I've settled on implementing a defragmenting conversion, at least first, as it seems to be simpler/have fewer edge cases than attempting to preserve block allocations.
+
+So now I need to allocate blocks afresh. Allocating blocks means marking the corresponding bits as used in the VBM/allocations bitmap and returning the extent that identifies those blocks, to be added to an extent record in a file's catalog record or the extents overflow file (or, for the special files themselves, in the volume header).
+
+One idea I've been toying with is having two separate allocation directions.
+
+The standard HFS/HFS+ algorithm allocates forward, starting from the block identified by `nextAllocation` (or, if that fails, from the FUAB), until an available extent is found. My version of this attempts to find the smallest single available extent that will fit the request, falling back to smaller allocations if necessary.
+
+What I'm toying with is doing that only for the special files (catalog, etc.) and the resource forks. Data forks would be allocated in the opposite direction from the opposite end.
+
+This would keep most of the smallest forks down at the low (hub-ward, on a spinning platter) end of the volume, and allocates the largest forks at the high (radial) end.
+
+There would be two `nextAllocation` fields. One, the one stored in the volume header, would be the one used for resource forks and special files (advancing forward). The other would be used for data forks and would advance backward. As `nextAllocation` is the block number where the most recently allocated (resource) extent starts, `nextDataAllocation` would be the block number of the last block of the most recently allocated data extent.
+
+It may also make sense to set a computed border between these two block numbers on every search, and stop the search if it would cross the border. Then a data fork would never receive extents in the resource region, nor vice versa.
+
+It's possible, maybe even likely, that this isn't worth the trouble. (Certainly not on Mac OS X volumes, which tend to be more data-fork-heavy.)
