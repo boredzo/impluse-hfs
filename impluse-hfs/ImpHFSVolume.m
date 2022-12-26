@@ -212,13 +212,6 @@
 		return false;
 	}
 
-	[intoData withRange:(NSRange){ offset, intoData.length - offset }
-		showSubdataToBlock_Imp:^(const void * _Nonnull bytes, NSUInteger length)
-	{
-		NSData *_Nonnull const excerpt = [[NSData alloc] initWithBytesNoCopy:(void *)bytes length:length freeWhenDone:false];
-		[excerpt writeToURL:[[NSURL fileURLWithPath:@"/tmp" isDirectory:true] URLByAppendingPathComponent:[NSString stringWithFormat:@"hfs+%llu.dat", readStart] isDirectory:false] options:0 error:NULL];
-	}];
-
 	return true;
 }
 
