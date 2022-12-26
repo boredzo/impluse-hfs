@@ -352,6 +352,7 @@ extern int32_t RelString(ConstStr255Param a, ConstStr255Param b, bool const case
 	memcpy(quarryCatalogKey.nodeName, nodeName, nodeName[0] + 1);
 	quarryCatalogKey.keyLength -= sizeof(quarryCatalogKey.keyLength);
 
+	//TODO: Factor this out into -hfsCatalogKeyComparator and -hfsPlusCatalogKeyComparator (the latter should use Unicode name comparisons)
 	ImpBTreeRecordKeyComparator _Nonnull const compareKeys = ^ImpBTreeComparisonResult(const void *const  _Nonnull foundKeyPtr) {
 		struct HFSCatalogKey const *_Nonnull const foundCatKeyPtr = foundKeyPtr;
 		if (quarryCatalogKey.parentID > L(foundCatKeyPtr->parentID)) {
