@@ -401,7 +401,7 @@
 {
 	__block u_int64_t totalAmountRead = 0;
 	__block bool ultimatelySucceeded = true;
-	__block NSError *_Nonnull readError = nil;
+	__block NSError *_Nullable readError = nil;
 
 	int const readFD = self.fileDescriptor;
 	u_int64_t const blockSize = L(_mdb->drAlBlkSiz);
