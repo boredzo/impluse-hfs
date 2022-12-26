@@ -10,9 +10,9 @@
 enum {
 	BTreeNodeLengthHFSStandard = 0x200 * 1,
 
-	BTreeNodeLengthHFSPlusCatalogMinimum = 0x200 * 8,
-	BTreeNodeLengthHFSPlusExtentsOverflowMinimum = 0x200 * 2,
-	BTreeNodeLengthHFSPlusAttributesMinimum = 0x200 * 8,
+	BTreeNodeLengthHFSPlusCatalogMinimum = kHFSPlusCatalogMinNodeSize,
+	BTreeNodeLengthHFSPlusExtentsOverflowMinimum = kHFSPlusExtentMinNodeSize,
+	BTreeNodeLengthHFSPlusAttributesMinimum = kHFSPlusAttrMinNodeSize,
 };
 
 typedef NS_ENUM(int8_t, ImpBTreeComparisonResult) {
