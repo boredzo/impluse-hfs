@@ -105,6 +105,30 @@ In HFS, every node is 512 bytes (IM: F). In HFS+, each B*-tree file defines its 
 >**IMPORTANT:**  
 >The node size of the attributes file must be at least kHFSPlusAttrMinNodeSize (4096).
 
+An HFS-style B*-tree is not *just* a tree. A tree is a directed graph from a root toward leaves. HFS-style B*-trees are trees, but each node also has links to siblings of the same height, as clarified by TN1150:
+
+>All the nodes in a given level (whose height field is the same) must be chained via their fLink and bLink field. The node with the smallest keys must be first in the chain and its bLink field must be zero. The node with the largest keys must be last in the chain and its fLink field must be zero.
+
+Thus, an HFS-style B*-tree has what I call “rows”:
+
+- the header/map node row (height 0)
+- index row (height n)
+- ⋮
+- index row (height 2)
+- leaf row (height 1)
+
+(Heights shown here are as described in TN1150; I haven't tried to nail down how heights work in HFS.)
+
+The bottom index row, at height 2, points to a subset of the nodes on the leaf row at height 1. The row at height 3, if there is one, points to a subset of nodes on row 2.
+
+(As noted in both sources, a B*-tree can have only one node, which would be a leaf node with no index nodes above it. It's also possible to have a B*-tree with few enough leaf nodes that one index node covers it.)
+
+TN1150 describes how B*-tree searching works:
+
+>When an implementation needs to find the data associated with a particular search key, it begins searching at the root node. Starting with the first record, it searches for the record with the greatest key that is less than or equal to the search key. In then moves to the child node (typically an index node) and repeats the same process.
+
+I interpret this to mean that every row must start with the first key in the tree. Otherwise, if you're searching for that key, you wouldn't find it because the first record in the first index node you visit would have a greater key.
+
 ## Catalog records
 
 There are four kinds of records in a catalog leaf node:
@@ -724,7 +748,3 @@ HFS+ conversion that attempts to preserve positions as much as possible may need
 It may not make sense, for volumes with large a-block sizes, to try to keep the allocations bitmap between the volume header and UABs. Such volumes may have a larger a-block size than the size of their allocations bitmap (examples: Mac OS 9.0.4 has a-block size 0x2a00 and VBM size 0x2000; “The Journeyman Project” Turbo! has a-block size 0x4200 and VBM size 0x1400). In these cases, it may make more sense to move the FUAB offset *up* to the second a-block, and find somewhere in the middle of UAB space to put the allocations file. One weird trick—rotational media hate it.
 
 Growing the allocations bitmap may end up adding another byte to it. Adding another byte to it may (in the worst case) necessitate allocating a whole new a-block. 
-
-#### Preflight checks
-
-- Is the source allocation block size a multiple of 0x200?
