@@ -443,6 +443,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 
 		ImpTextEncodingConverter *_Nonnull const tec = _tec;
 
+		__block bool anyRehydrationFailed = false;
 		__block NSError *_Nullable rehydrationError = nil;
 
 		//For each item in the dehydrated directory, rehydrate it, too.
@@ -458,6 +459,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 				bool const rehydrated = [dehydratedFile rehydrateFileAtRealWorldURL:fileURL error:&rehydrationError];
 				if (! rehydrated) {
 					ImpPrintf(@"%@ in rehydrating descendant 📄 “%@”", rehydrated ? @"Success" : @"Failure", filename);
+					anyRehydrationFailed = true;
 				}
 				return rehydrated;
 			}
@@ -467,13 +469,17 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 				NSURL *_Nonnull const folderURL = [realWorldURL URLByAppendingPathComponent:folderName isDirectory:true];
 				ImpPrintf(@"Rehydrating descendant 📁 “%@”", folderName);
 				bool const rehydrated = [dehydratedFolder rehydrateFolderAtRealWorldURL:folderURL error:&rehydrationError];
-				ImpPrintf(@"%@ in rehydrating descendant 📁 “%@”", rehydrated ? @"Success" : @"Failure", folderName);
+				if (! rehydrated) {
+					ImpPrintf(@"%@ in rehydrating descendant 📄 “%@”", rehydrated ? @"Success" : @"Failure", folderName);
+					anyRehydrationFailed = true;
+				}
 				return rehydrated;
 			}];
 		}
 
-		if (rehydrationError != nil && outError != NULL) {
+		if (anyRehydrationFailed && outError != NULL) {
 			*outError = rehydrationError;
+			return false;
 		}
 
 		catInfo.createDate.lowSeconds = L(folderRec->createDate);
