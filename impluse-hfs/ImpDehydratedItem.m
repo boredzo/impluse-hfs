@@ -310,6 +310,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		}
 		return allWritesSucceeded;
 	}];
+	FSCloseFork(dataForkRefnum);
 	if (writeError != nil) {
 		if (outError != NULL) {
 			*outError = writeError;
@@ -337,6 +338,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		}
 		return allWritesSucceeded;
 	}];
+	FSCloseFork(rsrcForkRefnum);
 	if (! allWritesSucceeded) {
 		if (outError != NULL) {
 			*outError = writeError;
