@@ -64,7 +64,7 @@
 		self.clumpSize = L(headerRec->clumpSize);
 
 		self.btreeType = L(headerRec->btreeType);
-		self.keyCompareType = L(headerRec->btreeType);
+		self.keyCompareType = L(headerRec->keyCompareType);
 
 		self.attributes = L(headerRec->attributes);
 
