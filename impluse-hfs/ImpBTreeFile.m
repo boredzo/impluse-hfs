@@ -157,13 +157,14 @@
 		keepIterating = block(node);
 		++numNodesVisited;
 	}
-	for (ImpBTreeNode *_Nullable node = startNode; keepIterating && node != nil; node = node.nextNode) {
-		if (node.nodeType == kBTIndexNode) {
-			ImpBTreeIndexNode *_Nonnull const indexNode = (ImpBTreeIndexNode *_Nonnull const)node;
-			for (ImpBTreeNode *_Nonnull const child in indexNode.children) {
-				numNodesVisited = [self _walkNodeAndItsSiblingsAndThenItsChildren:child keepIterating:&keepIterating block:block];
-				if (! keepIterating) break;
-			}
+	//An older, slower version of this method would at this point loop through the whole row again, and then each node's children, calling _walkNodeAndBlahBlah::: on each child. Guess what—that visits every node an incredibly excessive number of redundant times!
+	//I hadn't yet figured out that HFS B*-trees are organized into rows. We don't need to visit every child of every node—the first child of this node gets us down to the next row.
+	//In theory we should rewind to the start of the row via bLink members, but in practice we are only called by walkBreadthFirst:, so we can assume startNode is always the first node on a row.
+	if (startNode.nodeType == kBTIndexNode) {
+		ImpBTreeIndexNode *_Nonnull const indexNode = (ImpBTreeIndexNode *_Nonnull const)startNode;
+		ImpBTreeNode *_Nullable const firstChild = indexNode.children.firstObject;
+		if (firstChild != nil) {
+			numNodesVisited = [self _walkNodeAndItsSiblingsAndThenItsChildren:firstChild keepIterating:&keepIterating block:block];
 		}
 	}
 
