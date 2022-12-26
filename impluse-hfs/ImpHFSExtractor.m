@@ -120,6 +120,10 @@
 	NSByteCountFormatter *_Nonnull const bcf = [NSByteCountFormatter new];
 	[self deliverProgressUpdate:0.01 operationDescription:[NSString stringWithFormat:@"Volume size is %@; %@ in use, %@ free", [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksTotal], [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksUsed], [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksFree]]];
 
+	bool const grabEverything = (self.quarryNameOrPath == nil);
+	if (grabEverything) {
+		self.quarryNameOrPath = [srcVol.volumeName stringByAppendingString:@":"];
+	}
 	bool const grabAnyFileWithThisName = ! [self isHFSPath:self.quarryNameOrPath];
 	//TODO: Possibly in need of special-casing: When parsedPath is @[ @"" ], it means the user asked for ':'. Treat this as a relative path to the root directory, and unarchive the entire root volume.
 	NSArray <NSString *> *_Nonnull const parsedPath = [self parseHFSPath:self.quarryNameOrPath];
