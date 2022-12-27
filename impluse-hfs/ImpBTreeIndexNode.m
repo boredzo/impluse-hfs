@@ -67,6 +67,7 @@
 
 			case ImpBTreeComparisonQuarryIsLesser:
 				//We've found a key that is greater than the quarry, so we've run out of eligible candidates. Stop iterating and descend to the last result we got.
+				foundBestMatch = true;
 				keepIterating = false;
 				break;
 
@@ -81,11 +82,10 @@
 	}];
 
 	if (! foundBestMatch) {
-		ImpBTreeIndexNode *_Nonnull const nextIndexNode = (ImpBTreeIndexNode *_Nonnull const)self.nextNode;
-		ImpBTreeNode *_Nonnull const possiblyBetterCandidate = [nextIndexNode descendWithKeyComparator:block];
-		if (possiblyBetterCandidate != nil) {
-			result = possiblyBetterCandidate;
-		}
+		//At this point, it might be tempting to look in sibling nodes.
+		//But we've already been selected by searchSiblingsForBestMatchingNodeWithComparator:. This *is* the node to descend from. If we've gotten to this point, every single record in *this* node is viable, but the first record in the *next* node—if there is one—is not (because if it were, searchSiblings would have returned that node).
+		//So, stay in this node and descend through our last record.
+		NSAssert(result != nil, @"Expected to have found a viable match here (was the catalog file empty?); node contains %u records", self.numberOfRecords);
 	}
 
 	return result;
