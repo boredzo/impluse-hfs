@@ -129,6 +129,8 @@ TN1150 describes how B*-tree searching works:
 
 I interpret this to mean that every row must start with the first key in the tree. Otherwise, if you're searching for that key, you wouldn't find it because the first record in the first index node you visit would have a greater key.
 
+Another way of looking at this is to consider an HFS-style B*-tree to be *two* data structures that are connected to each other: a sorted doubly-linked list with all the data records (in the leaf nodes), and an index of that list which is an actual tree (ignoring that every row of index nodes is another complete linked list). I've found that sometimes it makes sense to skip the index and walk the linked list of leaves (which HFS thankfully provides members in the node descriptor for, so it seems Apple engineers had the same thought), and other times it makes sense to use the index tree to shorten the traversal to a particular item.
+
 ## Catalog records
 
 There are four kinds of records in a catalog leaf node:
