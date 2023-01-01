@@ -83,7 +83,6 @@
 	//Volume bitmap immediately follows MDB. We could look at drVBMSt, but it should always be 3.
 	//Volume bitmap *size* is drNmAlBlks bits, or (drNmAlBlks / 8) bytes.
 	size_t const vbmMinimumNumBytes = ImpNextMultipleOfSize(L(_mdb->drNmAlBlks), 8) / 8;
-	ImpPrintf(@"VBM minimum size in bytes is number of blocks %u / 8 = 0x%zx", (unsigned)L(_mdb->drNmAlBlks), vbmMinimumNumBytes);
 	off_t const vbmStartPos = (
 		_bootBlocksData.length
 		+
@@ -96,13 +95,15 @@
 		ImpNextMultipleOfSize(vbmMinimumNumBytes, kISOStandardBlockSize)
 	);
 	off_t const vbmFinalNumBytes = vbmEndPos - vbmStartPos;
-	ImpPrintf(@"Allocation block size is 0x%llx (0x200 * %.1f)", L(_mdb->drAlBlkSiz), L(_mdb->drAlBlkSiz) / 512.0);
-	ImpPrintf(@"Clump size is 0x%llx (0x200 * %.1f; ABS * %.1f)", L(_mdb->drClpSiz), L(_mdb->drClpSiz) / 512.0, L(_mdb->drClpSiz) / (double)L(_mdb->drAlBlkSiz));
+#if ImpHFS_DEBUG_LOGGING
+	ImpPrintf(@"VBM minimum size in bytes is number of blocks %u / 8 = 0x%zx", (unsigned)L(_mdb->drNmAlBlks), vbmMinimumNumBytes);
 	ImpPrintf(@"VBM starts at 0x%llx, runs for 0x%llx (%.1f blocks), ends at 0x%llx", vbmStartPos, vbmFinalNumBytes, vbmFinalNumBytes / (double)L(_mdb->drAlBlkSiz), vbmEndPos);
-	ImpPrintf(@"First allocation block: 0x%llx", L(_mdb->drAlBlSt) * 0x200);
+#endif
 
 	NSMutableData *_Nonnull const volumeBitmap = [NSMutableData dataWithLength:vbmFinalNumBytes];
-	ImpPrintf(@"Reading %zu (0x%zx) bytes (%zu blocks) of VBM starting from offset %lld bytes", volumeBitmap.length, volumeBitmap.length, volumeBitmap.length / kISOStandardBlockSize, lseek(readFD, 0, SEEK_CUR));
+#if ImpHFS_DEBUG_LOGGING
+	ImpPrintf(@"Reading %zu (0x%zx) bytes (%zu blocks) of VBM starting from offset 0x%llx bytes", volumeBitmap.length, volumeBitmap.length, volumeBitmap.length / kISOStandardBlockSize, lseek(readFD, 0, SEEK_CUR));
+#endif
 	ssize_t const amtRead = read(readFD, volumeBitmap.mutableBytes, volumeBitmap.length);
 	if (amtRead < volumeBitmap.length) {
 		NSError *_Nonnull const underrunError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: @"Unexpected end of file reading source volume allocation bitmap — are you sure this is an HFS volume?" }];
@@ -131,7 +132,10 @@
 	ImpPrintf(@"Catalog extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[2].blockCount))]);
 
 	NSData *_Nullable const catalogFileData = [self readDataFromFileDescriptor:readFD extents:_mdb->drCTExtRec numExtents:kHFSExtentDensity error:outError];
+	ImpPrintf(@"Catalog file data: 0x%lx bytes (%lu a-blocks)", catalogFileData.length, catalogFileData.length / L(_mdb->drAlBlkSiz));
+
 	self.catalogBTree = [[ImpBTreeFile alloc] initWithData:catalogFileData];
+	ImpPrintf(@"Catalog file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", self.catalogBTree.numberOfLiveNodes, self.catalogBTree.numberOfPotentialNodes, self.catalogBTree.numberOfPotentialNodes > 0 ? (self.catalogBTree.numberOfLiveNodes / (double)self.catalogBTree.numberOfPotentialNodes) * 100.0 : 1.0);
 
 	return (self.catalogBTree != nil);
 }
@@ -150,9 +154,10 @@
 	ImpPrintf(@"Extents overflow extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[2].blockCount))]);
 
 	NSData *_Nullable const extentsFileData = [self readDataFromFileDescriptor:readFD extents:_mdb->drXTExtRec numExtents:kHFSExtentDensity error:outError];
-	ImpPrintf(@"Extents file data: %lu bytes", extentsFileData.length);
+	ImpPrintf(@"Extents file data: 0x%lx bytes (%lu a-blocks)", extentsFileData.length, extentsFileData.length / L(_mdb->drAlBlkSiz));
 
 	self.extentsOverflowBTree = [[ImpBTreeFile alloc] initWithData:extentsFileData];
+	ImpPrintf(@"Extents file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", self.extentsOverflowBTree.numberOfLiveNodes, self.extentsOverflowBTree.numberOfPotentialNodes, self.extentsOverflowBTree.numberOfPotentialNodes > 0 ? (self.extentsOverflowBTree.numberOfLiveNodes / (double)self.extentsOverflowBTree.numberOfPotentialNodes) * 100.0 : 1.0);
 
 	return (self.extentsOverflowBTree != nil);
 }
@@ -202,7 +207,7 @@
 
 	off_t const offsetOfFirstAllocationBlock = L(_mdb->drAlBlSt) * kISOStandardBlockSize;
 	off_t const readStart = self.volumeStartOffset + offsetOfFirstAllocationBlock + L(hfsExt->startBlock) * L(_mdb->drAlBlkSiz);
-	ImpPrintf(@"Reading %lu bytes (%lu blocks) from source volume starting at %llu bytes (extent: [ start #%u, %u blocks ])", intoData.length, intoData.length / L(_mdb->drAlBlkSiz), readStart, L(hfsExt->startBlock), L(hfsExt->blockCount));
+	ImpPrintf(@"Reading 0x%lx bytes (%lu bytes = %lu blocks) from source volume starting at 0x%llx bytes (extent: [ start #%u, %u blocks ])", intoData.length, intoData.length, intoData.length / L(_mdb->drAlBlkSiz), readStart, L(hfsExt->startBlock), L(hfsExt->blockCount));
 	ssize_t const amtRead = pread(readFD, intoData.mutableBytes + offset, intoData.length - offset, readStart);
 	if (amtRead < 0) {
 		NSError *_Nonnull const readFailedError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to read data from extent { start #%u, %u blocks }", (unsigned)L(hfsExt->startBlock), (unsigned)L(hfsExt->blockCount) ] }];
