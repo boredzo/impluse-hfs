@@ -186,7 +186,7 @@
 	 * startupFile
 	 */
 
-	memcpy(&vh, vhPtr, sizeof(vh));
+	memcpy(vhPtr, &vh, sizeof(vh));
 }
 
 - (bool)performConversionOrReturnError:(NSError *_Nullable *_Nonnull) outError {
