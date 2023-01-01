@@ -8,6 +8,7 @@
 #import <Foundation/Foundation.h>
 
 #import "ImpForkUtilities.h"
+#import "ImpComparisonUtilities.h"
 #import "ImpBTreeNode.h"
 #import "ImpBTreeHeaderNode.h"
 

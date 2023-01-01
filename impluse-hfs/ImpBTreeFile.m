@@ -10,14 +10,11 @@
 #import <hfs/hfs_format.h>
 #import "ImpByteOrder.h"
 #import "ImpSizeUtilities.h"
+#import "ImpComparisonUtilities.h"
 #import "NSData+ImpSubdata.h"
 #import "ImpBTreeHeaderNode.h"
 #import "ImpBTreeIndexNode.h"
 #import "ImpTextEncodingConverter.h"
-
-///Historically declared in TextUtils.h, but now so deprecated that it's not even in the headers anymore. Could go away at any time, in which case this will need to be replaced with either a clean original implementation or Apple's open-source FastRelString from diskdev_cmds-491.3/fsck_hfs.tproj.
-//NOTE: Must be declared as int32_t, not NSComparisonResult, as the latter is long, which is 64-bit on LP64 systems, and this does not return a 64-bit value. If you declare this as NSComparisonResult, you get INT_MAX rather than -1.
-extern int32_t RelString(ConstStr255Param a, ConstStr255Param b, bool const caseSensitive, bool const diacriticSensitive);
 
 @implementation ImpBTreeFile
 {
@@ -356,14 +353,7 @@ extern int32_t RelString(ConstStr255Param a, ConstStr255Param b, bool const case
 	//TODO: Factor this out into -hfsCatalogKeyComparator and -hfsPlusCatalogKeyComparator (the latter should use Unicode name comparisons)
 	ImpBTreeRecordKeyComparator _Nonnull const compareKeys = ^ImpBTreeComparisonResult(const void *const  _Nonnull foundKeyPtr) {
 		struct HFSCatalogKey const *_Nonnull const foundCatKeyPtr = foundKeyPtr;
-		if (quarryCatalogKey.parentID > L(foundCatKeyPtr->parentID)) {
-			return ImpBTreeComparisonQuarryIsGreater;
-		}
-		if (quarryCatalogKey.parentID < L(foundCatKeyPtr->parentID)) {
-			return ImpBTreeComparisonQuarryIsLesser;
-		}
-		NSComparisonResult const nameComparison = RelString(quarryCatalogKey.nodeName, foundCatKeyPtr->nodeName, false, true);
-		return (ImpBTreeComparisonResult)nameComparison;
+		return ImpBTreeCompareHFSCatalogKeys(&quarryCatalogKey, foundCatKeyPtr);
 	};
 
 	ImpBTreeNode *_Nullable foundNode = nil;
@@ -408,14 +398,7 @@ extern int32_t RelString(ConstStr255Param a, ConstStr255Param b, bool const case
 
 	ImpBTreeRecordKeyComparator _Nonnull const compareKeys = ^ImpBTreeComparisonResult(const void *const  _Nonnull foundKeyPtr) {
 		struct HFSCatalogKey const *_Nonnull const foundCatKeyPtr = foundKeyPtr;
-		if (quarryCatalogKey.parentID > L(foundCatKeyPtr->parentID)) {
-			return ImpBTreeComparisonQuarryIsGreater;
-		}
-		if (quarryCatalogKey.parentID < L(foundCatKeyPtr->parentID)) {
-			return ImpBTreeComparisonQuarryIsLesser;
-		}
-		NSComparisonResult const nameComparison = RelString(quarryCatalogKey.nodeName, foundCatKeyPtr->nodeName, false, true);
-		return (ImpBTreeComparisonResult)nameComparison;
+		return ImpBTreeCompareHFSCatalogKeys(&quarryCatalogKey, foundCatKeyPtr);
 	};
 
 	ImpBTreeNode *_Nullable foundNode = nil;
