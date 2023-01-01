@@ -20,6 +20,7 @@
 {
 	NSData *_Nonnull _bTreeData;
 	struct BTNodeDescriptor const *_Nonnull _nodes;
+	u_int16_t _nodeSize;
 	NSUInteger _numPotentialNodes;
 	NSMutableArray *_Nullable _lastEnumeratedObjects;
 	NSMutableArray <ImpBTreeNode *> *_Nullable _nodeCache;
@@ -31,6 +32,7 @@
 
 		_nodes = _bTreeData.bytes;
 		_numPotentialNodes = _bTreeData.length / BTreeNodeLengthHFSStandard;
+		_nodeSize = nodeSize;
 
 		_nodeCache = [NSMutableArray arrayWithCapacity:_numNodes];
 		NSNull *_Nonnull const null = [NSNull null];
@@ -47,6 +49,10 @@
 
 - (NSUInteger)count {
 	return _numPotentialNodes;
+}
+
+- (u_int16_t) bytesPerNode {
+	return _nodeSize;
 }
 
 ///Debugging method. Returns the number of total nodes in the tree, live or otherwise (that is, the total length in bytes of the file divided by the size of one node).

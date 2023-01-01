@@ -16,6 +16,9 @@
 
 - (instancetype _Nullable )initWithData:(NSData *_Nonnull const)bTreeFileContents;
 
+///Size of each node in the file in bytes. All nodes in any B*-tree file have the same size. Corresponds to BTHeaderRec.nodeSize. For HFS trees, this is always kISOStandardBlockSize; for HFS+ trees, the minimum node size varies by kind of tree, and the true node size is given in the header node (BTHeaderRec.nodeSize).
+- (u_int16_t) bytesPerNode;
+
 ///Debugging method. Returns the number of total nodes in the tree, live or otherwise (that is, the total length in bytes of the file divided by the size of one node).
 - (NSUInteger) numberOfPotentialNodes;
 ///Debugging method. Returns the number of nodes in the tree that are reachable: 1 for the header node, plus the number of map nodes (siblings to the header node), the number of index nodes, and the number of leaf nodes.
