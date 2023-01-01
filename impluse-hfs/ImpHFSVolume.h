@@ -53,6 +53,7 @@
 	numExtents:(NSUInteger const)numExtents
 	error:(NSError *_Nullable *_Nonnull const)outError;
 
+///Returns true if none of the extents in this record overlap. Returns false if there are overlapping extents, which may jeopardize user data or lead to volume corruption. Ignores any extents after an empty extent.
 - (bool) checkExtentRecord:(HFSExtentRecord const *_Nonnull const)hfsExtRec;
 
 ///For every extent in the file (the initial three plus any overflow records) until an empty extent, call the block with that extent and the number of bytes remaining in the file. The block should return the number of bytes it consumed (e.g., read from the file descriptor). Returns the total number of bytes consumed.
