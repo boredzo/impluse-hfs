@@ -114,7 +114,7 @@
 	return total;
 }
 
-- (void) convertHFSVolumeHeader:(struct HFSMasterDirectoryBlock const *_Nonnull const)mdbPtr toHFSPlusVolumeHeader:(struct HFSPlusVolumeHeader const *_Nonnull const)vhPtr
+- (void) convertHFSVolumeHeader:(struct HFSMasterDirectoryBlock const *_Nonnull const)mdbPtr toHFSPlusVolumeHeader:(struct HFSPlusVolumeHeader *_Nonnull const)vhPtr
 {
 	struct HFSPlusVolumeHeader vh = {
 		.signature = kHFSPlusSigWord,
