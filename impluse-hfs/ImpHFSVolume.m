@@ -307,6 +307,9 @@
 - (void) getVolumeHeader:(void *_Nonnull const)outMDB {
 	memcpy(outMDB, _mdb, sizeof(*_mdb));
 }
+- (void) peekAtVolumeHeader:(void (^_Nonnull const)(struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr NS_NOESCAPE))block {
+	block(_mdb);
+}
 - (NSData *_Nonnull) volumeBitmap {
 	return _volumeBitmapData;
 }

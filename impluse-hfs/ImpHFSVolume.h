@@ -28,6 +28,7 @@
 
 - (NSData *_Nonnull)bootBlocks;
 - (void) getVolumeHeader:(void *_Nonnull const)outMDB;
+- (void) peekAtVolumeHeader:(void (^_Nonnull const)(struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr NS_NOESCAPE))block;
 - (NSData *_Nonnull)volumeBitmap;
 @property(strong) ImpBTreeFile *_Nonnull catalogBTree;
 @property(strong) ImpBTreeFile *_Nonnull extentsOverflowBTree;
