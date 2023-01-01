@@ -9,6 +9,7 @@
 
 #import <hfs/hfs_format.h>
 #import "ImpByteOrder.h"
+#import "ImpSizeUtilities.h"
 #import "NSData+ImpSubdata.h"
 #import "ImpBTreeHeaderNode.h"
 #import "ImpBTreeIndexNode.h"
