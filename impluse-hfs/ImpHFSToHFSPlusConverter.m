@@ -210,55 +210,6 @@
 		return false;
 
 	struct HFSMasterDirectoryBlock mdb;
-	[srcVol getVolumeHeader:&mdb];
-	[self deliverProgressUpdate:0.01 operationDescription:[NSString stringWithFormat:@"Found HFS volume named “%@”", srcVol.volumeName]];
-	[self deliverProgressUpdate:0.01 operationDescription:[NSString stringWithFormat:@"Block size is %lu bytes; volume has %lu blocks in use, %lu free", srcVol.numberOfBytesPerBlock, srcVol.numberOfBlocksUsed, srcVol.numberOfBlocksFree]];
-	NSByteCountFormatter *_Nonnull const bcf = [NSByteCountFormatter new];
-	[self deliverProgressUpdate:0.01 operationDescription:[NSString stringWithFormat:@"Volume size is %@; %@ in use, %@ free", [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksTotal], [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksUsed], [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksFree]]];
-
-	[self deliverProgressUpdate:0.1 operationDescription:[NSString stringWithFormat:@"Slurped catalog file: %@", srcVol.catalogBTree]];
-	fflush(stdout);
-
-	ImpBTreeFile *_Nonnull const catalog = srcVol.catalogBTree;
-	ImpBTreeNode *_Nonnull const firstNode = [catalog nodeAtIndex:0];
-	NSAssert(firstNode != nil, @"Empty catalog file! %@", catalog);
-	NSAssert(firstNode.nodeType == kBTHeaderNode, @"First node in catalog must be a header node, but it was actually a %@", firstNode.nodeTypeName);
-
-	ImpBTreeHeaderNode *_Nonnull const headerNode = (ImpBTreeHeaderNode *_Nonnull const)firstNode;
-	printf("Header node portends %u total nodes, of which %u are free (= %u used)\n", headerNode.numberOfTotalNodes, headerNode.numberOfFreeNodes, headerNode.numberOfTotalNodes - headerNode.numberOfFreeNodes);
-	ImpBTreeNode *_Nonnull const rootNode = headerNode.rootNode;
-	ImpPrintf(@"Root node is %@", rootNode);
-	__block NSUInteger numNodes = 0;
-	__block NSUInteger numFiles = 0, numFolders = 0, numThreads = 0;
-	NSMutableSet *_Nonnull const nodesPreviouslyEncountered = [NSMutableSet setWithCapacity:headerNode.numberOfTotalNodes];
-	[catalog walkBreadthFirst:^bool(ImpBTreeNode *const  _Nonnull node) {
-		if ([nodesPreviouslyEncountered containsObject:@(node.nodeNumber)]) {
-			return true;
-		}
-		ImpPrintf(@"Walk encountered node: %@", node);
-		[nodesPreviouslyEncountered addObject:@(node.nodeNumber)];
-		++numNodes;
-
-		if (node.nodeType == kBTLeafNode) {
-			[node forEachCatalogRecord_file:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFile *const _Nonnull fileRec) {
-				ImpPrintf(@"- 📄 “%@”, ID #%u (0x%x), type %@ creator %@", [self stringForPascalString:catalogKeyPtr->nodeName], L(fileRec->fileID), L(fileRec->fileID),  NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdType)), NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdCreator)));
-				++numFiles;
-			} folder:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRec) {
-				ImpPrintf(@"- 📁 “%@” with ID #%u, %u items", [self stringForPascalString:catalogKeyPtr->nodeName], L(folderRec->folderID), L(folderRec->valence));
-				++numFolders;
-			} thread:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogThread *const _Nonnull threadRec) {
-				u_int32_t const threadID = L(threadRec->parentID);
-				ImpPrintf(@"- 🧵 with ID #%u and name %@", threadID, [self stringForPascalString:threadRec->nodeName]);
-				++numThreads;
-			}];
-		}
-		return true;
-	}];
-	ImpPrintf(@"Encountered %lu nodes", numNodes);
-	ImpPrintf(@"Encountered %lu files, %lu folders, %lu threads", numFiles, numFolders, numThreads);
-
-//	int const writeFD = open(self.destinationDevice.fileSystemRepresentation, O_WRONLY);
-	return false; //TEMP
 }
 
 @end

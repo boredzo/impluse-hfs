@@ -11,6 +11,7 @@
 #import "ImpHFSToHFSPlusConverter.h"
 #import "ImpHFSExtractor.h"
 #import "ImpHFSLister.h"
+#import "ImpHFSAnalyzer.h"
 
 @interface Impluse : NSObject
 
@@ -162,6 +163,35 @@ int main(int argc, const char * argv[]) {
 	NSError *_Nullable error = nil;
 	bool const extracted = [extractor performExtractionOrReturnError:&error];
 	if (! extracted) {
+		NSLog(@"Failed: %@", error.localizedDescription);
+		self.status = EXIT_FAILURE;
+	}
+}
+
+#pragma mark Debugging commands (not documented)
+
+- (void) analyze:(NSEnumerator <NSString *> *_Nonnull const)argsEnum {
+	NSString *_Nullable srcDevPath = nil;
+	for (NSString *_Nonnull const arg in argsEnum) {
+		if (srcDevPath != nil) {
+			[self printUsageToFile:stderr];
+			self.status = EX_USAGE;
+			return;
+		}
+		srcDevPath = arg;
+	}
+	if (srcDevPath == nil) {
+		[self printUsageToFile:stderr];
+		self.status = EX_USAGE;
+		return;
+	}
+
+	ImpHFSAnalyzer *_Nonnull const analyzer = [ImpHFSAnalyzer new];
+	analyzer.sourceDevice = [NSURL fileURLWithPath:srcDevPath isDirectory:false];
+
+	NSError *_Nullable error = nil;
+	bool const converted = [analyzer performAnalysisOrReturnError:&error];
+	if (! converted) {
 		NSLog(@"Failed: %@", error.localizedDescription);
 		self.status = EXIT_FAILURE;
 	}
