@@ -14,6 +14,11 @@
 ///Returns an object that (hopefully) can convert filenames from the given encoding into Unicode.
 - (instancetype _Nullable) initWithHFSTextEncoding:(TextEncoding const)hfsTextEncoding;
 
+///Obtain an estimate of how many bytes might be needed to hold the Unicode conversion of this string, including 2 bytes for the length.
+- (ByteCount) estimateSizeOfHFSUniStr255NeededForPascalString:(ConstStr31Param _Nonnull const)pascalString;
+///Returns true if the characters were successfully converted; returns false if some characters could not be converted or there wasn't enough space.
+- (bool) convertPascalString:(ConstStr31Param _Nonnull const)pascalString intoHFSUniStr255:(HFSUniStr255 *_Nonnull const)outUnicode bufferSize:(ByteCount)outputBufferSizeInBytes;
+
 - (NSData *_Nonnull const)hfsUniStr255ForPascalString:(ConstStr31Param _Nonnull const)pascalString;
 - (NSString *_Nonnull const) stringForPascalString:(ConstStr31Param _Nonnull const)pascalString;
 

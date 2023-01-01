@@ -47,7 +47,7 @@
 	DisposeTextToUnicodeInfo(&_ttui);
 }
 
-- (NSData *_Nonnull const)hfsUniStr255ForPascalString:(ConstStr31Param)pascalString {
+- (ByteCount) estimateSizeOfHFSUniStr255NeededForPascalString:(ConstStr31Param _Nonnull const)pascalString {
 	//The length in MacRoman characters may include accented characters that HFS+ decomposition will decompose to a base character and a combining character, so we actually need to double the length *in characters*.
 	ByteCount outputPayloadSizeInBytes = (2 * *pascalString) * sizeof(UniChar);
 	//TECConvertText documentation: “Always allocate a buffer at least 32 bytes long.”
@@ -55,15 +55,12 @@
 		outputPayloadSizeInBytes = 32;
 	}
 	ByteCount const outputBufferSizeInBytes = outputPayloadSizeInBytes + 1 * sizeof(UniChar);
-	NSMutableData *_Nonnull const unicodeData = [NSMutableData dataWithLength:outputBufferSizeInBytes];
+	return outputBufferSizeInBytes;
+}
+- (bool) convertPascalString:(ConstStr31Param _Nonnull const)pascalString intoHFSUniStr255:(HFSUniStr255 *_Nonnull const)outUnicode bufferSize:(ByteCount)outputBufferSizeInBytes {
+	UniChar *_Nonnull const outputBuf = (UniChar *)outUnicode;
 
-	if (*pascalString == 0) {
-		//TEC doesn't like converting empty strings, so just return our empty HFSUniStr255 without calling TEC.
-		return unicodeData;
-	}
-
-	UniChar *_Nonnull const outputBuf = unicodeData.mutableBytes;
-
+	ByteCount const outputPayloadSizeInBytes = outputBufferSizeInBytes - 1 * sizeof(UniChar);
 	ByteCount actualOutputLengthInBytes = 0;
 	OSStatus err = ConvertFromPStringToUnicode(_ttui, pascalString, outputPayloadSizeInBytes, &actualOutputLengthInBytes, outputBuf + 1);
 
@@ -86,12 +83,25 @@
 		if (err == kTECOutputBufferFullStatus) {
 			ImpPrintf(@"Output buffer full: %lu vs. buffer size %lu", (unsigned long)actualOutputLengthInBytes, outputPayloadSizeInBytes);
 		}
-		return nil;
+		return false;
 	}
 
 	S(outputBuf[0], (u_int16_t)(actualOutputLengthInBytes / sizeof(UniChar)));
+	return true;
+}
+- (NSData *_Nonnull const)hfsUniStr255ForPascalString:(ConstStr31Param)pascalString {
+	ByteCount const outputBufferSizeInBytes = [self estimateSizeOfHFSUniStr255NeededForPascalString:pascalString];
+	NSMutableData *_Nonnull const unicodeData = [NSMutableData dataWithLength:outputBufferSizeInBytes];
 
-	return unicodeData;
+	if (*pascalString == 0) {
+		//TEC doesn't like converting empty strings, so just return our empty HFSUniStr255 without calling TEC.
+		return unicodeData;
+	}
+
+	UniChar *_Nonnull const outputBuf = unicodeData.mutableBytes;
+	bool const converted = [self convertPascalString:pascalString intoHFSUniStr255:(HFSUniStr255 *)outputBuf bufferSize:outputBufferSizeInBytes];
+
+	return converted ? unicodeData : nil;
 }
 - (NSString *_Nonnull const) stringForPascalString:(ConstStr31Param)pascalString {
 	NSData *_Nonnull const unicodeData = [self hfsUniStr255ForPascalString:pascalString];
