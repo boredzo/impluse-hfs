@@ -305,7 +305,7 @@
 	return _bootBlocksData;
 }
 - (void) getVolumeHeader:(void *_Nonnull const)outMDB {
-	memcpy(outMDB, &_mdb, sizeof(_mdb));
+	memcpy(outMDB, _mdb, sizeof(*_mdb));
 }
 - (NSData *_Nonnull) volumeBitmap {
 	return _volumeBitmapData;
