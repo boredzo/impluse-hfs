@@ -32,15 +32,19 @@ ImpBTreeComparisonResult ImpBTreeCompareHFSPlusCatalogKeys(struct HFSPlusCatalog
 	return (ImpBTreeComparisonResult)ImpHFSPlusCompareNames(&quarryCatalogKeyPtr->nodeName, &foundCatKeyPtr->nodeName);
 }
 
-static UInt16 tn1150_gLowerCaseTable[256 * 11];
+///Use my original implementation of the TN1150 algorithm rather than the sample code copied in from the technote's attachment.
+#define ORIGINAL_IMPLEMENTATION 1
+
+#if ORIGINAL_IMPLEMENTATION
 static UInt16 tn1150_gLowerCaseTables[11][256];
+#else
+static UInt16 tn1150_gLowerCaseTable[256 * 11];
+#endif
 
 NSComparisonResult ImpHFSPlusCompareNames(struct HFSUniStr255 const *_Nonnull const str0, struct HFSUniStr255 const *_Nonnull const str1) {
-#define ORIGINAL_IMPLEMENTATION 1
 #if ORIGINAL_IMPLEMENTATION
 	static UInt16 *_Nonnull const *_Nonnull const lowercaseTables = (UInt16 **)tn1150_gLowerCaseTables;
 #else
-	//While gLowerCaseTable below is copied from the Apple sample code verbatim, this code is (at least somewhat) original.
 	static UInt16 *_Nonnull const lowercaseTable = tn1150_gLowerCaseTable;
 #endif
 
