@@ -14,7 +14,7 @@
 @property(copy) NSURL *_Nonnull sourceDevice;
 @property TextEncoding hfsTextEncoding;
 
-@property ImpHFSVolume *sourceVolume;
+@property ImpHFSVolume *_Nonnull sourceVolume;
 
 - (bool)performAnalysisOrReturnError:(NSError *_Nullable *_Nonnull) outError;
 
