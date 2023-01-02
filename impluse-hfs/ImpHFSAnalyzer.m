@@ -7,6 +7,7 @@
 
 #import "ImpHFSAnalyzer.h"
 
+#import "ImpSizeUtilities.h"
 #import "ImpTextEncodingConverter.h"
 
 #import "ImpHFSVolume.h"
@@ -29,11 +30,16 @@
 	if (! [srcVol loadAndReturnError:outError])
 		return false;
 
-	ImpPrintf(@"Found HFS volume named “%@”", srcVol.volumeName);
-	ImpPrintf(@"“%@” contains %lu files and %lu folders", srcVol.volumeName, srcVol.numberOfFiles, srcVol.numberOfFolders);
-	ImpPrintf(@"Block size is %lu bytes; volume has %lu blocks in use, %lu free", srcVol.numberOfBytesPerBlock, srcVol.numberOfBlocksUsed, srcVol.numberOfBlocksFree);
-	NSByteCountFormatter *_Nonnull const bcf = [NSByteCountFormatter new];
-	ImpPrintf(@"Volume size is %@; %@ in use, %@ free", [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksTotal], [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksUsed], [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksFree]);
+	[srcVol peekAtVolumeHeader:^(NS_NOESCAPE struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr) {
+		ImpPrintf(@"Found HFS volume named “%@”", srcVol.volumeName);
+		ImpPrintf(@"“%@” contains %lu files and %lu folders", srcVol.volumeName, srcVol.numberOfFiles, srcVol.numberOfFolders);
+		ImpPrintf(@"Allocation block size is %lu bytes; volume has %lu blocks in use, %lu free", srcVol.numberOfBytesPerBlock, srcVol.numberOfBlocksUsed, srcVol.numberOfBlocksFree);
+		ImpPrintf(@"First allocation block: 0x%llx", L(mdbPtr->drAlBlSt) * kISOStandardBlockSize);
+		ImpPrintf(@"Space remaining: %u blocks (0x%llx bytes)", L(mdbPtr->drFreeBks), L(mdbPtr->drFreeBks) * L(mdbPtr->drAlBlkSiz));
+		NSByteCountFormatter *_Nonnull const bcf = [NSByteCountFormatter new];
+		ImpPrintf(@"Volume size is %@; %@ in use, %@ free", [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksTotal], [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksUsed], [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksFree]);
+		ImpPrintf(@"Clump size is 0x%llx (0x200 * %.1f; ABS * %.1f)", L(mdbPtr->drClpSiz), L(mdbPtr->drClpSiz) / (double)kISOStandardBlockSize, L(mdbPtr->drClpSiz) / (double)L(mdbPtr->drAlBlkSiz));
+	}];
 
 	ImpBTreeFile *_Nonnull const catalog = srcVol.catalogBTree;
 	ImpPrintf(@"Slurped catalog file: %@", catalog);
