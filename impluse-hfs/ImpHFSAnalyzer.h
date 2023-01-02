@@ -11,7 +11,7 @@
 
 @interface ImpHFSAnalyzer : NSObject
 
-@property(copy) NSURL *sourceDevice;
+@property(copy) NSURL *_Nonnull sourceDevice;
 @property TextEncoding hfsTextEncoding;
 
 @property ImpHFSVolume *sourceVolume;
