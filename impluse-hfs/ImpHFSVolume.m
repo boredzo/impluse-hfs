@@ -72,7 +72,7 @@
 	_mdb = mdbData.bytes;
 
 	if (L(_mdb->drSigWord) != kHFSSigWord) {
-		NSError *_Nonnull const thisIsNotHFSError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Unrecognized signature 0x%04x (expected 0x%04x) in what should have been the master directory block/volume header. This doesn't look like an HFS volume.", L(_mdb->drSigWord), kHFSSigWord ] }];
+		NSError *_Nonnull const thisIsNotHFSError = [NSError errorWithDomain:NSOSStatusErrorDomain code:noMacDskErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Unrecognized signature 0x%04x (expected 0x%04x) in what should have been the master directory block/volume header. This doesn't look like an HFS volume.", L(_mdb->drSigWord), kHFSSigWord ] }];
 		if (outError != NULL) *outError = thisIsNotHFSError;
 		return false;
 	}
@@ -124,17 +124,18 @@
 	//TODO: We may also need to load further extents from the extents overflow file, if the catalog is particularly fragmented. Only using the extent record in the volume header may lead to only having part of the catalog.
 
 	struct HFSExtentDescriptor const *_Nonnull const catExtDescs = _mdb->drCTExtRec;
-	NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
-	fmtr.numberStyle = NSNumberFormatterDecimalStyle;
-	fmtr.hasThousandSeparators = true;
-	ImpPrintf(@"Catalog extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[0].blockCount))]);
-	ImpPrintf(@"Catalog extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[1].blockCount))]);
-	ImpPrintf(@"Catalog extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[2].blockCount))]);
-
 	NSData *_Nullable const catalogFileData = [self readDataFromFileDescriptor:readFD logicalLength:L(_mdb->drCTFlSize) extents:catExtDescs numExtents:kHFSExtentDensity error:outError];
-	ImpPrintf(@"Catalog file data: 0x%lx bytes (%lu a-blocks)", catalogFileData.length, catalogFileData.length / L(_mdb->drAlBlkSiz));
+	ImpPrintf(@"Catalog file data: logical length 0x%lx bytes (%lu a-blocks); read 0x%lx bytes", L(_mdb->drCTFlSize), catalogFileData.length / L(_mdb->drAlBlkSiz), catalogFileData.length);
 
-	self.catalogBTree = [[ImpBTreeFile alloc] initWithData:catalogFileData];
+	if (catalogFileData != nil) {
+		self.catalogBTree = [[ImpBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSCatalog data:catalogFileData];
+		if (self.catalogBTree == nil) {
+			NSError *_Nonnull const noCatalogFileError = [NSError errorWithDomain:NSOSStatusErrorDomain code:badMDBErr userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Catalog file was invalid, corrupt, or not where the volume header said it would be", @"") }];
+			if (outError != NULL) {
+				*outError = noCatalogFileError;
+			}
+		}
+	}
 	ImpPrintf(@"Catalog file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", self.catalogBTree.numberOfLiveNodes, self.catalogBTree.numberOfPotentialNodes, self.catalogBTree.numberOfPotentialNodes > 0 ? (self.catalogBTree.numberOfLiveNodes / (double)self.catalogBTree.numberOfPotentialNodes) * 100.0 : 1.0);
 
 	return (self.catalogBTree != nil);
@@ -146,17 +147,18 @@
 	//So we essentially have to treat the extents overflow file as a file.
 
 	struct HFSExtentDescriptor const *_Nonnull const eoExtDescs = _mdb->drXTExtRec;
-	NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
-	fmtr.numberStyle = NSNumberFormatterDecimalStyle;
-	fmtr.hasThousandSeparators = true;
-	ImpPrintf(@"Extents overflow extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[0].blockCount))]);
-	ImpPrintf(@"Extents overflow extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[1].blockCount))]);
-	ImpPrintf(@"Extents overflow extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[2].blockCount))]);
-
 	NSData *_Nullable const extentsFileData = [self readDataFromFileDescriptor:readFD logicalLength:L(_mdb->drXTFlSize) extents:eoExtDescs numExtents:kHFSExtentDensity error:outError];
 	ImpPrintf(@"Extents file data: 0x%lx bytes (%lu a-blocks)", extentsFileData.length, extentsFileData.length / L(_mdb->drAlBlkSiz));
 
-	self.extentsOverflowBTree = [[ImpBTreeFile alloc] initWithData:extentsFileData];
+	if (extentsFileData != nil) {
+		self.extentsOverflowBTree = [[ImpBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSExtentsOverflow data:extentsFileData];
+		if (self.extentsOverflowBTree == nil) {
+			NSError *_Nonnull const noExtentsFileError = [NSError errorWithDomain:NSOSStatusErrorDomain code:badMDBErr userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Extents overflow file was invalid, corrupt, or not where the volume header said it would be", @"") }];
+			if (outError != NULL) {
+				*outError = noExtentsFileError;
+			}
+		}
+	}
 	ImpPrintf(@"Extents file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", self.extentsOverflowBTree.numberOfLiveNodes, self.extentsOverflowBTree.numberOfPotentialNodes, self.extentsOverflowBTree.numberOfPotentialNodes > 0 ? (self.extentsOverflowBTree.numberOfLiveNodes / (double)self.extentsOverflowBTree.numberOfPotentialNodes) * 100.0 : 1.0);
 
 	return (self.extentsOverflowBTree != nil);

@@ -26,6 +26,17 @@
 ///Read the boot blocks, volume header, and allocation bitmap in that order, followed by the extents overflow file and catalog file.
 - (bool)loadAndReturnError:(NSError *_Nullable *_Nonnull const)outError;
 
+///Finer-grained method intended specifically for the analyze command. Most other uses should use loadAndReturnError:.
+- (bool) readBootBlocksFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
+///Finer-grained method intended specifically for the analyze command. Most other uses should use loadAndReturnError:.
+- (bool) readVolumeHeaderFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
+///Finer-grained method intended specifically for the analyze command. Most other uses should use loadAndReturnError:.
+- (bool)readAllocationBitmapFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
+///Finer-grained method intended specifically for the analyze command. Most other uses should use loadAndReturnError:.
+- (bool)readCatalogFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
+///Finer-grained method intended specifically for the analyze command. Most other uses should use loadAndReturnError:.
+- (bool)readExtentsOverflowFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
+
 - (NSData *_Nonnull)bootBlocks;
 - (void) getVolumeHeader:(void *_Nonnull const)outMDB;
 - (void) peekAtVolumeHeader:(void (^_Nonnull const)(struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr NS_NOESCAPE))block;

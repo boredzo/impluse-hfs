@@ -27,8 +27,43 @@
 	}
 
 	ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD textEncoding:self.hfsTextEncoding];
-	if (! [srcVol loadAndReturnError:outError])
+	if (! [srcVol readBootBlocksFromFileDescriptor:readFD error:outError]) {
+		ImpPrintf(@"Failed to read boot blocks (most likely means the volume is too small to hold an HFS volume): %@", (*outError).localizedDescription);
 		return false;
+	}
+	if (! [srcVol readVolumeHeaderFromFileDescriptor:readFD error:outError]) {
+		ImpPrintf(@"Failed to read volume header (most likely means the volume is too small to hold an HFS volume): %@", (*outError).localizedDescription);
+		return false;
+	}
+	[srcVol peekAtVolumeHeader:^(NS_NOESCAPE const struct HFSMasterDirectoryBlock *const mdbPtr) {
+		ImpPrintf(@"Found HFS volume with name: %@", [srcVol.textEncodingConverter stringForPascalString:mdbPtr->drVN]);
+
+		NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
+		fmtr.numberStyle = NSNumberFormatterDecimalStyle;
+		fmtr.hasThousandSeparators = true;
+
+		struct HFSExtentDescriptor const *_Nonnull const catExtDescs = mdbPtr->drCTExtRec;
+		ImpPrintf(@"Catalog extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[0].blockCount))]);
+		ImpPrintf(@"Catalog extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[1].blockCount))]);
+		ImpPrintf(@"Catalog extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[2].blockCount))]);
+
+		struct HFSExtentDescriptor const *_Nonnull const eoExtDescs = mdbPtr->drXTExtRec;
+		ImpPrintf(@"Extents overflow extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[0].blockCount))]);
+		ImpPrintf(@"Extents overflow extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[1].blockCount))]);
+		ImpPrintf(@"Extents overflow extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[2].blockCount))]);
+	}];
+	if (! [srcVol readAllocationBitmapFromFileDescriptor:readFD error:outError]) {
+		ImpPrintf(@"Failed to read allocation bitmap: %@", (*outError).localizedDescription);
+		return false;
+	}
+	if (! [srcVol readExtentsOverflowFileFromFileDescriptor:readFD error:outError]) {
+		ImpPrintf(@"Failed to read extents overflow file: %@", (*outError).localizedDescription);
+		return false;
+	}
+	if (! [srcVol readCatalogFileFromFileDescriptor:readFD error:outError]) {
+		ImpPrintf(@"Failed to read catalog file: %@", (*outError).localizedDescription);
+		return false;
+	}
 
 	[srcVol peekAtVolumeHeader:^(NS_NOESCAPE struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr) {
 		ImpPrintf(@"Found HFS volume named “%@”", srcVol.volumeName);
