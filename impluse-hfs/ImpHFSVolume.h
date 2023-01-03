@@ -50,6 +50,7 @@
 #pragma mark -
 
 - (NSData *_Nullable) readDataFromFileDescriptor:(int const)readFD
+	logicalLength:(u_int64_t const)numBytes
 	extents:(struct HFSExtentDescriptor const *_Nonnull const)hfsExtRec
 	numExtents:(NSUInteger const)numExtents
 	error:(NSError *_Nullable *_Nonnull const)outError;

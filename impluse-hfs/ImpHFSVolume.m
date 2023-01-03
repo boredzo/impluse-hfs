@@ -131,7 +131,7 @@
 	ImpPrintf(@"Catalog extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[1].blockCount))]);
 	ImpPrintf(@"Catalog extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[2].blockCount))]);
 
-	NSData *_Nullable const catalogFileData = [self readDataFromFileDescriptor:readFD extents:_mdb->drCTExtRec numExtents:kHFSExtentDensity error:outError];
+	NSData *_Nullable const catalogFileData = [self readDataFromFileDescriptor:readFD logicalLength:L(_mdb->drCTFlSize) extents:catExtDescs numExtents:kHFSExtentDensity error:outError];
 	ImpPrintf(@"Catalog file data: 0x%lx bytes (%lu a-blocks)", catalogFileData.length, catalogFileData.length / L(_mdb->drAlBlkSiz));
 
 	self.catalogBTree = [[ImpBTreeFile alloc] initWithData:catalogFileData];
@@ -153,7 +153,7 @@
 	ImpPrintf(@"Extents overflow extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[1].blockCount))]);
 	ImpPrintf(@"Extents overflow extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[2].blockCount))]);
 
-	NSData *_Nullable const extentsFileData = [self readDataFromFileDescriptor:readFD extents:_mdb->drXTExtRec numExtents:kHFSExtentDensity error:outError];
+	NSData *_Nullable const extentsFileData = [self readDataFromFileDescriptor:readFD logicalLength:L(_mdb->drXTFlSize) extents:eoExtDescs numExtents:kHFSExtentDensity error:outError];
 	ImpPrintf(@"Extents file data: 0x%lx bytes (%lu a-blocks)", extentsFileData.length, extentsFileData.length / L(_mdb->drAlBlkSiz));
 
 	self.extentsOverflowBTree = [[ImpBTreeFile alloc] initWithData:extentsFileData];
@@ -222,6 +222,7 @@
 
 
 - (NSData *_Nullable) readDataFromFileDescriptor:(int const)readFD
+	logicalLength:(u_int64_t const)numBytes
 	extents:(struct HFSExtentDescriptor const *_Nonnull const)extents
 	numExtents:(NSUInteger const)numExtents
 	error:(NSError *_Nullable *_Nonnull const)outError
@@ -255,6 +256,9 @@
 
 		totalAmtRead += amtRead;
 		successfullyReadAllNonEmptyExtents = successfullyReadAllNonEmptyExtents && success;
+	}
+	if (successfullyReadAllNonEmptyExtents && data.length > numBytes) {
+		[data setLength:numBytes];
 	}
 
 	return successfullyReadAllNonEmptyExtents ? [data copy] : nil;
