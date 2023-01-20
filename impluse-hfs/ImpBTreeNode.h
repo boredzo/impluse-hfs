@@ -8,14 +8,7 @@
 #import <Foundation/Foundation.h>
 
 #import "ImpComparisonUtilities.h"
-
-enum {
-	BTreeNodeLengthHFSStandard = 0x200 * 1,
-
-	BTreeNodeLengthHFSPlusCatalogMinimum = kHFSPlusCatalogMinNodeSize,
-	BTreeNodeLengthHFSPlusExtentsOverflowMinimum = kHFSPlusExtentMinNodeSize,
-	BTreeNodeLengthHFSPlusAttributesMinimum = kHFSPlusAttrMinNodeSize,
-};
+#import "ImpBTreeTypes.h"
 
 @class ImpBTreeFile;
 

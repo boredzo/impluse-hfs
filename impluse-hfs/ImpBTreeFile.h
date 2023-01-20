@@ -9,8 +9,10 @@
 
 #import "ImpForkUtilities.h"
 #import "ImpComparisonUtilities.h"
-#import "ImpBTreeNode.h"
-#import "ImpBTreeHeaderNode.h"
+#import "ImpBTreeTypes.h"
+
+@class ImpBTreeNode;
+@class ImpBTreeHeaderNode;
 
 @interface ImpBTreeFile : NSObject <NSFastEnumeration>
 
