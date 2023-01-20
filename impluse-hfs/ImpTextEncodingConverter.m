@@ -114,4 +114,26 @@
 	return unicodeString;
 }
 
+- (NSString *_Nonnull const) stringFromHFSUniStr255:(ConstHFSUniStr255Param)unicodeName {
+	UInt16 const numCharacters = L(unicodeName->length);
+
+	//Ideally, we'd simply pass _hfsPlusTextEncoding (Unicode 2.0 UTF-16 BE) to CFStringCreateWithBytes and that would Just Work. It does not.
+	//Failing that, we might swab and then use this encoding, which at least stays in Unicode 2.0. However, it doesn't work either.
+	//	TextEncoding const hfsPlusNativeOrderTextEncoding = CreateTextEncoding(kTextEncodingUnicodeV2_0, kUnicodeHFSPlusDecompVariant, kUnicodeUTF16Format);
+	//	NSString *_Nonnull const str = (__bridge_transfer NSString *)CFStringCreateWithBytes(kCFAllocatorDefault, (UInt8 const *_Nonnull)unicodeName->unicode, numBytes, hfsPlusNativeOrderTextEncoding, /*isExternalRepresentation*/ false);
+	//So our last resort is to interpret the Unicode 2.0 bytes as modern-Unicode bytes. Your friendly author does not know of any reasons why this is a bad idea. (If any such reasons present themselves, we would need to use TEC to convert the Unicode 2.0 bytes—swabbed or otherwise—to modern Unicode in native order.)
+
+	size_t const numBytes = numCharacters * sizeof(unichar);
+	NSMutableData *_Nonnull const charactersData = [NSMutableData dataWithLength:numBytes];
+	unichar *_Nonnull const nativeOrderCharacters = charactersData.mutableBytes;
+#if __LITTLE_ENDIAN__
+	swab(unicodeName->unicode, nativeOrderCharacters, numBytes);
+#else
+	memcpy(nativeOrderCharacters, unicodeName->unicode, numBytes);
+#endif
+
+	NSString *_Nonnull const str = [NSString stringWithCharacters:nativeOrderCharacters length:numCharacters];
+	return str;
+}
+
 @end

@@ -22,4 +22,6 @@
 - (NSData *_Nonnull const)hfsUniStr255ForPascalString:(ConstStr31Param _Nonnull const)pascalString;
 - (NSString *_Nonnull const) stringForPascalString:(ConstStr31Param _Nonnull const)pascalString;
 
+- (NSString *_Nonnull const) stringFromHFSUniStr255:(ConstHFSUniStr255Param _Nonnull const)unicodeName;
+
 @end
