@@ -12,20 +12,20 @@
 extern int32_t RelString(ConstStr255Param a, ConstStr255Param b, bool const caseSensitive, bool const diacriticSensitive);
 
 ImpBTreeComparisonResult ImpBTreeCompareHFSCatalogKeys(struct HFSCatalogKey const *_Nonnull const quarryCatalogKeyPtr, struct HFSCatalogKey const *_Nonnull const foundCatKeyPtr) {
-	if (quarryCatalogKeyPtr->parentID > L(foundCatKeyPtr->parentID)) {
+	if (L(quarryCatalogKeyPtr->parentID) > L(foundCatKeyPtr->parentID)) {
 		return ImpBTreeComparisonQuarryIsGreater;
 	}
-	if (quarryCatalogKeyPtr->parentID < L(foundCatKeyPtr->parentID)) {
+	if (L(quarryCatalogKeyPtr->parentID) < L(foundCatKeyPtr->parentID)) {
 		return ImpBTreeComparisonQuarryIsLesser;
 	}
 	NSComparisonResult const nameComparison = RelString(quarryCatalogKeyPtr->nodeName, foundCatKeyPtr->nodeName, false, true);
 	return (ImpBTreeComparisonResult)nameComparison;
 }
 ImpBTreeComparisonResult ImpBTreeCompareHFSPlusCatalogKeys(struct HFSPlusCatalogKey const *_Nonnull const quarryCatalogKeyPtr, struct HFSPlusCatalogKey const *_Nonnull const foundCatKeyPtr) {
-	if (quarryCatalogKeyPtr->parentID > L(foundCatKeyPtr->parentID)) {
+	if (L(quarryCatalogKeyPtr->parentID) > L(foundCatKeyPtr->parentID)) {
 		return ImpBTreeComparisonQuarryIsGreater;
 	}
-	if (quarryCatalogKeyPtr->parentID < L(foundCatKeyPtr->parentID)) {
+	if (L(quarryCatalogKeyPtr->parentID) < L(foundCatKeyPtr->parentID)) {
 		return ImpBTreeComparisonQuarryIsLesser;
 	}
 
