@@ -130,7 +130,7 @@
 		ImpPrintf(@"Walk encountered node: %@", node);
 
 		@autoreleasepool {
-			[node forEachCatalogRecord_file:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFile *const _Nonnull fileRec) {
+			[node forEachHFSCatalogRecord_file:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFile *const _Nonnull fileRec) {
 				ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSVolume:srcVol catalogNodeID:L(fileRec->fileID) key:catalogKeyPtr fileRecord:fileRec];
 	//				ImpPrintf(@"We're looking for “%@” and found a file named “%@”", self.quarryName, dehydratedFile.name);
 				bool const nameIsEqual = [dehydratedFile.name isEqualToString:self.quarryName];

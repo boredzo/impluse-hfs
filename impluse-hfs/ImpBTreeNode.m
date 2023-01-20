@@ -312,9 +312,9 @@ typedef u_int16_t BTreeNodeOffset;
 	return numVisited;
 }
 
-- (void) forEachCatalogRecord_file:(void (^_Nonnull const)(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogFile const *_Nonnull const recordDataPtr))fileRecordBlock
-	folder:(void (^_Nonnull const)(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogFolder  const *_Nonnull const))folderRecordBlock
-	thread:(void (^_Nonnull const)(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogThread const *_Nonnull const))threadRecordBlock
+- (void) forEachHFSCatalogRecord_file:(void (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogFile const *_Nonnull const recordDataPtr))fileRecordBlock
+	folder:(void (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogFolder  const *_Nonnull const))folderRecordBlock
+	thread:(void (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogThread const *_Nonnull const))threadRecordBlock
 {
 	[self forEachKeyedRecord:^bool(NSData *const  _Nonnull keyData, NSData *const  _Nonnull payloadData) {
 		struct HFSCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
@@ -326,14 +326,20 @@ typedef u_int16_t BTreeNodeOffset;
 
 		switch (recordType << 8) {
 			case kHFSFileRecord:
+				if (fileRecordBlock != NULL) {
 				fileRecordBlock(keyPtr, (struct HFSCatalogFile const *)dataPtr);
+				}
 				break;
 			case kHFSFolderRecord:
+				if (folderRecordBlock != NULL) {
 				folderRecordBlock(keyPtr, (struct HFSCatalogFolder const *)dataPtr);
+				}
 				break;
 			case kHFSFileThreadRecord:
 			case kHFSFolderThreadRecord:
+				if (threadRecordBlock != NULL) {
 				threadRecordBlock(keyPtr, (struct HFSCatalogThread const *)dataPtr);
+				}
 				break;
 			default:
 				fprintf(stderr, "\tUnrecognized record type 0x%x while trying to iterate catalog records; either this isn't a catalog file, or the parsing has gotten off-track somehow.\n", (unsigned)recordType);

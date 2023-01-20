@@ -59,9 +59,9 @@
 ///Call this block for every record in this node. Stops iterating if the block returns false. Returns the number of records visited (which may be less than the number of records in the node, if the block called an early stop).
 - (NSUInteger) forEachKeyedRecord:(bool (^_Nonnull const)(NSData *_Nonnull const keyData, NSData *_Nonnull const payloadData))block;
 
-///Call these blocks with every catalog record in this B*-tree node, assuming that this B*-tree node is in a catalog file. Behavior is undefined if you call this on a node that isn't in a catalog file, such as an extents overflow file.
-- (void) forEachCatalogRecord_file:(void (^_Nonnull const)(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogFile const *_Nonnull const))fileRecordBlock
-	folder:(void (^_Nonnull const)(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogFolder const *_Nonnull const))folderRecordBlock
-	thread:(void (^_Nonnull const)(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogThread const *_Nonnull const))threadRecordBlock;
+///Call these blocks with every catalog record in this B*-tree node, assuming that this B*-tree node is in an HFS catalog file. If this node came from HFS+ or from a non-catalog file, no HFS catalog records will be found and your blocks will not be called.
+- (void) forEachHFSCatalogRecord_file:(void (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogFile const *_Nonnull const))fileRecordBlock
+	folder:(void (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogFolder const *_Nonnull const))folderRecordBlock
+	thread:(void (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogThread const *_Nonnull const))threadRecordBlock;
 
 @end
