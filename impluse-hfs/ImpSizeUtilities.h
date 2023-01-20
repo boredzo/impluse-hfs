@@ -24,6 +24,12 @@ static inline size_t ImpNextMultipleOfSize(size_t const size, size_t const facto
 	}
 }
 
+///Returns the sum of the block counts of the extents in the extent record, up to the first empty extent or the end of the record.
+u_int64_t ImpNumberOfBlocksInHFSPlusExtentRecord(struct HFSPlusExtentDescriptor const *_Nonnull const extRec);
+
+///Returns a string concisely describing the extents in the given extent record, up to the first empty extent or the end of the record.
+NSString *_Nonnull ImpDescribeHFSPlusExtentRecord(struct HFSPlusExtentDescriptor const *_Nonnull const extRec);
+
 enum {
 	///Size of the blocks used for the boot blocks, volume header, and VBM. Allocation blocks (used for the catalog file, extents file, and user data) use a different size, indicated by drAlBlkSiz in the volume header.
 	kISOStandardBlockSize = 512
