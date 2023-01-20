@@ -28,6 +28,7 @@
 		31F719BC293D1FC40055EEA3 /* NSData+ImpSubdata.m in Sources */ = {isa = PBXBuildFile; fileRef = 31F719BB293D1FC40055EEA3 /* NSData+ImpSubdata.m */; };
 		31F719C4293D4C5F0055EEA3 /* TestDangerouslyFastSubdata.m in Sources */ = {isa = PBXBuildFile; fileRef = 31F719C3293D4C5F0055EEA3 /* TestDangerouslyFastSubdata.m */; };
 		31F719C8293D4C8E0055EEA3 /* NSData+ImpSubdata.m in Sources */ = {isa = PBXBuildFile; fileRef = 31F719BB293D1FC40055EEA3 /* NSData+ImpSubdata.m */; };
+		31FD38C42978E29D00B44404 /* ImpSizeUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 31FD38C32978E29D00B44404 /* ImpSizeUtilities.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -89,6 +90,7 @@
 		31F719BB293D1FC40055EEA3 /* NSData+ImpSubdata.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSData+ImpSubdata.m"; sourceTree = "<group>"; };
 		31F719C1293D4C5F0055EEA3 /* UnitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UnitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		31F719C3293D4C5F0055EEA3 /* TestDangerouslyFastSubdata.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TestDangerouslyFastSubdata.m; sourceTree = "<group>"; };
+		31FD38C32978E29D00B44404 /* ImpSizeUtilities.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpSizeUtilities.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -136,6 +138,7 @@
 				314EFFDA2932CF3700CE74E9 /* main.m */,
 				314EFFF829370DF700CE74E9 /* ImpByteOrder.h */,
 				31077ACE2937C5E500066789 /* ImpSizeUtilities.h */,
+				31FD38C32978E29D00B44404 /* ImpSizeUtilities.m */,
 				31F719B9293AF1F40055EEA3 /* ImpForkUtilities.h */,
 				31F719B0293A8FC90055EEA3 /* ImpErrorUtilities.h */,
 				31F719B1293A8FD90055EEA3 /* ImpErrorUtilities.m */,
@@ -278,6 +281,7 @@
 				314EFFED29346AB300CE74E9 /* ImpBTreeFile.m in Sources */,
 				31F719B2293A8FD90055EEA3 /* ImpErrorUtilities.m in Sources */,
 				3135D7782960FFDC001E4890 /* ImpComparisonUtilities.m in Sources */,
+				31FD38C42978E29D00B44404 /* ImpSizeUtilities.m in Sources */,
 				314EFFF0293486BB00CE74E9 /* ImpBTreeNode.m in Sources */,
 				31077AD42939587400066789 /* NSData+ImpHexDump.m in Sources */,
 				31F719B5293ABAAB0055EEA3 /* ImpDehydratedItem.m in Sources */,
