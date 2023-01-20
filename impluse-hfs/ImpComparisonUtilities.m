@@ -43,18 +43,19 @@ static UInt16 tn1150_gLowerCaseTable[256 * 11];
 
 NSComparisonResult ImpHFSPlusCompareNames(struct HFSUniStr255 const *_Nonnull const str0, struct HFSUniStr255 const *_Nonnull const str1) {
 #if ORIGINAL_IMPLEMENTATION
-	static UInt16 *_Nonnull const *_Nonnull const lowercaseTables = (UInt16 **)tn1150_gLowerCaseTables;
+	static UInt16 (*_Nonnull const lowercaseTables)[256] = tn1150_gLowerCaseTables;
 #else
 	static UInt16 *_Nonnull const lowercaseTable = tn1150_gLowerCaseTable;
 #endif
 
-	UInt16 len0 = str0->length, len1 = str1->length;
-#if ! ORIGINAL_IMPLEMENTATION
+	UInt16 len0 = L(str0->length), len1 = L(str1->length);
+#if ORIGINAL_IMPLEMENTATION
+	UInt16 idx0 = 0, idx1 = 0;
+#else
 	UniChar const *_Nonnull cur0 = str0->unicode;
 	UniChar const *_Nonnull cur1 = str1->unicode;
 #endif
 
-	UInt16 idx0 = 0, idx1 = 0;
 	UniChar c0 = 0, c1 = 0;
 
 	for (;;) {
