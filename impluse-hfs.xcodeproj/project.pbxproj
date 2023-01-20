@@ -74,6 +74,7 @@
 		314EFFF829370DF700CE74E9 /* ImpByteOrder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpByteOrder.h; sourceTree = "<group>"; };
 		31A5B1C0296127CB00D8A731 /* ImpHFSAnalyzer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpHFSAnalyzer.h; sourceTree = "<group>"; };
 		31A5B1C1296127CB00D8A731 /* ImpHFSAnalyzer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpHFSAnalyzer.m; sourceTree = "<group>"; };
+		31A5B1C72968FC5000D8A731 /* ImpBTreeTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpBTreeTypes.h; sourceTree = "<group>"; };
 		31C6E9D42939CE7D000A87D8 /* ImpPrintf.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpPrintf.h; sourceTree = "<group>"; };
 		31C6E9D52939CE7D000A87D8 /* ImpPrintf.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpPrintf.m; sourceTree = "<group>"; };
 		31C6E9D72939CF1A000A87D8 /* Prefix.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Prefix.h; sourceTree = "<group>"; };
@@ -158,6 +159,7 @@
 				314EFFE929332FEA00CE74E9 /* ImpHFSPlusVolume.m */,
 				314EFFEB29346AB300CE74E9 /* ImpBTreeFile.h */,
 				314EFFEC29346AB300CE74E9 /* ImpBTreeFile.m */,
+				31A5B1C72968FC5000D8A731 /* ImpBTreeTypes.h */,
 				314EFFEE293486BB00CE74E9 /* ImpBTreeNode.h */,
 				314EFFEF293486BB00CE74E9 /* ImpBTreeNode.m */,
 				314EFFF1293510CE00CE74E9 /* ImpBTreeHeaderNode.h */,
