@@ -16,5 +16,8 @@
 ///subdataWithRange: copies the backing store even when it doesn't need to. This method borrows the backing store of the parent data, which is dangerous if the subdata might outlive its parent.
 - (NSData *_Nonnull) dangerouslyFastSubdataWithRange_Imp:(NSRange)range;
 
+///subdataWithRange: copies the backing store even when it doesn't need to. This method borrows the backing store of the parent data, which is dangerous if the subdata might outlive its parent.
+- (NSMutableData *_Nonnull) dangerouslyFastMutableSubdataWithRange_Imp:(NSRange)range;
+
 @end
 
