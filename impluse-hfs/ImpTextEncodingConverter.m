@@ -58,22 +58,22 @@
 	return outputBufferSizeInBytes;
 }
 - (bool) convertPascalString:(ConstStr31Param _Nonnull const)pascalString intoHFSUniStr255:(HFSUniStr255 *_Nonnull const)outUnicode bufferSize:(ByteCount)outputBufferSizeInBytes {
-	UniChar *_Nonnull const outputBuf = (UniChar *)outUnicode;
+	UniChar *_Nonnull const outputBuf = outUnicode->unicode;
 
 	ByteCount const outputPayloadSizeInBytes = outputBufferSizeInBytes - 1 * sizeof(UniChar);
 	ByteCount actualOutputLengthInBytes = 0;
-	OSStatus err = ConvertFromPStringToUnicode(_ttui, pascalString, outputPayloadSizeInBytes, &actualOutputLengthInBytes, outputBuf + 1);
+	OSStatus err = ConvertFromPStringToUnicode(_ttui, pascalString, outputPayloadSizeInBytes, &actualOutputLengthInBytes, outputBuf);
 
 	if (err == paramErr) {
 		//Set a breakpoint here to try to step into ConvertFromPStringToUnicode.
 		NSLog(@"Unicode conversion failure!");
-		err = ConvertFromPStringToUnicode(_ttui, pascalString, outputPayloadSizeInBytes, &actualOutputLengthInBytes, outputBuf + 1);
+		err = ConvertFromPStringToUnicode(_ttui, pascalString, outputPayloadSizeInBytes, &actualOutputLengthInBytes, outputBuf);
 	}
 
 	if (err == noErr) {
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		//Swap all the bytes in the output data.
-		swab(outputBuf + 1, outputBuf + 1, actualOutputLengthInBytes);
+		swab(outputBuf, outputBuf, actualOutputLengthInBytes);
 #endif
 	} else {
 		NSMutableData *_Nonnull const cStringData = [NSMutableData dataWithLength:pascalString[0]];
@@ -86,7 +86,7 @@
 		return false;
 	}
 
-	S(outputBuf[0], (u_int16_t)(actualOutputLengthInBytes / sizeof(UniChar)));
+	S(outUnicode->length, (u_int16_t)(actualOutputLengthInBytes / sizeof(UniChar)));
 	return true;
 }
 - (NSData *_Nonnull const)hfsUniStr255ForPascalString:(ConstStr31Param)pascalString {
