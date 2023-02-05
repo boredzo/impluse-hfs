@@ -33,7 +33,7 @@ ImpBTreeComparisonResult ImpBTreeCompareHFSPlusCatalogKeys(struct HFSPlusCatalog
 }
 
 ///Use my original implementation of the TN1150 algorithm rather than the sample code copied in from the technote's attachment.
-#define ORIGINAL_IMPLEMENTATION 1
+#define ORIGINAL_IMPLEMENTATION 0
 
 #if ORIGINAL_IMPLEMENTATION
 static UInt16 tn1150_gLowerCaseTables[11][256];
