@@ -41,13 +41,32 @@
 
 	ImpBTreeFile *_Nullable const tree = self.tree;
 
+	bool isHFSPlus = false;
+	switch (tree.version) {
+		case ImpBTreeVersionHFSPlusCatalog:
+		case ImpBTreeVersionHFSPlusExtentsOverflow:
+		case ImpBTreeVersionHFSPlusAttributes:
+			isHFSPlus = true;
+			break;
+
+		case ImpBTreeVersionHFSCatalog:
+		case ImpBTreeVersionHFSExtentsOverflow:
+		default:
+			isHFSPlus = false;
+			break;
+	}
+
 	[self forEachRecord:^bool(NSData *const  _Nonnull data) {
 		void const *_Nonnull const recordPtr = data.bytes;
 		void const *_Nonnull const keyPtr = recordPtr;
-		//TODO: This assumes this is an HFS B*-tree. In HFS+, key lengths are two bytes. Which size we use needs to be configurable.
+
 		u_int8_t const *_Nonnull const hfsKeyLengthPtr = recordPtr;
-		static u_int16_t const hfsKeyLengthSize = sizeof(u_int8_t);
-		u_int16_t const keyLength = (*hfsKeyLengthPtr) + hfsKeyLengthSize;
+		u_int16_t const *_Nonnull const hfsPlusKeyLengthPtr = recordPtr;
+
+		u_int16_t const keyLengthSize = self.tree.keyLengthSize;
+		u_int16_t const keyLength = keyLengthSize == sizeof(u_int16_t)
+			? L(*hfsPlusKeyLengthPtr) + keyLengthSize
+			:  (*hfsKeyLengthPtr) + keyLengthSize;
 		u_int32_t const *_Nonnull const downwardNodePtr = (u_int32_t const *)(recordPtr + keyLength);
 
 		ImpBTreeComparisonResult order = block(keyPtr);

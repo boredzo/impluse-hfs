@@ -79,6 +79,10 @@
 
 	return true;
 }
+- (void) setAllocationBitmapData:(NSMutableData *_Nonnull const)bitmapData numberOfBits:(u_int32_t const)numBits {
+	_volumeBitmapData = bitmapData;
+	_bitVector = CFBitVectorCreate(kCFAllocatorDefault, _volumeBitmapData.bytes, numBits);
+}
 - (bool)readAllocationBitmapFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
 	//Volume bitmap immediately follows MDB. We could look at drVBMSt, but it should always be 3.
 	//Volume bitmap *size* is drNmAlBlks bits, or (drNmAlBlks / 8) bytes.
@@ -111,8 +115,7 @@
 		return false;
 	}
 
-	_volumeBitmapData = volumeBitmap;
-	_bitVector = CFBitVectorCreate(kCFAllocatorDefault, _volumeBitmapData.bytes, L(_mdb->drNmAlBlks));
+	[self setAllocationBitmapData:volumeBitmap numberOfBits:L(_mdb->drNmAlBlks)];
 
 	return true;
 }
@@ -181,23 +184,23 @@
 
 #pragma mark -
 
-///Returns intoData on success; nil on failure. The copy's destination starts offset bytes into the data.
 - (bool) readIntoData:(NSMutableData *_Nonnull const)intoData
 	atOffset:(NSUInteger)offset
 	fromFileDescriptor:(int const)readFD
-	extent:(struct HFSExtentDescriptor const *_Nonnull const)hfsExt
+	startBlock:(u_int32_t const)startBlock
+	blockCount:(u_int32_t const)blockCount
 	actualAmountRead:(u_int64_t *_Nonnull const)outAmtRead
 	error:(NSError *_Nullable *_Nonnull const)outError
 {
 	int32_t firstUnallocatedBlockNumber = -1;
 	//TODO: Optimize using CFBitVectorGetCountOfBit (start range at startBlock, check returned count >= blockCount)
-	for (u_int16_t i = 0; i < L(hfsExt->blockCount); ++i) {
-//		ImpPrintf(@"- #%u: %@", L(hfsExt->startBlock) + i, CFBitVectorGetBitAtIndex(_bitVector, L(hfsExt->startBlock) + i) ? @"YES" : @"NO!");
-		if (! CFBitVectorGetBitAtIndex(_bitVector, L(hfsExt->startBlock) + i)) {
-			firstUnallocatedBlockNumber = L(hfsExt->startBlock) + i;
+	for (u_int16_t i = 0; i < blockCount; ++i) {
+//		ImpPrintf(@"- #%u: %@", startBlock + i, CFBitVectorGetBitAtIndex(_bitVector, startBlock + i) ? @"YES" : @"NO!");
+		if (! [self isBlockAllocated:startBlock + i]) {
+			firstUnallocatedBlockNumber = startBlock + i;
 		}
 	}
-	ImpPrintf(@"Extent starting at %u is fully allocated before reading: %@", L(hfsExt->startBlock), (firstUnallocatedBlockNumber < 0) ? @"YES" : @"NO");
+//	ImpPrintf(@"Extent starting at %u is fully allocated before reading: %@", startBlock, (firstUnallocatedBlockNumber < 0) ? @"YES" : @"NO");
 	if (firstUnallocatedBlockNumber > -1) {
 		//It's possible that this should be a warning, or that its level of fatality should be adjustable (particularly in situations of data recovery).
 		NSError *_Nonnull const readingIntoTheVoidError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Attempt to read block #%u, which is unallocated; this may indicate a bug in this program, or that the volume itself was corrupt (please save a copy of it using bzip2)", @""), firstUnallocatedBlockNumber] }];
@@ -207,12 +210,14 @@
 		return false;
 	}
 
-	off_t const offsetOfFirstAllocationBlock = L(_mdb->drAlBlSt) * kISOStandardBlockSize;
-	off_t const readStart = self.volumeStartOffset + offsetOfFirstAllocationBlock + L(hfsExt->startBlock) * L(_mdb->drAlBlkSiz);
-	ImpPrintf(@"Reading 0x%lx bytes (%lu bytes = %lu blocks) from source volume starting at 0x%llx bytes (extent: [ start #%u, %u blocks ])", intoData.length, intoData.length, intoData.length / L(_mdb->drAlBlkSiz), readStart, L(hfsExt->startBlock), L(hfsExt->blockCount));
+	off_t const readStart = self.volumeStartOffset + self.offsetOfFirstAllocationBlock + startBlock * self.numberOfBytesPerBlock;
+//	ImpPrintf(@"Reading 0x%lx bytes (%lu bytes = %lu blocks) from source volume starting at 0x%llx bytes (extent: [ start #%u, %u blocks ])", intoData.length, intoData.length, intoData.length / self.numberOfBytesPerBlock, readStart, startBlock, blockCount);
 	ssize_t const amtRead = pread(readFD, intoData.mutableBytes + offset, intoData.length - offset, readStart);
+	if (outAmtRead != NULL) {
+		*outAmtRead = amtRead;
+	}
 	if (amtRead < 0) {
-		NSError *_Nonnull const readFailedError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to read data from extent { start #%u, %u blocks }", (unsigned)L(hfsExt->startBlock), (unsigned)L(hfsExt->blockCount) ] }];
+		NSError *_Nonnull const readFailedError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to read data from extent { start #%u, %u blocks }", (unsigned)startBlock, (unsigned)blockCount ] }];
 		if (outError != NULL) {
 			*outError = readFailedError;
 		}
@@ -222,6 +227,22 @@
 	return true;
 }
 
+///Convenience wrapper for the low-level method that unpacks and reads data for a single HFS extent.
+- (bool) readIntoData:(NSMutableData *_Nonnull const)intoData
+	atOffset:(NSUInteger)offset
+	fromFileDescriptor:(int const)readFD
+	extent:(struct HFSExtentDescriptor const *_Nonnull const)hfsExt
+	actualAmountRead:(u_int64_t *_Nonnull const)outAmtRead
+	error:(NSError *_Nullable *_Nonnull const)outError
+{
+	return [self readIntoData:intoData
+		atOffset:offset
+		fromFileDescriptor:readFD
+		startBlock:L(hfsExt->startBlock)
+		blockCount:L(hfsExt->blockCount)
+		actualAmountRead:outAmtRead
+		error:outError];
+}
 
 - (NSData *_Nullable) readDataFromFileDescriptor:(int const)readFD
 	logicalLength:(u_int64_t const)numBytes
@@ -246,7 +267,7 @@
 
 		[data increaseLengthBy:blockSize * L(extents[i].blockCount)];
 
-		ImpPrintf(@"Reading extent #%lu: start block #%@, length %@ blocks", i, [fmtr stringFromNumber:@(L(extents[i].startBlock))], [fmtr stringFromNumber:@(L(extents[i].blockCount))]);
+//		ImpPrintf(@"Reading extent #%lu: start block #%@, length %@ blocks", i, [fmtr stringFromNumber:@(L(extents[i].startBlock))], [fmtr stringFromNumber:@(L(extents[i].blockCount))]);
 		//Note: Should never return zero because we already bailed out if blockCount is zero.
 		u_int64_t amtRead = 0;
 		bool const success = [self readIntoData:data
@@ -266,7 +287,7 @@
 	return successfullyReadAllNonEmptyExtents ? [data copy] : nil;
 }
 
-- (bool) checkExtentRecord:(HFSExtentRecord const *_Nonnull const)hfsExtRec {
+- (bool) checkHFSExtentRecord:(HFSExtentRecord const *_Nonnull const)hfsExtRec {
 	struct HFSExtentDescriptor const *_Nonnull const hfsExtDescs = (struct HFSExtentDescriptor const *_Nonnull const)hfsExtRec;
 	NSUInteger const firstStartBlock = hfsExtDescs[0].startBlock;
 	NSUInteger const firstNextBlock = firstStartBlock + hfsExtDescs[0].blockCount;
@@ -313,11 +334,23 @@
 - (void) getVolumeHeader:(void *_Nonnull const)outMDB {
 	memcpy(outMDB, _mdb, sizeof(*_mdb));
 }
-- (void) peekAtVolumeHeader:(void (^_Nonnull const)(struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr NS_NOESCAPE))block {
+- (void) peekAtHFSVolumeHeader:(void (^_Nonnull const)(struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr NS_NOESCAPE))block {
 	block(_mdb);
 }
 - (NSData *_Nonnull) volumeBitmap {
 	return _volumeBitmapData;
+}
+
+- (bool) isBlockAllocated:(u_int32_t const)blockNumber {
+	return CFBitVectorGetBitAtIndex(_bitVector, blockNumber);
+}
+
+- (u_int32_t) numberOfBlocksFreeAccordingToBitmap {
+	return (u_int32_t)CFBitVectorGetCountOfBit(_bitVector, (CFRange){ 0, self.numberOfBlocksTotal }, false);
+}
+
+- (off_t) offsetOfFirstAllocationBlock {
+	return L(_mdb->drAlBlSt) * kISOStandardBlockSize;
 }
 
 - (NSString *_Nonnull) volumeName {
@@ -363,17 +396,27 @@
 	__block u_int64_t logicalBytesRemaining = forkLength;
 	void (^_Nonnull const processOneExtentRecord)(struct HFSExtentDescriptor const *_Nonnull const hfsExtRec, NSUInteger const numExtents) = ^(struct HFSExtentDescriptor const *_Nonnull const hfsExtRec, NSUInteger const numExtents) {
 		for (NSUInteger i = 0; i < numExtents && keepIterating; ++i) {
-			ImpPrintf(@"Reading extent starting at block #%u, containing %u blocks", L(hfsExtRec[i].startBlock), L(hfsExtRec[i].blockCount));
+			u_int16_t const numBlocks = L(hfsExtRec[i].blockCount);
+			if (numBlocks == 0) {
+				break;
+			}
+//			ImpPrintf(@"Reading extent starting at block #%u, containing %u blocks", L(hfsExtRec[i].startBlock), numBlocks);
 			u_int64_t const bytesConsumed = block(&hfsExtRec[i], logicalBytesRemaining);
 
-			if (bytesConsumed == 0) keepIterating = false;
+			if (bytesConsumed == 0) {
+				ImpPrintf(@"Consumer block consumed no bytes. Stopping further reads.");
+				keepIterating = false;
+			}
 
 			if (bytesConsumed > logicalBytesRemaining) {
 				logicalBytesRemaining = 0;
 			} else {
 				logicalBytesRemaining -= bytesConsumed;
 			}
-			if (logicalBytesRemaining == 0) keepIterating = false;
+			if (logicalBytesRemaining == 0) {
+//				ImpPrintf(@"0 bytes remaining in logical length (all bytes consumed). No further reads warranted.");
+				keepIterating = false;
+			}
 		}
 	};
 
@@ -399,6 +442,7 @@
 }
 
 ///For each extent in the file, call the block with the data contained in that extent and the logical length of it. The logical length will equal the physical length (block size times block count) for extents that aren't the last in the file; for the last extent, the logical length may be shorter than the physical length. For extraction, you should only use the first logicalLength bytes of the file; for conversion to HFS+, you should use the full NSData (copy the full allocation block, including unused data).
+///Returns the physical length read. Unless your block returns false at any point, or an error occurs, this should equal the total size in bytes of all consecutive non-empty extents.
 - (u_int64_t) forEachExtentInFileWithID:(HFSCatalogNodeID)cnid
 	fork:(ImpForkType)forkType
 	forkLogicalLength:(u_int64_t const)forkLength
@@ -421,7 +465,7 @@
 		startingWithExtentsRecord:hfsExtRec
 		block:^u_int64_t(const struct HFSExtentDescriptor *const  _Nonnull oneExtent, u_int64_t logicalBytesRemaining)
 	{
-		ImpPrintf(@"Reading extent starting at #%u for %u blocks; %llu bytes remain…", L(oneExtent->startBlock), L(oneExtent->blockCount), logicalBytesRemaining);
+//		ImpPrintf(@"Reading extent starting at #%u for %u blocks; %llu bytes remain…", L(oneExtent->startBlock), L(oneExtent->blockCount), logicalBytesRemaining);
 		u_int64_t const physicalLength = blockSize * L(oneExtent->blockCount);
 		u_int64_t const logicalLength = logicalBytesRemaining < physicalLength ? logicalBytesRemaining : physicalLength;
 		u_int64_t amtRead = 0;
@@ -429,6 +473,7 @@
 		bool const success = [weakSelf readIntoData:data atOffset:0 fromFileDescriptor:readFD extent:oneExtent actualAmountRead:&amtRead error:&readError];
 		if (success) {
 			bool const successfullyDelivered = block(data, MAX(amtRead, logicalBytesRemaining));
+//			ImpPrintf(@"Consumer block returned %@; returning %llu bytes", successfullyDelivered ? @"true" : @"false", successfullyDelivered ? amtRead : 0);
 			return successfullyDelivered ? amtRead : 0;
 		} else {
 			ultimatelySucceeded = success;

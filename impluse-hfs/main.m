@@ -9,6 +9,7 @@
 #import <sysexits.h>
 
 #import "ImpHFSToHFSPlusConverter.h"
+#import "ImpDefragmentingHFSToHFSPlusConverter.h"
 #import "ImpHFSExtractor.h"
 #import "ImpHFSLister.h"
 #import "ImpHFSAnalyzer.h"
@@ -119,7 +120,7 @@ int main(int argc, const char * argv[]) {
 		return;
 	}
 
-	ImpHFSToHFSPlusConverter *_Nonnull const converter = [ImpHFSToHFSPlusConverter new];
+	ImpHFSToHFSPlusConverter *_Nonnull const converter = [ImpDefragmentingHFSToHFSPlusConverter new];
 	converter.sourceDevice = [NSURL fileURLWithPath:srcDevPath isDirectory:false];
 	converter.destinationDevice = [NSURL fileURLWithPath:dstDevPath isDirectory:false];
 	converter.conversionProgressUpdateBlock = ^(double progress, NSString * _Nonnull operationDescription) {

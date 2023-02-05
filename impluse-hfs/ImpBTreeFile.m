@@ -18,29 +18,121 @@
 
 @implementation ImpBTreeFile
 {
-	NSData *_Nonnull _bTreeData;
 	struct BTNodeDescriptor const *_Nonnull _nodes;
-	u_int16_t _nodeSize;
 	NSUInteger _numPotentialNodes;
 	NSMutableArray *_Nullable _lastEnumeratedObjects;
 	NSMutableArray <ImpBTreeNode *> *_Nullable _nodeCache;
 }
 
-- (instancetype _Nullable)initWithData:(NSData *_Nonnull const)bTreeFileContents {
-	if ((self = [super init])) {
-		_bTreeData = [bTreeFileContents copy];
++ (u_int16_t) nodeSizeForVersion:(ImpBTreeVersion const)version {
+	switch (version) {
+		case ImpBTreeVersionHFSCatalog:
+			return BTreeNodeLengthHFSStandard;
+			break;
+		case ImpBTreeVersionHFSExtentsOverflow:
+			return BTreeNodeLengthHFSStandard;
+			break;
+		case ImpBTreeVersionHFSPlusCatalog:
+			return BTreeNodeLengthHFSPlusCatalogMinimum;
+			break;
+		case ImpBTreeVersionHFSPlusExtentsOverflow:
+			return BTreeNodeLengthHFSPlusExtentsOverflowMinimum;
+			break;
+		case ImpBTreeVersionHFSPlusAttributes:
+			return BTreeNodeLengthHFSPlusAttributesMinimum;
+			break;
+		default:
+			NSAssert(false, @"Can't determine node size for unrecognized B*-tree version 0x%02lx", (unsigned long)version);
+			return 0;
+	}
+}
 
++ (u_int16_t) maxKeyLengthForVersion:(ImpBTreeVersion const)version {
+	switch (version) {
+		case ImpBTreeVersionHFSCatalog:
+			return kHFSCatalogKeyMaximumLength;
+			break;
+		case ImpBTreeVersionHFSExtentsOverflow:
+			return kHFSExtentKeyMaximumLength;
+			break;
+		case ImpBTreeVersionHFSPlusCatalog:
+			return kHFSPlusCatalogKeyMaximumLength;
+			break;
+		case ImpBTreeVersionHFSPlusExtentsOverflow:
+			return kHFSPlusExtentKeyMaximumLength;
+			break;
+		case ImpBTreeVersionHFSPlusAttributes:
+			//TN1150: “The maximum key length for the attributes B-tree will probably be a little larger than for the catalog file.” ¯\_(ツ)_/¯
+			return kHFSPlusCatalogKeyMaximumLength;
+			break;
+		default:
+			NSAssert(false, @"Can't determine max key length for unrecognized B*-tree version 0x%02lx", (unsigned long)version);
+			return 0;
+	}
+}
+
+- (instancetype _Nullable )initWithVersion:(ImpBTreeVersion const)version data:(NSData *_Nonnull const)bTreeFileContents nodeSize:(u_int16_t const)nodeSize copyData:(bool const)copyData {
+	if ((self = [super init])) {
+		_version = version;
+
+		_bTreeData = copyData ? [bTreeFileContents copy] : bTreeFileContents;
 		_nodes = _bTreeData.bytes;
-		_numPotentialNodes = _bTreeData.length / BTreeNodeLengthHFSStandard;
 		_nodeSize = nodeSize;
 
-		_nodeCache = [NSMutableArray arrayWithCapacity:_numNodes];
+		_numPotentialNodes = _bTreeData.length / _nodeSize;
+
+		_nodeCache = [NSMutableArray arrayWithCapacity:_numPotentialNodes];
 		NSNull *_Nonnull const null = [NSNull null];
 		for (NSUInteger i = 0; i < _numPotentialNodes; ++i) {
 			[_nodeCache addObject:(ImpBTreeNode *)null];
 		}
 	}
 	return self;
+}
+
+- (instancetype _Nullable )initWithVersion:(ImpBTreeVersion const)version data:(NSData *_Nonnull const)bTreeFileContents {
+	_version = version;
+	u_int16_t nodeSize = [[self class] nodeSizeForVersion:_version];
+
+	NSString *_Nullable versionName = nil;
+	switch (_version) {
+		case ImpBTreeVersionHFSCatalog:
+			versionName = @"HFS catalog";
+			break;
+		case ImpBTreeVersionHFSExtentsOverflow:
+			versionName = @"HFS extents overflow";
+			break;
+		case ImpBTreeVersionHFSPlusCatalog:
+			versionName = @"HFS+ catalog";
+			break;
+		case ImpBTreeVersionHFSPlusExtentsOverflow:
+			versionName = @"HFS+ extents overflow";
+			break;
+		case ImpBTreeVersionHFSPlusAttributes:
+			versionName = @"HFS+ attributes";
+			break;
+		default:
+			NSAssert(false, @"Unrecognized B*-tree version 0x%02lx", (unsigned long)version);
+	}
+
+	NSAssert(bTreeFileContents.length >= _nodeSize, @"Cannot read B*-tree from data of length %lu when expected node size is (at least) %u for an %@ tree", bTreeFileContents.length, _nodeSize, versionName);
+
+	bool copyData = false;
+
+	struct BTNodeDescriptor const *_Nonnull const nodes = bTreeFileContents.bytes;
+	if (L(nodes[0].kind) == kBTHeaderNode) {
+		//This is data from an HFS volume (rather than blank data we've been given by our mutable subclass).
+		copyData = true;
+
+		//Get the actual node size for the later things which may depend on having the right size.
+		ImpBTreeHeaderNode *_Nonnull const headerNode = [ImpBTreeHeaderNode nodeWithTree:self data:bTreeFileContents];
+		nodeSize = headerNode.bytesPerNode;
+	} else {
+		//This is not a valid B*-tree file.
+		self = nil;
+	}
+
+	return [self initWithVersion:version data:bTreeFileContents nodeSize:nodeSize copyData:copyData];
 }
 
 - (NSString *_Nonnull) description {
@@ -53,6 +145,22 @@
 
 - (u_int16_t) bytesPerNode {
 	return _nodeSize;
+}
+
+- (u_int16_t) keyLengthSize {
+	switch (self.version) {
+		case ImpBTreeVersionHFSCatalog:
+		case ImpBTreeVersionHFSExtentsOverflow:
+			return sizeof(u_int8_t);
+
+		case ImpBTreeVersionHFSPlusCatalog:
+		case ImpBTreeVersionHFSPlusExtentsOverflow:
+		case ImpBTreeVersionHFSPlusAttributes:
+			return self.headerNode.hasBigKeys ? sizeof(u_int16_t) : sizeof(u_int8_t);
+
+		default:
+			return 0;
+	}
 }
 
 ///Debugging method. Returns the number of total nodes in the tree, live or otherwise (that is, the total length in bytes of the file divided by the size of one node).
@@ -79,6 +187,17 @@
 	return count;
 }
 
+#pragma mark Serialization
+
+- (u_int64_t) lengthInBytes {
+	return _bTreeData.length;
+}
+- (void) serializeToData:(void (^_Nonnull const)(NSData *_Nonnull const data))block {
+	block(_bTreeData);
+}
+
+#pragma mark Node access
+
 - (ImpBTreeNode *_Nullable) alreadyCachedNodeAtIndex:(NSUInteger)idx {
 	return idx < _nodeCache.count
 		? _nodeCache[idx]
@@ -96,6 +215,26 @@
 	return nil;
 }
 
+- (u_int64_t) offsetInFileOfPointer:(void const *_Nonnull const)ptr {
+	return ptr - _bTreeData.bytes;
+}
+
+- (NSData *_Nonnull) sliceData:(NSData *_Nonnull const)data selectRange:(NSRange)range {
+	return [data dangerouslyFastSubdataWithRange_Imp:range];
+}
+
+///Given the index (aka node number) of a node in the file, return an NSData containing that node's raw bytes, either sourced from disk or suitable for writing to disk.
+///This may or may not be a subdata of a larger NSData. Subclasses may override this if they keep node data in a different format, such as an array of individual NSDatas.
+- (NSData *_Nonnull const) nodeDataAtIndex:(u_int32_t const)idx {
+	NSRange const nodeByteRange = { _nodeSize * idx, _nodeSize };
+	NSData *_Nonnull const nodeData = [self sliceData:_bTreeData selectRange:nodeByteRange];
+	return nodeData;
+}
+
+- (bool) hasMutableNodes {
+	return false;
+}
+
 - (ImpBTreeNode *_Nonnull const) nodeAtIndex:(u_int32_t const)idx {
 	if (idx >= _numPotentialNodes) {
 		//This will throw a range exception.
@@ -108,15 +247,17 @@
 	}
 
 	//TODO: Create all of these once, probably up front, and keep them in an array. Turn this into objectAtIndex: and the fast enumeration into fast enumeration of that array.
-	NSRange const nodeByteRange = { BTreeNodeLengthHFSStandard * idx, BTreeNodeLengthHFSStandard };
-	NSData *_Nonnull const nodeData = [_bTreeData dangerouslyFastSubdataWithRange_Imp:nodeByteRange];
-
-	ImpBTreeNode *_Nonnull const node = [ImpBTreeNode nodeWithTree:self data:nodeData];
+	NSData *_Nonnull const nodeData = [self nodeDataAtIndex:idx];
+	ImpBTreeNode *_Nonnull const node = [ImpBTreeNode nodeWithTree:self data:nodeData copy:false mutable:self.hasMutableNodes]; //copy:false because we either already copied it when the tree was created or we're intentionally creating a mutable subdata of a mutable data.
 	node.nodeNumber = idx;
+	NSRange const nodeByteRange = { _nodeSize * idx, _nodeSize };
+	node.byteRange = nodeByteRange;
 	[self storeNode:node inCacheAtIndex:idx];
 
 	return node;
 }
+
+#pragma mark Node traversal and search
 
 - (NSUInteger)countByEnumeratingWithState:(NSFastEnumerationState *_Nonnull)state
 	objects:(__unsafe_unretained id  _Nullable [_Nonnull])outObjects
@@ -143,10 +284,12 @@
 		[_lastEnumeratedObjects removeAllObjects];
 	}
 	for (NSUInteger	i = 0; i < nextReturnedRange.length; ++i) {
-		NSRange const nodeByteRange = { BTreeNodeLengthHFSStandard * ( nextReturnedRange.location + i), BTreeNodeLengthHFSStandard };
-		NSData *_Nonnull const data = [_bTreeData subdataWithRange:nodeByteRange];
+		u_int32_t const nodeNumber = (u_int32_t)(nextReturnedRange.location + i);
+
+		NSData *_Nonnull const data = [self nodeDataAtIndex:nodeNumber];
 		ImpBTreeNode *_Nonnull const node = [ImpBTreeNode nodeWithTree:self data:data];
-		node.nodeNumber = (u_int32_t)(nextReturnedRange.location + i);
+		node.nodeNumber = nodeNumber;
+
 		[_lastEnumeratedObjects addObject:node];
 		outObjects[i] = node;
 	}
@@ -267,10 +410,14 @@
 					u_int8_t const *_Nonnull const recordTypePtr = payloadPtr;
 					switch (*recordTypePtr << 8) {
 						case kHFSFileRecord:
-							keepIterating = visitFile(keyPtr, payloadPtr);
+							if (visitFile != nil) {
+								keepIterating = visitFile(keyPtr, payloadPtr);
+							}
 							break;
 						case kHFSFolderRecord:
-							keepIterating = visitFolder(keyPtr, payloadPtr);
+							if (visitFolder != nil) {
+								keepIterating = visitFolder(keyPtr, payloadPtr);
+							}
 							break;
 						case kHFSFileThreadRecord:
 						case kHFSFolderThreadRecord:
@@ -303,6 +450,8 @@
 			nextSearchNode = [indexNode searchSiblingsForBestMatchingNodeWithComparator:compareKeys];
 //			ImpPrintf(@"2. Next search node is #%u at height %u", nextSearchNode.nodeNumber, (unsigned)nextSearchNode.nodeHeight);
 
+			NSAssert(nextSearchNode.nodeType == kBTIndexNode || nextSearchNode.nodeType == kBTLeafNode, @"Index node %@ claimed that sibling %@ was a better match for this search", indexNode, nextSearchNode);
+
 			//If the best matching node on this tier is an index node, descend through it to the next tier.
 			if (nextSearchNode != nil && nextSearchNode.nodeType == kBTIndexNode) {
 				indexNode = (ImpBTreeIndexNode *_Nonnull)nextSearchNode;
@@ -310,14 +459,16 @@
 				nextSearchNode = [indexNode descendWithKeyComparator:compareKeys];
 //				ImpPrintf(@"4. Descended. Next search node is #%u at height %u", nextSearchNode.nodeNumber, (unsigned)nextSearchNode.nodeHeight);
 			}
+
+			NSAssert(nextSearchNode.nodeType == kBTIndexNode || nextSearchNode.nodeType == kBTLeafNode, @"Index node %@ claimed that %@ was a descendant and a better match for this search", indexNode, nextSearchNode);
 		}
 
 		if (nextSearchNode != nil) {
-//			ImpPrintf(@"Presumptive leaf node is #%u at height %u. Searching for records…", nextSearchNode.nodeNumber, (unsigned)nextSearchNode.nodeHeight);
+//			ImpPrintf(@"5. Presumptive leaf node is #%u at height %u. Searching for records…", nextSearchNode.nodeNumber, (unsigned)nextSearchNode.nodeHeight);
 
 			//Should be a leaf node.
 			int16_t const recordIdx = [nextSearchNode indexOfBestMatchingRecord:compareKeys];
-//			ImpPrintf(@"Best matching record is #%lu", recordIdx);
+//			ImpPrintf(@"6. Best matching record is #%u", recordIdx);
 
 			//TODO: If outItemRecordData is non-NULL, we need a file or folder record—a thread record will not do.
 			//We'll need to look before or after this record for a non-thread record. It might not be in this node. It might not even be in this catalog (although I'm not sure what it would mean for a catalog to have a thread record but no file or folder record—is that possible when items are deleted?).
@@ -349,12 +500,11 @@
 	threadRecordData:(NSData *_Nullable *_Nullable const)outThreadRecordData
 {
 	struct HFSCatalogKey quarryCatalogKey = {
-		.keyLength = sizeof(struct HFSCatalogKey),
 		.reserved = 0,
-		.parentID = cnid,
 	};
+	S(quarryCatalogKey.parentID, cnid);
 	memcpy(quarryCatalogKey.nodeName, nodeName, nodeName[0] + 1);
-	quarryCatalogKey.keyLength -= sizeof(quarryCatalogKey.keyLength);
+	S(quarryCatalogKey.keyLength, (u_int8_t)(sizeof(struct HFSCatalogKey) - sizeof(quarryCatalogKey.keyLength)));
 
 	//TODO: Factor this out into -hfsCatalogKeyComparator and -hfsPlusCatalogKeyComparator (the latter should use Unicode name comparisons)
 	ImpBTreeRecordKeyComparator _Nonnull const compareKeys = ^ImpBTreeComparisonResult(const void *const  _Nonnull foundKeyPtr) {
@@ -389,24 +539,10 @@
 	return false;
 }
 
-- (bool) searchCatalogTreeForItemWithParentID:(HFSCatalogNodeID)cnid
-	name:(ConstStr31Param _Nonnull)nodeName
+- (bool) searchCatalogTreeWithKeyComparator:(ImpBTreeRecordKeyComparator _Nonnull const)compareKeys
 	getRecordKeyData:(NSData *_Nullable *_Nullable const)outRecordKeyData
-	fileOrFolderRecordData:(NSData *_Nullable *_Nullable const)outItemRecordData
+	payloadData:(NSData *_Nullable *_Nullable const)outPayloadData
 {
-	struct HFSCatalogKey quarryCatalogKey = {
-		.keyLength = sizeof(struct HFSCatalogKey),
-		.reserved = 0,
-		.parentID = cnid,
-	};
-	memcpy(quarryCatalogKey.nodeName, nodeName, nodeName[0] + 1);
-	quarryCatalogKey.keyLength -= sizeof(quarryCatalogKey.keyLength);
-
-	ImpBTreeRecordKeyComparator _Nonnull const compareKeys = ^ImpBTreeComparisonResult(const void *const  _Nonnull foundKeyPtr) {
-		struct HFSCatalogKey const *_Nonnull const foundCatKeyPtr = foundKeyPtr;
-		return ImpBTreeCompareHFSCatalogKeys(&quarryCatalogKey, foundCatKeyPtr);
-	};
-
 	ImpBTreeNode *_Nullable foundNode = nil;
 	u_int16_t recordIdx = 0;
 	bool const found = [self searchTreeForItemWithKeyComparator:compareKeys
@@ -424,14 +560,71 @@
 			if (outRecordKeyData != NULL) {
 				*outRecordKeyData = [foundNode recordKeyDataAtIndex:recordIdx];
 			}
-			if (outItemRecordData != NULL) {
-				*outItemRecordData = [foundNode recordPayloadDataAtIndex:recordIdx];
+			if (outPayloadData != NULL) {
+				*outPayloadData = [foundNode recordPayloadDataAtIndex:recordIdx];
 			}
 			return true;
 		}
 	}
 
 	return false;
+}
+
+- (bool) searchCatalogTreeForItemWithParentID:(HFSCatalogNodeID)cnid
+	name:(ConstStr31Param _Nonnull)nodeName
+	getRecordKeyData:(NSData *_Nullable *_Nullable const)outRecordKeyData
+	fileOrFolderRecordData:(NSData *_Nullable *_Nullable const)outItemRecordData
+{
+	struct HFSCatalogKey quarryCatalogKey = {
+		.reserved = 0,
+	};
+	S(quarryCatalogKey.parentID, cnid);
+	memcpy(quarryCatalogKey.nodeName, nodeName, nodeName[0] + 1);
+	S(quarryCatalogKey.keyLength, (u_int8_t)(sizeof(struct HFSCatalogKey) - sizeof(quarryCatalogKey.keyLength)));
+
+	ImpBTreeRecordKeyComparator _Nonnull const compareKeys = ^ImpBTreeComparisonResult(const void *const  _Nonnull foundKeyPtr) {
+		struct HFSCatalogKey const *_Nonnull const foundCatKeyPtr = foundKeyPtr;
+		return ImpBTreeCompareHFSCatalogKeys(&quarryCatalogKey, foundCatKeyPtr);
+	};
+
+	return [self searchCatalogTreeWithKeyComparator:compareKeys getRecordKeyData:outRecordKeyData payloadData:outItemRecordData];
+}
+
+- (bool) searchCatalogTreeForItemWithParentID:(HFSCatalogNodeID)cnid
+	unicodeName:(ConstHFSUniStr255Param _Nonnull)nodeName
+	getRecordKeyData:(NSData *_Nullable *_Nullable const)outRecordKeyData
+	fileOrFolderRecordData:(NSData *_Nullable *_Nullable const)outItemRecordData
+{
+	struct HFSPlusCatalogKey quarryCatalogKey;
+	S(quarryCatalogKey.parentID, cnid);
+	memcpy(quarryCatalogKey.nodeName.unicode, nodeName->unicode, nodeName->length * sizeof(UniChar));
+	quarryCatalogKey.nodeName.length = nodeName->length;
+	S(quarryCatalogKey.keyLength, (u_int16_t)(sizeof(struct HFSPlusCatalogKey) - self.keyLengthSize));
+
+	ImpBTreeRecordKeyComparator _Nonnull const compareKeys = ^ImpBTreeComparisonResult(const void *const  _Nonnull foundKeyPtr) {
+		struct HFSPlusCatalogKey const *_Nonnull const foundCatKeyPtr = foundKeyPtr;
+		return ImpBTreeCompareHFSPlusCatalogKeys(&quarryCatalogKey, foundCatKeyPtr);
+	};
+
+	return [self searchCatalogTreeWithKeyComparator:compareKeys getRecordKeyData:outRecordKeyData payloadData:outItemRecordData];
+}
+- (bool) searchCatalogTreeForItemWithParentID:(HFSCatalogNodeID)cnid
+	unicodeName:(ConstHFSUniStr255Param _Nonnull)nodeName
+	getRecordKeyData:(NSData *_Nullable *_Nullable const)outRecordKeyData
+	threadRecordData:(NSData *_Nullable *_Nullable const)outThreadRecordData
+{
+	struct HFSPlusCatalogKey quarryCatalogKey;
+	S(quarryCatalogKey.parentID, cnid);
+	memcpy(quarryCatalogKey.nodeName.unicode, nodeName->unicode, nodeName->length * sizeof(UniChar));
+	quarryCatalogKey.nodeName.length = nodeName->length;
+	S(quarryCatalogKey.keyLength, (u_int16_t)(sizeof(struct HFSPlusCatalogKey) - self.keyLengthSize));
+
+	ImpBTreeRecordKeyComparator _Nonnull const compareKeys = ^ImpBTreeComparisonResult(const void *const  _Nonnull foundKeyPtr) {
+		struct HFSPlusCatalogKey const *_Nonnull const foundCatKeyPtr = foundKeyPtr;
+		return ImpBTreeCompareHFSPlusCatalogKeys(&quarryCatalogKey, foundCatKeyPtr);
+	};
+
+	return [self searchCatalogTreeWithKeyComparator:compareKeys getRecordKeyData:outRecordKeyData payloadData:outThreadRecordData];
 }
 
 - (NSUInteger) searchExtentsOverflowTreeForCatalogNodeID:(HFSCatalogNodeID)cnid
@@ -503,6 +696,13 @@
 		//TODO: We still need to iterate over the records of leafNode and call the block.
 	}
 	return numRecords;
+}
+
+#pragma mark Node map
+
+- (bool) isNodeAllocatedAtIndex:(NSUInteger)nodeIdx {
+	//Note: This refers the request to a map node if the index is beyond the header node's map record.
+	return [self.headerNode isNodeAllocated:nodeIdx];
 }
 
 @end

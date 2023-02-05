@@ -37,10 +37,17 @@
 ///Finer-grained method intended specifically for the analyze command. Most other uses should use loadAndReturnError:.
 - (bool)readExtentsOverflowFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
 
+///For subclass implementations of readAllocationBitmapFromFileDescriptor:.
+- (void) setAllocationBitmapData:(NSMutableData *_Nonnull const)bitmapData numberOfBits:(u_int32_t const)numBits;
+
 - (NSData *_Nonnull)bootBlocks;
 - (void) getVolumeHeader:(void *_Nonnull const)outMDB;
-- (void) peekAtVolumeHeader:(void (^_Nonnull const)(struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr NS_NOESCAPE))block;
+- (void) peekAtHFSVolumeHeader:(void (^_Nonnull const)(struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr NS_NOESCAPE))block;
+
 - (NSData *_Nonnull)volumeBitmap;
+///Calculate the number of bits in the bitmap that are zero. Should match the drFreeBks/freeBlocks value in the volume header.
+- (u_int32_t) numberOfBlocksFreeAccordingToBitmap;
+
 @property(strong) ImpBTreeFile *_Nonnull catalogBTree;
 @property(strong) ImpBTreeFile *_Nonnull extentsOverflowBTree;
 
@@ -67,8 +74,18 @@
 	numExtents:(NSUInteger const)numExtents
 	error:(NSError *_Nullable *_Nonnull const)outError;
 
+///Low-level method intended for subclasses implementing their own versions of the higher-level readDataFromFileDescriptor:logicalLength:… method. This effectively takes one extent, using HFS+'s larger type for block numbers.
+///Returns intoData on success; nil on failure. The copy's destination starts offset bytes into the data.
+- (bool) readIntoData:(NSMutableData *_Nonnull const)intoData
+	atOffset:(NSUInteger)offset
+	fromFileDescriptor:(int const)readFD
+	startBlock:(u_int32_t const)startBlock
+	blockCount:(u_int32_t const)blockCount
+	actualAmountRead:(u_int64_t *_Nonnull const)outAmtRead
+	error:(NSError *_Nullable *_Nonnull const)outError;
+
 ///Returns true if none of the extents in this record overlap. Returns false if there are overlapping extents, which may jeopardize user data or lead to volume corruption. Ignores any extents after an empty extent.
-- (bool) checkExtentRecord:(HFSExtentRecord const *_Nonnull const)hfsExtRec;
+- (bool) checkHFSExtentRecord:(HFSExtentRecord const *_Nonnull const)hfsExtRec;
 
 ///For every extent in the file (the initial three plus any overflow records) until an empty extent, call the block with that extent and the number of bytes remaining in the file. The block should return the number of bytes it consumed (e.g., read from the file descriptor). Returns the total number of bytes consumed.
 - (u_int64_t) forEachExtentInFileWithID:(HFSCatalogNodeID)cnid

@@ -18,3 +18,15 @@ enum {
 	BTreeNodeLengthHFSPlusExtentsOverflowMinimum = kHFSPlusExtentMinNodeSize,
 	BTreeNodeLengthHFSPlusAttributesMinimum = kHFSPlusAttrMinNodeSize,
 };
+
+///Constants identifying various types of B*-trees, to inform how their contents (particularly keys and leaf node record payloads) should be interpreted, and to aid in converting a tree to a different version of the same kind.
+typedef NS_ENUM(NSUInteger, ImpBTreeVersion) {
+	ImpBTreeVersionHFSCatalog = 0x001,
+	ImpBTreeVersionHFSExtentsOverflow = 0x002,
+	//No ImpBTreeVersionHFSAttributes because there is no attributes file in HFS.
+
+	ImpBTreeVersionHFSPlusCatalog = 0x100,
+	ImpBTreeVersionHFSPlusExtentsOverflow = 0x200,
+	ImpBTreeVersionHFSPlusAttributes = 0x300,
+};
+
