@@ -60,6 +60,7 @@
 
 #pragma mark -
 
+///Read fork contents from the sections of the volume indicated by the given extents.
 - (NSData *_Nullable) readDataFromFileDescriptor:(int const)readFD
 	logicalLength:(u_int64_t const)numBytes
 	extents:(struct HFSExtentDescriptor const *_Nonnull const)hfsExtRec
