@@ -8,6 +8,7 @@
 #import <Foundation/Foundation.h>
 
 @class ImpHFSVolume;
+@class ImpHFSPlusVolume;
 
 typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
 	ImpDehydratedItemTypeFile = 1,
@@ -28,6 +29,18 @@ typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
 - (instancetype _Nonnull) initWithHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol	catalogNodeID:(HFSCatalogNodeID const)cnid
 	key:(struct HFSCatalogKey const *_Nonnull const)key
 	folderRecord:(struct HFSCatalogFolder const *_Nonnull const)folderRec;
+
+///Create a dehydrated item object that references a given HFS+ catalog. The initializer will populate the object's properties with the catalog's data for the given catalog node ID.
+- (instancetype _Nonnull) initWithHFSPlusVolume:(ImpHFSPlusVolume *_Nonnull const)hfsVol
+	catalogNodeID:(HFSCatalogNodeID const)cnid
+	key:(struct HFSPlusCatalogKey const *_Nonnull const)key
+	fileRecord:(struct HFSPlusCatalogFile const *_Nonnull const)fileRec;
+
+///Create a dehydrated item object that references a given HFS+ catalog. The initializer will populate the object's properties with the catalog's data for the given catalog node ID.
+- (instancetype _Nonnull) initWithHFSPlusVolume:(ImpHFSPlusVolume *_Nonnull const)hfsVol
+	catalogNodeID:(HFSCatalogNodeID const)cnid
+	key:(struct HFSPlusCatalogKey const *_Nonnull const)key
+	folderRecord:(struct HFSPlusCatalogFolder const *_Nonnull const)folderRec;
 
 @property(weak) ImpHFSVolume * _Nullable hfsVolume;
 @property HFSCatalogNodeID catalogNodeID;

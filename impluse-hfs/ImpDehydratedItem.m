@@ -10,6 +10,7 @@
 #import "ImpTextEncodingConverter.h"
 
 #import "ImpHFSVolume.h"
+#import "ImpHFSPlusVolume.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
 
@@ -36,6 +37,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	NSArray <NSString *> *_cachedPath;
 	NSMutableArray <ImpDehydratedItem *> *_children;
 	ImpTextEncodingConverter *_tec;
+	bool _isHFSPlus;
 }
 
 - (instancetype _Nonnull) initWithHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol catalogNodeID:(HFSCatalogNodeID const)cnid {
@@ -44,11 +46,13 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		self.catalogNodeID = cnid;
 
 		_tec = hfsVol.textEncodingConverter;
+		_isHFSPlus = [_hfsVolume isKindOfClass:[ImpHFSPlusVolume class]];
 	}
 	return self;
 }
 
-- (instancetype _Nonnull) initWithHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol	catalogNodeID:(HFSCatalogNodeID const)cnid
+- (instancetype _Nonnull) initWithHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol
+	catalogNodeID:(HFSCatalogNodeID const)cnid
 	key:(struct HFSCatalogKey const *_Nonnull const)key
 	fileRecord:(struct HFSCatalogFile const *_Nonnull const)fileRec
 {
@@ -64,6 +68,36 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 - (instancetype _Nonnull) initWithHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol catalogNodeID:(HFSCatalogNodeID const)cnid
 	key:(struct HFSCatalogKey const *_Nonnull const)key
 	folderRecord:(struct HFSCatalogFolder const *_Nonnull const)folderRec
+{
+	if ((self = [self initWithHFSVolume:hfsVol catalogNodeID:cnid])) {
+		self.hfsCatalogKeyData = [NSData dataWithBytesNoCopy:(void *)key length:sizeof(*key) freeWhenDone:false];
+		self.hfsFolderCatalogRecordData = [NSData dataWithBytesNoCopy:(void *)folderRec length:sizeof(*folderRec) freeWhenDone:false];
+
+		_parentFolderID = L(key->parentID);
+		_type = _parentFolderID == kHFSRootParentID ? ImpDehydratedItemTypeVolume : ImpDehydratedItemTypeFolder;
+	}
+	return self;
+}
+
+///Create a dehydrated item object that references a given HFS+ catalog. The initializer will populate the object's properties with the catalog's data for the given catalog node ID.
+- (instancetype _Nonnull) initWithHFSPlusVolume:(ImpHFSPlusVolume *_Nonnull const)hfsVol
+	catalogNodeID:(HFSCatalogNodeID const)cnid
+	key:(struct HFSPlusCatalogKey const *_Nonnull const)key
+	fileRecord:(struct HFSPlusCatalogFile const *_Nonnull const)fileRec
+{
+	if ((self = [self initWithHFSVolume:hfsVol catalogNodeID:cnid])) {
+		self.hfsCatalogKeyData = [NSData dataWithBytesNoCopy:(void *)key length:sizeof(*key) freeWhenDone:false];
+		self.hfsFileCatalogRecordData = [NSData dataWithBytesNoCopy:(void *)fileRec length:sizeof(*fileRec) freeWhenDone:false];
+
+		self.type = ImpDehydratedItemTypeFile;
+	}
+	return self;
+}
+
+- (instancetype _Nonnull) initWithHFSPlusVolume:(ImpHFSPlusVolume *_Nonnull const)hfsVol
+	catalogNodeID:(HFSCatalogNodeID const)cnid
+	key:(struct HFSPlusCatalogKey const *_Nonnull const)key
+	folderRecord:(struct HFSPlusCatalogFolder const *_Nonnull const)folderRec
 {
 	if ((self = [self initWithHFSVolume:hfsVol catalogNodeID:cnid])) {
 		self.hfsCatalogKeyData = [NSData dataWithBytesNoCopy:(void *)key length:sizeof(*key) freeWhenDone:false];
@@ -94,13 +128,23 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 }
 
 - (HFSCatalogNodeID) parentFolderID {
-	struct HFSCatalogKey const *_Nonnull const catalogKey = (struct HFSCatalogKey const *_Nonnull const)(self.hfsCatalogKeyData.bytes);
-	return L(catalogKey->parentID);
+	if (_isHFSPlus) {
+		struct HFSPlusCatalogKey const *_Nonnull const catalogKey = (struct HFSPlusCatalogKey const *_Nonnull const)(self.hfsCatalogKeyData.bytes);
+		return L(catalogKey->parentID);
+	} else {
+		struct HFSCatalogKey const *_Nonnull const catalogKey = (struct HFSCatalogKey const *_Nonnull const)(self.hfsCatalogKeyData.bytes);
+		return L(catalogKey->parentID);
+	}
 }
 
 - (NSString *_Nonnull const) name {
-	struct HFSCatalogKey const *_Nonnull const catalogKey = (struct HFSCatalogKey const *_Nonnull const)(self.hfsCatalogKeyData.bytes);
-	return [_tec stringForPascalString:catalogKey->nodeName];
+	if (_isHFSPlus) {
+		struct HFSPlusCatalogKey const *_Nonnull const catalogKey = (struct HFSPlusCatalogKey const *_Nonnull const)(self.hfsCatalogKeyData.bytes);
+		return [_tec stringFromHFSUniStr255:&(catalogKey->nodeName)];
+	} else {
+		struct HFSCatalogKey const *_Nonnull const catalogKey = (struct HFSCatalogKey const *_Nonnull const)(self.hfsCatalogKeyData.bytes);
+		return [_tec stringForPascalString:catalogKey->nodeName];
+	}
 }
 
 - (u_int32_t) hfsDateForDate:(NSDate *_Nonnull const)dateToConvert {
@@ -111,12 +155,22 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 }
 
 - (u_int64_t) logicalDataForkBytes {
-	struct HFSCatalogFile const *_Nonnull const fileRec = self.hfsFileCatalogRecordData.bytes;
-	return L(fileRec->dataLogicalSize);
+	if (_isHFSPlus) {
+		struct HFSPlusCatalogFile const *_Nonnull const fileRec = self.hfsFileCatalogRecordData.bytes;
+		return L(fileRec->dataFork.logicalSize);
+	} else {
+		struct HFSCatalogFile const *_Nonnull const fileRec = self.hfsFileCatalogRecordData.bytes;
+		return L(fileRec->dataLogicalSize);
+	}
 }
 - (u_int64_t) logicalResourceForkBytes {
-	struct HFSCatalogFile const *_Nonnull const fileRec = self.hfsFileCatalogRecordData.bytes;
-	return L(fileRec->rsrcLogicalSize);
+	if (_isHFSPlus) {
+		struct HFSPlusCatalogFile const *_Nonnull const fileRec = self.hfsFileCatalogRecordData.bytes;
+		return L(fileRec->resourceFork.logicalSize);
+	} else {
+		struct HFSCatalogFile const *_Nonnull const fileRec = self.hfsFileCatalogRecordData.bytes;
+		return L(fileRec->rsrcLogicalSize);
+	}
 }
 
 ///Search the catalog for parent items until reaching the volume root, then return the path so constructed.
@@ -127,16 +181,25 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 
 		ImpBTreeFile *_Nonnull const catalog = self.hfsVolume.catalogBTree;
 		NSData *_Nullable keyData = nil;
-		struct HFSCatalogKey const *_Nonnull const ownCatalogKey = self.hfsCatalogKeyData.bytes;
-		HFSCatalogNodeID nextParentID = L(ownCatalogKey->parentID);
+		HFSCatalogNodeID nextParentID = self.parentFolderID;
 		NSData *_Nullable threadRecordData = nil;
 
 		//Keep ascending directories until we reach kHFSRootParentID, which is the parent of the root directory.
-		while (nextParentID != kHFSRootParentID && [catalog searchCatalogTreeForItemWithParentID:nextParentID name:"\p" getRecordKeyData:&keyData threadRecordData:&threadRecordData]) {
-			struct HFSCatalogThread const *_Nonnull const threadPtr = threadRecordData.bytes;
-			NSString *_Nonnull const name = [_tec stringForPascalString:threadPtr->nodeName];
-			[path insertObject:name atIndex:0];
-			nextParentID = L(threadPtr->parentID);
+		if (_isHFSPlus) {
+			struct HFSUniStr255 emptyName = { .length = 0 };
+			while (nextParentID != kHFSRootParentID && [catalog searchCatalogTreeForItemWithParentID:nextParentID unicodeName:&emptyName getRecordKeyData:&keyData threadRecordData:&threadRecordData]) {
+				struct HFSPlusCatalogThread const *_Nonnull const threadPtr = threadRecordData.bytes;
+				NSString *_Nonnull const name = [_tec stringFromHFSUniStr255:&(threadPtr->nodeName)];
+				[path insertObject:name atIndex:0];
+				nextParentID = L(threadPtr->parentID);
+			}
+		} else {
+			while (nextParentID != kHFSRootParentID && [catalog searchCatalogTreeForItemWithParentID:nextParentID name:"\p" getRecordKeyData:&keyData threadRecordData:&threadRecordData]) {
+				struct HFSCatalogThread const *_Nonnull const threadPtr = threadRecordData.bytes;
+				NSString *_Nonnull const name = [_tec stringForPascalString:threadPtr->nodeName];
+				[path insertObject:name atIndex:0];
+				nextParentID = L(threadPtr->parentID);
+			}
 		}
 
 		_cachedPath = path;
@@ -174,11 +237,12 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	NSAssert(volume != nil, @"Can't rehydrate a file from no volume. This is likely an internal inconsistency error and therefore a bug.");
 
 	struct HFSCatalogFile const *_Nonnull const fileRec = (struct HFSCatalogFile const *_Nonnull const)self.hfsFileCatalogRecordData.bytes;
+	struct HFSPlusCatalogFile const *_Nonnull const fileRecPlus = (struct HFSPlusCatalogFile const *_Nonnull const)self.hfsFileCatalogRecordData.bytes;
 
 	//TODO: This implementation will overwrite the destination file if it already exists. The client should probably check for that and prompt for confirmation…
 
-	off_t const dataForkSize = L(fileRec->dataLogicalSize);
-	off_t const rsrcForkSize = L(fileRec->rsrcLogicalSize);
+	off_t const dataForkSize = _isHFSPlus ? L(fileRecPlus->dataFork.logicalSize) : L(fileRec->dataLogicalSize);
+	off_t const rsrcForkSize = _isHFSPlus ? L(fileRecPlus->resourceFork.logicalSize) : L(fileRec->rsrcLogicalSize);
 
 	//Realistically, we have to use the File Manager.
 	//The alternative is using NSURL and writing to resource forks as realWorldURL/..namedFork/rsrc. This doesn't work on APFS, for reasons unknown, and still wouldn't enable us to rehydrate certain metadata, such as the Locked checkbox.
@@ -187,7 +251,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 	//First thing, create the file. We can set some metadata while we're at it, so do that.
-	struct FileInfo const *_Nonnull const sourceFinderInfo = (struct FileInfo const *_Nonnull const)&(fileRec->userInfo);
+	struct FileInfo const *_Nonnull const sourceFinderInfo = (struct FileInfo const *_Nonnull const)(_isHFSPlus ? &(fileRecPlus->userInfo) : &(fileRec->userInfo));
 	struct FileInfo swappedFinderInfo = {
 		.fileType = kFirstMagicBusyFiletype,//L(sourceFinderInfo->fileType),
 		.fileCreator = L(sourceFinderInfo->fileCreator),
@@ -198,7 +262,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		},
 		.reservedField = L(sourceFinderInfo->reservedField),
 	};
-	struct ExtendedFileInfo const *_Nonnull const sourceExtFinderInfo = (struct ExtendedFileInfo const *_Nonnull const)&(fileRec->finderInfo);
+	struct ExtendedFileInfo const *_Nonnull const sourceExtFinderInfo = (struct ExtendedFileInfo const *_Nonnull const)(_isHFSPlus ? &(fileRecPlus->finderInfo) : &(fileRec->finderInfo));
 	struct ExtendedFileInfo swappedExtFinderInfo = {
 		.reserved1 = {
 			L(sourceExtFinderInfo->reserved1[0]),
@@ -211,13 +275,17 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		.putAwayFolderID = L(sourceExtFinderInfo->putAwayFolderID),
 	};
 
+	u_int16_t const flags = (_isHFSPlus ? L(fileRecPlus->flags) : L(fileRec->flags));
+	u_int32_t const createDate = (_isHFSPlus ? L(fileRecPlus->createDate) : L(fileRec->createDate));
+	u_int32_t const modifyDate = (_isHFSPlus ? L(fileRecPlus->contentModDate) : L(fileRec->modifyDate));
+
 	struct FSCatalogInfo catInfo = {
-		.nodeFlags = (L(fileRec->flags) & ~kFSNodeLockedMask) | kFSNodeResOpenMask | kFSNodeDataOpenMask | kFSNodeForkOpenMask,
+		.nodeFlags = (flags & ~kFSNodeLockedMask) | kFSNodeResOpenMask | kFSNodeDataOpenMask | kFSNodeForkOpenMask,
 		.createDate = {
 			.lowSeconds = kMagicBusyCreationDate,//L(fileRec->createDate),
 		},
 		.contentModDate = {
-			.lowSeconds = L(fileRec->modifyDate),
+			.lowSeconds = modifyDate,
 		},
 		//TODO: We should include textEncodingHint, based on whatever encoding was used to decode the file.
 	};
@@ -296,12 +364,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 
 	__block bool allWritesSucceeded = true; //Defaults to true in case the fork is empty so we encounter no extents.
 	__block NSError *_Nullable writeError = nil;
-	[volume forEachExtentInFileWithID:self.catalogNodeID
-		fork:ImpForkTypeData
-		forkLogicalLength:dataForkSize
-		startingWithExtentsRecord:fileRec->dataExtents
-		readDataOrReturnError:outError
-		block:^bool(NSData *_Nonnull const fileData, u_int64_t const logicalLength)
+	bool (^_Nonnull const writeDataForkBlock)(NSData *_Nonnull const fileData, u_int64_t const logicalLength) = ^bool(NSData *_Nonnull const fileData, u_int64_t const logicalLength)
 	{
 		OSStatus const dataWriteErr = FSWriteFork(dataForkRefnum, fsAtMark, noCacheMask, fileData.length, fileData.bytes, /*actualCount*/ NULL);
 		allWritesSucceeded = allWritesSucceeded && (dataWriteErr == noErr);
@@ -309,7 +372,22 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 			writeError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Can't write to data fork of file “%@”", @""), name ]}];
 		}
 		return allWritesSucceeded;
-	}];
+	};
+	if (_isHFSPlus) {
+		[(ImpHFSPlusVolume *)volume forEachExtentInFileWithID:self.catalogNodeID
+			fork:ImpForkTypeData
+			forkLogicalLength:dataForkSize
+			startingWithBigExtentsRecord:fileRecPlus->dataFork.extents
+			readDataOrReturnError:outError
+			block:writeDataForkBlock];
+	} else {
+		[volume forEachExtentInFileWithID:self.catalogNodeID
+			fork:ImpForkTypeData
+			forkLogicalLength:dataForkSize
+			startingWithExtentsRecord:fileRec->dataExtents
+			readDataOrReturnError:outError
+			block:writeDataForkBlock];
+	}
 	FSCloseFork(dataForkRefnum);
 	if (writeError != nil) {
 		if (outError != NULL) {
@@ -327,7 +405,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	[volume forEachExtentInFileWithID:self.catalogNodeID
 		fork:ImpForkTypeResource
 		forkLogicalLength:rsrcForkSize
-		startingWithExtentsRecord:fileRec->rsrcExtents
+		startingWithExtentsRecord:(_isHFSPlus ? L(fileRecPlus->resourceFork.extents) : L(fileRec->rsrcExtents))
 		readDataOrReturnError:outError
 		block:^bool(NSData *_Nonnull const fileData, u_int64_t const logicalLength)
 	{
@@ -351,9 +429,9 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	//Next, finish up the file's metadata by removing our busy markings.
 	bool wroteMetadata = false;
 
-	catInfo.nodeFlags = L(fileRec->flags);
-	catInfo.createDate.lowSeconds = L(fileRec->createDate);
-	swappedFinderInfo.fileType = L(fileRec->userInfo.fdType);
+	catInfo.nodeFlags = flags;
+	catInfo.createDate.lowSeconds = createDate;
+	swappedFinderInfo.fileType = L(sourceFinderInfo->fileType);
 	memcpy(catInfo.finderInfo, &swappedFinderInfo, sizeof(catInfo.finderInfo));
 	FSCatalogInfoBitmap const whichInfo2 = kFSCatInfoCreateDate | kFSCatInfoContentMod | kFSCatInfoFinderInfo;
 	err = FSSetCatalogInfo(&ref, whichInfo2, &catInfo);
@@ -422,7 +500,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		struct FSCatalogInfo catInfo = {
 			.nodeFlags = (L(folderRec->flags) & ~kFSNodeLockedMask),
 			.createDate = {
-				.lowSeconds = kMagicBusyCreationDate,//L(fileRec->createDate),
+				.lowSeconds = kMagicBusyCreationDate,//L(folderRec->createDate),
 			},
 			.contentModDate = {
 				.lowSeconds = L(folderRec->modifyDate),
@@ -622,6 +700,35 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		} thread:^(const struct HFSCatalogKey *const  _Nonnull catalogKeyPtr, const struct HFSCatalogThread *const _Nonnull threadRec) {
 			//Not sure we have anything to do for threads?
 		}];
+
+		[node forEachHFSPlusCatalogRecord_file:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSPlusCatalogFile const *_Nonnull const fileRec) {
+			ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSPlusVolume:(ImpHFSPlusVolume *)hfsVol catalogNodeID:L(fileRec->fileID) key:catalogKeyPtr fileRecord:fileRec];
+
+			ImpDehydratedItem *_Nullable const parent = dehydratedFolders[@(L(catalogKeyPtr->parentID))];
+			if (parent != nil) {
+				[parent addChildrenObject:dehydratedFile];
+			} else {
+				[itemsThatNeedToBeAddedToTheirParents addObject:dehydratedFile];
+			}
+		} folder:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSPlusCatalogFolder const *_Nonnull const folderRec) {
+			ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSPlusVolume:hfsVol catalogNodeID:L(folderRec->folderID) key:catalogKeyPtr folderRecord:folderRec];
+			dehydratedFolder->_children = [NSMutableArray arrayWithCapacity:L(folderRec->valence)];
+
+			dehydratedFolders[@(dehydratedFolder.catalogNodeID)] = dehydratedFolder;
+
+			HFSCatalogNodeID const parentID = L(catalogKeyPtr->parentID);
+			if (parentID == kHFSRootParentID) {
+				rootItem = dehydratedFolder;
+			} else {
+				ImpDehydratedItem *_Nullable const parent = dehydratedFolders[@(parentID)];
+				if (parent != nil) {
+					[parent addChildrenObject:dehydratedFolder];
+				} else {
+					[itemsThatNeedToBeAddedToTheirParents addObject:dehydratedFolder];
+				}
+			}
+		} thread:nil];
+
 		return true;
 	}];
 
