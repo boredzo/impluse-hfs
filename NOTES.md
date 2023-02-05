@@ -139,6 +139,18 @@ I interpret this to mean that every row must start with the first key in the tre
 
 Another way of looking at this is to consider an HFS-style B*-tree to be *two* data structures that are connected to each other: a sorted doubly-linked list with all the data records (in the leaf nodes), and an index of that list which is an actual tree (ignoring that every row of index nodes is another complete linked list). I've found that sometimes it makes sense to skip the index and walk the linked list of leaves (which HFS thankfully provides members in the node descriptor for, so it seems Apple engineers had the same thought), and other times it makes sense to use the index tree to shorten the traversal to a particular item.
 
+### What an empty B*-tree contains
+
+I went down a cul-de-sac on this one after misdiagnosing an error in my conversion output.
+
+A correct empty B*-tree—one with no leaf records—has no leaf nodes, and thus no index nodes, and thus no root node. The header node's `rootNode` field is zero, as are `firstLeaf` and `lastLeaf`.
+
+I got an error at one point that made me think this was invalid, so I started creating an empty leaf node and making it the root node, as well as the first and last leaf. fsck_hfs explicitly does not like that: There is a check that, if you look at the source code, is very clearly “if the number of records in this node is zero, and it has no next or previous node, then it is invalid”.
+
+So yeah, an empty leaf node will not work. An empty B*-tree has exactly one node, which is the header node, and no others.
+
+(As will be discussed later, the extents overflow file in a converted volume ends up empty, so knowing how to create a valid empty B*-tree is necessary.)
+
 ## Catalog records
 
 There are four kinds of records in a catalog leaf node:
