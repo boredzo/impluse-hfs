@@ -61,6 +61,12 @@ If we're to try to keep things in the same places, we may have to change the blo
 
 Other divisors may be possible but might complicate placing the special files. 0x4200 could be divided by 11 rather than 33 to get 0x600-byte blocks. That could be small enough to put the boot blocks (0x400) and volume header (x200) in block #0, while still potentially being able to spend EO file reduction savings on keeping the three special files together. 
 
+### The HFS+ version: The allocations file
+
+On HFS+, the volume bitmap is replaced with a file called the allocation file (I call it the allocations file). The contents are mostly the same, aside from the change to what is considered the first block (in HFS+ it's the very start of the volume; in HFS it comes after the VBM and there's a field in the volume header that says where it is); the big difference is that it's stored as a special file, alongside the catalog and extents overflow files (and a couple others we won't be creating), so it can live anywhere on the disk and be broken up into multiple extents.
+
+One thing the documentation doesn't clarify is what the logical length of the allocations file must be, given that the number of blocks on the disk isn't likely to line up with the total number of bits stored in the file's physical length (concatenation of all blocks). TN1150 is explicit that the logical length must be *at least* the number of blocks on the disk divided by 8, but doesn't have a recommendation for whether it should be *exactly* that length (potentially shorter than the physical length) or padded out to the physical length. I initially tried the former, and DiskWarrior didn't like that—it wants the allocation's file's logical length to match its physical length. fsck_hfs doesn't seem to care either way. So, padding it is then. 
+
 ## Extents
 
 An extent is basically the same thing as an NSRange: a start point and a length. An extent is measured in allocation blocks.
