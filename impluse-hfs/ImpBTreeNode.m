@@ -403,7 +403,7 @@
 			*outLength = nextRecordOffset - thisRecordOffset;
 		} else {
 			//We're getting the range of empty space. Measure from the start of empty space (this offset) to the top of the offsets stack.
-			u_int16_t offsetOfTopOfStack = (u_int16_t)(_nodeData.length - _numberOfRecords * sizeof(u_int16_t));
+			u_int16_t offsetOfTopOfStack = (u_int16_t)(_nodeData.length - ((_numberOfRecords + 1) * sizeof(BTreeNodeOffset)));
 			*outLength = offsetOfTopOfStack - thisRecordOffset;
 		}
 	}
@@ -608,19 +608,10 @@
 
 ///Returns the number of bytes of empty space: the distance between the value of the last record offset (which points to the start of empty space after the last record) and the position of the top of the record offset stack (which is immediately after the end of empty space). May return zero (the last record offset points to itself).
 - (u_int32_t) numberOfBytesAvailable {
-	BTreeNodeOffset const *_Nonnull const offsets = _nodeData.bytes;
-
-	u_int16_t const maxNumOffsets = (u_int16_t)(_nodeData.length / sizeof(BTreeNodeOffset));
-	u_int16_t const bottomOffsetIdx = maxNumOffsets - 1;
-
-	//Note: If _numberOfRecords is 0, this ends up pointing to just after the node. (Usually the beginning of the next node.) Technically this is UB if offsets is an original allocation of nodeData.length bytes, though in our case we're generally a slice of the larger B*-tree file data so we should usually be fine. May the compiler gods forgive us if we happen to be the very last node in the file.
-	BTreeNodeOffset const *_Nonnull const addressOfLastOffset = offsets + (maxNumOffsets - _numberOfRecords);
-	ptrdiff_t const offsetOfLastOffset = addressOfLastOffset - offsets;
-
-	BTreeNodeOffset const *_Nonnull const addressOfEmptySpace = offsets + L(offsets[bottomOffsetIdx]);
-	ptrdiff_t const offsetOfEmptySpace = addressOfEmptySpace - offsets;
-
-	return (u_int32_t)(offsetOfLastOffset - offsetOfEmptySpace);
+	BTreeNodeOffset startOfEmptySpace = 0;
+	u_int16_t lengthOfEmptySpace = 0;
+	[self forRecordAtIndex:self.numberOfRecords getItsOffset:&startOfEmptySpace andLength:&lengthOfEmptySpace];
+	return lengthOfEmptySpace;
 }
 
 - (NSMutableData *_Nonnull) mutableRecordDataAtIndex:(u_int16_t)idx {

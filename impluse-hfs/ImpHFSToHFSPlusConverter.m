@@ -594,7 +594,7 @@
 	 *Each round of the loop produces a significantly shorter row. (I haven't done the math but my intuitive sense is that it's an exponential curve following the approximate average number of keys per index node.) Every row will contain the first key in the leaf row, fulfilling that requirement.
 	 *The loop ends when the upper row has been fully populated in one node. That node is the root node.
 	 */
-	u_int32_t const nodeBodySize = destTree.bytesPerNode - sizeof(struct BTNodeDescriptor);
+	u_int32_t const nodeBodySize = destTree.bytesPerNode - (sizeof(struct BTNodeDescriptor) + sizeof(BTreeNodeOffset));
 
 	//First, fill out the bottom row with mock leaf nodes. Each “mock node” is an array of NSDatas representing catalog keys; we separately track the total size of the pointer records (each of which is a key + a u_int32_t), so that when adding another key would exceed the capacity of a real node (nodeBodySize), we tear off that node and start the next one.
 	NSMutableArray <ImpMockNode *> *_Nonnull const bottomRow = [NSMutableArray arrayWithCapacity:allSourceItems.count];
