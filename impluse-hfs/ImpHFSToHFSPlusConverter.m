@@ -17,6 +17,7 @@
 #import "ImpHFSVolume.h"
 #import "ImpHFSPlusVolume.h"
 #import "ImpBTreeFile.h"
+#import "ImpBTreeNode.h"
 #import "ImpBTreeHeaderNode.h"
 #import "ImpBTreeIndexNode.h"
 #import "ImpMutableBTreeFile.h"
@@ -707,7 +708,9 @@
 		S(vhPtr->attributes, L(vhPtr->attributes) | kHFSCatalogNodeIDsReusedMask);
 	}
 
-	ImpPrintf(@"HFS tree had %lu live nodes; HFS+ tree has %lu live nodes", sourceTree.numberOfLiveNodes, destTree.numberOfLiveNodes);
+	NSUInteger const numSrcLiveNodes = sourceTree.numberOfLiveNodes;
+	NSUInteger const numDstLiveNodes = destTree.numberOfLiveNodes;
+	ImpPrintf(@"HFS tree had %lu live nodes; HFS+ tree has %lu live nodes", numSrcLiveNodes, numDstLiveNodes);
 }
 
 ///Map the number of an allocation block from the source volume (e.g., the start block of an extent) to the number of the corresponding block on the destination volume. By default, returns sourceBlock plus the source volume's first block number. You may need to override this method if the destination volume uses a different block size, or if you need to make exceptions for certain blocks (in extents that were relocated due to not fitting in the new volume).
@@ -987,7 +990,10 @@
 		NSMutableData *_Nonnull const payloadData = [NSMutableData dataWithLength:sizeof(u_int32_t)];
 		u_int32_t *_Nonnull const pointerRecordPtr = payloadData.mutableBytes;
 		S(*pointerRecordPtr, obj.nodeNumber);
-		ImpPrintf(@"Node #%u: Wrote index record: %u -(swap)-> %u", realIndexNode.nodeNumber, obj.nodeNumber, *pointerRecordPtr);
+
+		NSString *_Nonnull const filename = [ImpBTreeNode nodeNameFromHFSPlusCatalogKey:key];
+		ImpPrintf(@"Node #%u: Wrote index record for file “%@”: %u -(swap)-> %u", realIndexNode.nodeNumber, filename, obj.nodeNumber, *pointerRecordPtr);
+
 		[realIndexNode appendRecordWithKey:key payload:payloadData];
 	}
 }

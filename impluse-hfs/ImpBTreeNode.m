@@ -165,6 +165,12 @@
 	NSString *_Nonnull const nodeName = [tec stringFromHFSUniStr255:&(catKeyPtr->nodeName)];
 	return [NSString stringWithFormat:@"%u/“%@”", parentID, nodeName];
 }
++ (NSString *_Nonnull const) nodeNameFromHFSPlusCatalogKey:(NSData *_Nonnull const)keyData {
+	struct HFSPlusCatalogKey const *_Nonnull const catKeyPtr = keyData.bytes;
+	ImpTextEncodingConverter *_Nonnull const tec = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:kTextEncodingMacRoman];
+	NSString *_Nonnull const nodeName = [tec stringFromHFSUniStr255:&(catKeyPtr->nodeName)];
+	return nodeName;
+}
 
 - (int16_t) indexOfBestMatchingRecord:(ImpBTreeRecordKeyComparator _Nonnull)comparator {
 	//We *could* bisect this, but there are only likely to be a handful of records in each node, so let's just search linearly.
@@ -626,6 +632,18 @@
 
 //	ImpPrintf(@"Record at index %u starts at offset %lu, length %lu: <\n%@>", idx, (unsigned long)thisRecordOffset, length, recordData.hexDump_Imp);
 	return recordData;
+}
+
+- (u_int32_t) totalNumberOfBytesUsed {
+	u_int32_t total = sizeof(BTNodeDescriptor) + sizeof(BTreeNodeOffset);
+	u_int16_t const numRecords = self.numberOfRecords;
+	for (u_int16_t i = 0; i < numRecords; ++i) {
+		BTreeNodeOffset recordStart = 0;
+		u_int16_t recordLength = 0;
+		[self forRecordAtIndex:i getItsOffset:&recordStart andLength:&recordLength];
+		total += recordLength + sizeof(BTreeNodeOffset);
+	}
+	return total;
 }
 
 - (void) replaceKeyOfRecordAtIndex:(u_int16_t const)idx withKey:(NSData *_Nonnull const)keyData {

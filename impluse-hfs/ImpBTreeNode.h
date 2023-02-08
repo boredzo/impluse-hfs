@@ -56,6 +56,8 @@
 + (NSString *_Nonnull const) describeHFSCatalogKeyWithData:(NSData *_Nonnull const)keyData;
 ///Return a string concisely describing an HFS+ catalog key. If the data does not represent (or at least start with) an HFS+ catalog key, results are undefined. For debugging purposes only.
 + (NSString *_Nonnull const) describeHFSPlusCatalogKeyWithData:(NSData *_Nonnull const)keyData;
+///Extract the node name from an HFS+ catalog key and return it as an NSString. For debugging purposes only.
++ (NSString *_Nonnull const) nodeNameFromHFSPlusCatalogKey:(NSData *_Nonnull const)keyData;
 
 ///Iterate from a given node forward to the end of its row.
 - (void) walkRow:(bool (^_Nonnull const)(ImpBTreeNode *_Nonnull const node))block;
@@ -72,6 +74,9 @@
 
 ///The number of bytes in the node not allocated to any record. In other words, the number of bytes between the end of the last record and the start of the last record's offset.
 @property(nonatomic, readonly) u_int32_t numberOfBytesAvailable;
+
+///Compute the number of bytes in use, regardless of the node descriptor's stated number of bytes available, by totaling up the size of the node descriptor, all records, and the record offsets stack.
+- (u_int32_t) totalNumberOfBytesUsed;
 
 ///This is for subclasses' use.
 - (bool) forRecordAtIndex:(u_int16_t const)idx getItsOffset:(BTreeNodeOffset *_Nullable const)outThisOffset andTheOneAfterThat:(BTreeNodeOffset *_Nullable const)outNextOffset;
