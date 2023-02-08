@@ -984,9 +984,11 @@
 ///Add records to a real index node to match the contents of this mock node.
 - (void) writeIntoNode:(ImpBTreeNode *_Nonnull const)realNode {
 	NSParameterAssert([realNode isKindOfClass:[ImpBTreeIndexNode class]]);
+
 	ImpBTreeIndexNode *_Nonnull const realIndexNode = (ImpBTreeIndexNode *_Nonnull const)realNode;
 	for (NSData *_Nonnull const key in self.allKeys) {
 		ImpMockNode *_Nonnull const obj = _pointerRecords[key];
+
 		NSMutableData *_Nonnull const payloadData = [NSMutableData dataWithLength:sizeof(u_int32_t)];
 		u_int32_t *_Nonnull const pointerRecordPtr = payloadData.mutableBytes;
 		S(*pointerRecordPtr, obj.nodeNumber);
