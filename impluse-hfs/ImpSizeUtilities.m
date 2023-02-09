@@ -36,6 +36,23 @@ u_int64_t ImpNumberOfBlocksInHFSPlusExtentRecord(struct HFSPlusExtentDescriptor 
 	return total;
 }
 
+NSString *_Nonnull ImpDescribeHFSExtentRecord(struct HFSExtentDescriptor const *_Nonnull const extRec)
+{
+	NSMutableArray <NSString *> *_Nonnull const extentDescriptions = [NSMutableArray arrayWithCapacity:kHFSExtentDensity];
+	for (NSUInteger i = 0; i < kHFSExtentDensity; ++i) {
+		u_int16_t const numBlocks = L(extRec[i].blockCount);
+		if (numBlocks == 0) {
+			break;
+		}
+
+		u_int16_t const firstBlock = L(extRec[i].startBlock);
+		u_int16_t const lastBlock = firstBlock + (numBlocks - 1);
+		[extentDescriptions addObject:[NSString stringWithFormat:@"%u–%u", firstBlock, lastBlock]];
+	}
+
+	return extentDescriptions.count > 0 ? [extentDescriptions componentsJoinedByString:@", "] : @"(empty)";
+}
+
 NSString *_Nonnull ImpDescribeHFSPlusExtentRecord(struct HFSPlusExtentDescriptor const *_Nonnull const extRec)
 {
 	NSMutableArray <NSString *> *_Nonnull const extentDescriptions = [NSMutableArray arrayWithCapacity:kHFSPlusExtentDensity];

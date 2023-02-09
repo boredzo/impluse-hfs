@@ -31,6 +31,9 @@ u_int32_t ImpNumberOfBlocksInHFSExtentRecord(struct HFSExtentDescriptor const *_
 u_int64_t ImpNumberOfBlocksInHFSPlusExtentRecord(struct HFSPlusExtentDescriptor const *_Nonnull const extRec);
 
 ///Returns a string concisely describing the extents in the given extent record, up to the first empty extent or the end of the record.
+NSString *_Nonnull ImpDescribeHFSExtentRecord(struct HFSExtentDescriptor const *_Nonnull const extRec);
+
+///Returns a string concisely describing the extents in the given extent record, up to the first empty extent or the end of the record.
 NSString *_Nonnull ImpDescribeHFSPlusExtentRecord(struct HFSPlusExtentDescriptor const *_Nonnull const extRec);
 
 enum {
