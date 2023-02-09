@@ -128,7 +128,7 @@
 
 	struct HFSExtentDescriptor const *_Nonnull const catExtDescs = _mdb->drCTExtRec;
 	NSData *_Nullable const catalogFileData = [self readDataFromFileDescriptor:readFD logicalLength:L(_mdb->drCTFlSize) extents:catExtDescs numExtents:kHFSExtentDensity error:outError];
-	ImpPrintf(@"Catalog file data: logical length 0x%lx bytes (%lu a-blocks); read 0x%lx bytes", L(_mdb->drCTFlSize), catalogFileData.length / L(_mdb->drAlBlkSiz), catalogFileData.length);
+	ImpPrintf(@"Catalog file data: logical length 0x%x bytes (%lu a-blocks); read 0x%lx bytes", L(_mdb->drCTFlSize), catalogFileData.length / L(_mdb->drAlBlkSiz), catalogFileData.length);
 
 	if (catalogFileData != nil) {
 		self.catalogBTree = [[ImpBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSCatalog data:catalogFileData];
