@@ -750,7 +750,7 @@ The purpose of the FUAB is twofold:
 
 The FUAB in an HFS volume is the block starting at `drAlBlSt`, often but not necessarily immediately after the VBM. The FUAB in HFS+ *can be* the block starting immediately after the volume header, at 0x600, if the allocations file is moved into formerly-free UABs.
 
-The first *user* allocation block is distinct from the first allocation block in HFS+. The first allocation block is the first `blockSize` bytes of the volume, containing at least the first boot block and possibly both boot blocks + the volume header + leftover space if the block size is big enough. I'm also not counting the allocation file's a-blocks as user a-blocks; if the allocation file is kept in its HFS-style position before the first user a-block, the first user a-block need to slide downward to 
+The first *user* allocation block is distinct from the first allocation block (block 0) in HFS+. The first allocation block starts at the very start of the device, and is the first `blockSize` bytes of the volume, containing at least the first boot block and possibly both boot blocks + the volume header + leftover space if the block size is big enough. I'm also not counting the allocation file's a-blocks as user a-blocks; in a position-preserving conversion, the allocation file goes where the VBM was, and each is followed by the FUAB.
 
 HFS+ conversion that attempts to preserve positions as much as possible may need to:
 
