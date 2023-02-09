@@ -21,12 +21,18 @@
 		return false;
 	}
 
+	NSError *_Nullable errorLoadingHFS, *errorLoadingHFSPlus;
 	ImpHFSVolume *_Nonnull srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD textEncoding:self.hfsTextEncoding];
-	if (! [srcVol loadAndReturnError:outError]) {
+	bool const loadedHFS = [srcVol loadAndReturnError:&errorLoadingHFS];
+	bool loadedHFSPlus = false;
+	if (! loadedHFS) {
 		lseek(readFD, 0, SEEK_SET);
 		srcVol = [[ImpHFSPlusVolume alloc] initWithFileDescriptor:readFD textEncoding:self.hfsTextEncoding];
-		if (! [srcVol loadAndReturnError:outError])
-			return false;
+		loadedHFSPlus = [srcVol loadAndReturnError:&errorLoadingHFSPlus];
+	}
+	if (! (loadedHFS || loadedHFSPlus)) {
+		*outError = errorLoadingHFS ?: errorLoadingHFSPlus;
+		return false;
 	}
 
 	ImpDehydratedItem *_Nonnull const rootDirectory = [ImpDehydratedItem rootDirectoryOfHFSVolume:srcVol];
