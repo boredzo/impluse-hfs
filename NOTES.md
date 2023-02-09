@@ -14,7 +14,7 @@
 
 ## Layout
 
-The disk is divided into 512-byte blocks. Physical blocks start from the very start of the disk; the first physical blocks include the partition map. The first block of a volume is the first logical block.
+The disk is divided into 512-byte blocks. Physical blocks (sometimes called “sectors” to distinguish them from allocation blocks) start from the very start of the disk; the first physical blocks include the partition map. In HFS, the first block of a volume is the first logical block.
 
 The first two logical blocks are reserved for “boot blocks”, which include a variety of parameter settings used by classic Macs. (Very likely none of it is used by modern macOS.)
 
