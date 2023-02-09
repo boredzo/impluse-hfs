@@ -265,13 +265,14 @@
 			break;
 		}
 
+		NSUInteger const destOffset = data.length;
 		[data increaseLengthBy:blockSize * L(extents[i].blockCount)];
 
 //		ImpPrintf(@"Reading extent #%lu: start block #%@, length %@ blocks", i, [fmtr stringFromNumber:@(L(extents[i].startBlock))], [fmtr stringFromNumber:@(L(extents[i].blockCount))]);
 		//Note: Should never return zero because we already bailed out if blockCount is zero.
 		u_int64_t amtRead = 0;
 		bool const success = [self readIntoData:data
-			atOffset:0
+			atOffset:destOffset
 			fromFileDescriptor:readFD
 			extent:&extents[i]
 			actualAmountRead:&amtRead
