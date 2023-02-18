@@ -127,8 +127,6 @@
 
 	ImpBTreeFile *_Nonnull const catalog = srcVol.catalogBTree;
 	[catalog walkLeafNodes:^bool(ImpBTreeNode *_Nonnull const node) {
-		ImpPrintf(@"Walk encountered node: %@", node);
-
 		@autoreleasepool {
 			[node forEachHFSCatalogRecord_file:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFile *const _Nonnull fileRec) {
 				ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSVolume:srcVol catalogNodeID:L(fileRec->fileID) key:catalogKeyPtr fileRecord:fileRec];

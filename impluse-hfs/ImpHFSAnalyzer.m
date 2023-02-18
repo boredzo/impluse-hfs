@@ -280,8 +280,6 @@
 	__block NSUInteger numFiles = 0, numFolders = 0, numThreads = 0;
 
 	[catalog walkBreadthFirst:^bool(ImpBTreeNode *_Nonnull const node) {
-		ImpPrintf(@"Walk encountered node: %@", node);
-
 		if (node.nodeType == kBTLeafNode) {
 			//Each of these will only return HFS or HFS+ catalog entries, so call both. If it's an HFS volume, we'll get HFS entries; if it's HFS+, we'll get HFS+ entries.
 			[node forEachHFSCatalogRecord_file:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFile *const _Nonnull fileRec) {
