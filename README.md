@@ -118,17 +118,6 @@ If you get a list of partitions but there is no “`Apple_HFS`” partition, the
 
 If you get a list with multiple “`Apple_HFS`” partitions, then there are multiple HFS partitions (most likely for a partitioned hard drive). You can create a raw HFS image file from, or use impluse directly with, each partition separately.
 
-### What you can do with impluse
-
-Pick out the diskXsY or diskXsYsZ that corresponds to “Apple_HFS”, then feed it to `impluse convert` or `impluse extract`:
-
-- `impluse convert /dev/diskXsY "Insert Name Here-HFS+.img"`
-- `impluse extract /dev/diskXsY ':'`
-
-':' is a path to the root of the volume; this path will tell `extract` to extract the whole volume as a folder. The folder will have the name of the volume.
-
-Both operations are quite fast; they will typically be limited by the speed of I/O (e.g., if you're reading directly from a CD, this will be limited by the speed of your CD drive).
-
 ### On bare HFS volumes, such as floppies
 A storage device that isn't big enough to make sense to partition will often omit the partition map entirely, containing only a bare HFS volume. Often these are floppy disks, or images thereof.
 
@@ -143,3 +132,44 @@ If you try to use impluse with a file you think is an image of an HFS volume, bu
 - impluse can only read from raw _HFS_ images, where the image file contains only the volume with no partition map around it. impluse does not currently know how to read a partition map. If you have an image file containing a partition map, you'll need to follow the steps above to attach the image and expose any HFS volumes that might be present.
 - impluse also does not know how to read wrapped (non-raw) images. You'll need to attach these using the disk images system as described above.
 - If you imaged a CD-ROM using its top-level device (`CD_partition_scheme`), that won't work—the data is wrapped in thousands of CD-ROM frame headers. These can be stripped out (with some other program), but it's safer to re-image the disc from the original physical copy.
+
+## Using impluse
+
+Once you have either an attached device that contains an HFS volume (see mentions of “`Apple_HFS`” above) or a raw bare-HFS image file, you can then feed that volume to impluse.
+
+All of these operations are quite fast; they will typically be limited by the speed of I/O (e.g., if you're reading directly from a CD, they will be limited by the speed of your CD drive).
+
+### Conversion to HFS+
+
+- `impluse convert /dev/diskXsY "Insert Name Here-HFS+.img"`
+
+This will output a raw disk image containing a bare HFS+ (Mac OS Extended, as opposed to Mac OS Standard) volume. You should be able to mount the new image immediately if you so choose:
+
+`hdiutil attach -readonly "Insert Name Here-HFS+.img"`
+
+Unlike HFS, HFS+ is still supported on modern macOS, so the image should mount without difficulty and you should be able to browse the volume in the Finder.
+
+You should still keep the HFS original, particularly as impluse is still new and may contain bugs, and certain things may not be implemented yet and may not even be possible to implement.
+
+### Listing volume contents
+
+- `impluse list /dev/diskXsY`
+
+This produces a human-readable hierarchical listing of the entire volume. Emoji are used to indicate whether something is a file (📄) or folder (📁). Note that `list` doesn't look at file type codes or the bundle bit, so even applications will be listed with either the 📄 or 📁 emoji.
+
+### Extracting files, folders and their contents, or the entire volume
+
+- `impluse extract /dev/diskXsY ':'`
+
+':' is a path to the root of the volume; this path will tell `extract` to extract the whole volume as a folder. The folder will have the name of the volume.
+
+Be aware that extracted aliases may be broken and need reconnecting. (Aliases are different from symbolic links, which are path-based; aliases refer to items by ID numbers, and extracted items will have different IDs in the volume  you extract them to than the one they came from.)
+
+- `impluse extract /dev/diskXsY 'Mac OS 9:System Folder:Mac OS ROM'`
+- `impluse extract /dev/diskXsY 'Mac OS ROM'`
+
+If you provide a complete absolute path (or a relative path, starting with `:`, which will be interpreted relative to the volume root), impluse will extract that item specifically. If the item is a folder, impluse will extract the folder and all of its contents, including subfolders and their contents.
+
+If you provide only the name of an item, impluse will search the disk for items with that name. If there's only one match, impluse will extract it. If there are multiple matches, impluse will print their paths, and you can pick which one you want.
+
+The above warning about extracting aliases goes double when extracting specific items. Even if it's possible to automatically reconnect an alias if the alias and its destination are both extracted, this isn't possible if the alias is extracted without its destination.
