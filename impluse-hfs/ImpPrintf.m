@@ -7,6 +7,14 @@
 
 #import "ImpPrintf.h"
 
+static bool curMuffled = false;
+
+bool ImpSetPrintfMuffle(bool newMuffled) {
+	bool const oldMuffled = curMuffled;
+	curMuffled = newMuffled;
+	return oldMuffled;
+}
+
 int ImpPrintf(NSString *_Nonnull const fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
