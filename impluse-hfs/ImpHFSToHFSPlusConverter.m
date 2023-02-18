@@ -583,9 +583,7 @@
 	NSMutableArray <ImpCatalogKeyValuePair *> *_Nonnull const keyValuePairs = [NSMutableArray arrayWithCapacity:allSourceItems.count];
 	for (ImpCatalogItem *_Nonnull const item in allSourceItems) {
 		[keyValuePairs addObject:[[ImpCatalogKeyValuePair alloc] initWithKey:item.destinationKey value:item.destinationRecord]];
-		ImpPrintf(@"Main record: %lu + %lu = %lu bytes", item.destinationKey.length, item.destinationRecord.length, item.destinationKey.length + item.destinationRecord.length);
 		[keyValuePairs addObject:[[ImpCatalogKeyValuePair alloc] initWithKey:item.destinationThreadKey value:item.destinationThreadRecord]];
-		ImpPrintf(@"Thread record: %lu + %lu = %lu bytes", item.destinationThreadKey.length, item.destinationThreadRecord.length, item.destinationThreadKey.length + item.destinationThreadRecord.length);
 	}
 	[keyValuePairs sortUsingSelector:@selector(caseInsensitiveCompare:)];
 
@@ -708,9 +706,9 @@
 		S(vhPtr->attributes, L(vhPtr->attributes) | kHFSCatalogNodeIDsReusedMask);
 	}
 
-	NSUInteger const numSrcLiveNodes = sourceTree.numberOfLiveNodes;
-	NSUInteger const numDstLiveNodes = destTree.numberOfLiveNodes;
-	ImpPrintf(@"HFS tree had %lu live nodes; HFS+ tree has %lu live nodes", numSrcLiveNodes, numDstLiveNodes);
+//	NSUInteger const numSrcLiveNodes = sourceTree.numberOfLiveNodes;
+//	NSUInteger const numDstLiveNodes = destTree.numberOfLiveNodes;
+//	ImpPrintf(@"HFS tree had %lu live nodes; HFS+ tree has %lu live nodes", numSrcLiveNodes, numDstLiveNodes);
 }
 
 ///Map the number of an allocation block from the source volume (e.g., the start block of an extent) to the number of the corresponding block on the destination volume. By default, returns sourceBlock plus the source volume's first block number. You may need to override this method if the destination volume uses a different block size, or if you need to make exceptions for certain blocks (in extents that were relocated due to not fitting in the new volume).

@@ -43,7 +43,6 @@
 	//Do this before super init in case the superclass initializer needs to consult the header node.
 	[ImpBTreeHeaderNode convertHeaderNode:sourceTree.headerNode forTreeVersion:version intoData:fileData nodeSize:nodeSize maxKeyLength:maxKeyLength];
 	u_int8_t const *_Nonnull const bytePtr = fileData.bytes + sizeof(struct BTNodeDescriptor) + sizeof(struct BTHeaderRec) + 128;
-	ImpPrintf(@"Initialized header node data for new mutable tree. Map record's first byte is 0x%02x.", *bytePtr);
 
 	if ((self = [super initWithVersion:version data:fileData nodeSize:nodeSize copyData:false])) {
 		_mutableBTreeData = fileData;

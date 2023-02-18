@@ -117,12 +117,12 @@
 	[dstVol allocateLogicalLength:catFileLength forFork:ImpForkTypeSpecialFileContents populateExtentRecord:vh->catalogFile.extents];
 	S(vh->catalogFile.logicalSize, catFileLength);
 	S(vh->catalogFile.totalBlocks, L(vh->catalogFile.extents[0].blockCount));
-	ImpPrintf(@"Catalog file will be %llu bytes in %u blocks", L(vh->catalogFile.logicalSize), L(vh->catalogFile.totalBlocks));
 	u_int32_t const extFileLength = (u_int32_t)destExtentsOverflow.lengthInBytes;
 	[dstVol allocateLogicalLength:extFileLength forFork:ImpForkTypeSpecialFileContents populateExtentRecord:vh->extentsFile.extents];
 	S(vh->extentsFile.logicalSize, extFileLength);
 	S(vh->extentsFile.totalBlocks, L(vh->extentsFile.extents[0].blockCount));
-	ImpPrintf(@"Extents overflow file will be %llu bytes in %u blocks", L(vh->extentsFile.logicalSize), L(vh->extentsFile.totalBlocks));
+//	ImpPrintf(@"Catalog file will be %llu bytes in %u blocks", L(vh->catalogFile.logicalSize), L(vh->catalogFile.totalBlocks));
+//	ImpPrintf(@"Extents overflow file will be %llu bytes in %u blocks", L(vh->extentsFile.logicalSize), L(vh->extentsFile.totalBlocks));
 
 	__block bool copiedEverything = true;
 
