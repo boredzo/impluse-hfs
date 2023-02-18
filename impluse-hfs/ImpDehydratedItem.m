@@ -402,12 +402,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		}
 	}
 	//Now do that again, but for the resource fork.
-	[volume forEachExtentInFileWithID:self.catalogNodeID
-		fork:ImpForkTypeResource
-		forkLogicalLength:rsrcForkSize
-		startingWithExtentsRecord:(_isHFSPlus ? L(fileRecPlus->resourceFork.extents) : L(fileRec->rsrcExtents))
-		readDataOrReturnError:outError
-		block:^bool(NSData *_Nonnull const fileData, u_int64_t const logicalLength)
+	bool (^_Nonnull const writeRsrcForkBlock)(NSData *_Nonnull const fileData, u_int64_t const logicalLength) = ^bool(NSData *_Nonnull const fileData, u_int64_t const logicalLength)
 	{
 		OSStatus const rsrcWriteErr = FSWriteFork(rsrcForkRefnum, fsAtMark, noCacheMask, logicalLength, fileData.bytes, /*actualCount*/ NULL);
 		allWritesSucceeded = allWritesSucceeded && (rsrcWriteErr == noErr);
@@ -415,7 +410,22 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 			writeError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Can't write to resource fork of file “%@”", @""), name ]}];
 		}
 		return allWritesSucceeded;
-	}];
+	};
+	if (_isHFSPlus) {
+		[(ImpHFSPlusVolume *)volume forEachExtentInFileWithID:self.catalogNodeID
+			fork:ImpForkTypeResource
+			forkLogicalLength:rsrcForkSize
+			startingWithBigExtentsRecord:fileRecPlus->resourceFork.extents
+			readDataOrReturnError:outError
+			block:writeRsrcForkBlock];
+	} else {
+		[volume forEachExtentInFileWithID:self.catalogNodeID
+			fork:ImpForkTypeResource
+			forkLogicalLength:rsrcForkSize
+			startingWithExtentsRecord:fileRec->rsrcExtents
+			readDataOrReturnError:outError
+			block:writeRsrcForkBlock];
+	}
 	FSCloseFork(rsrcForkRefnum);
 	if (! allWritesSucceeded) {
 		if (outError != NULL) {
