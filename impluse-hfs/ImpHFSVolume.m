@@ -474,7 +474,12 @@
 
 		u_int64_t amtRead = 0;
 		[data setLength:logicalLengthRoundedUp];
-		bool const success = [weakSelf readIntoData:data atOffset:0 fromFileDescriptor:readFD extent:oneExtent actualAmountRead:&amtRead error:&readError];
+		bool const success = [weakSelf readIntoData:data
+			atOffset:0
+			fromFileDescriptor:readFD
+			extent:oneExtent
+			actualAmountRead:&amtRead
+			error:&readError];
 		[data setLength:logicalLength];
 
 		if (success) {
