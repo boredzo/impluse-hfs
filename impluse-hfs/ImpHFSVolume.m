@@ -469,9 +469,14 @@
 //		ImpPrintf(@"Reading extent starting at #%u for %u blocks; %llu bytes remain…", L(oneExtent->startBlock), L(oneExtent->blockCount), logicalBytesRemaining);
 		u_int64_t const physicalLength = blockSize * L(oneExtent->blockCount);
 		u_int64_t const logicalLength = logicalBytesRemaining < physicalLength ? logicalBytesRemaining : physicalLength;
+		//When reading from rdisk devices, reads must be multiples of kISOStandardBlockSize. So, round up to the volume's block size (which has the same constraint), then truncate to the logical length.
+		u_int64_t const logicalLengthRoundedUp = ImpNextMultipleOfSize(logicalLength, blockSize);
+
 		u_int64_t amtRead = 0;
-		[data setLength:logicalLength];
+		[data setLength:logicalLengthRoundedUp];
 		bool const success = [weakSelf readIntoData:data atOffset:0 fromFileDescriptor:readFD extent:oneExtent actualAmountRead:&amtRead error:&readError];
+		[data setLength:logicalLength];
+
 		if (success) {
 			bool const successfullyDelivered = block(data, MAX(amtRead, logicalBytesRemaining));
 //			ImpPrintf(@"Consumer block returned %@; returning %llu bytes", successfullyDelivered ? @"true" : @"false", successfullyDelivered ? amtRead : 0);
