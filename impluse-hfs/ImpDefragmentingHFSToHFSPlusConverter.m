@@ -179,7 +179,7 @@
 			[dataFH closeFile];
 
 //			ImpPrintf(@"Final tally: Wrote %llu out of %llu bytes", totalDataBytesWritten, dataLogicalLength);
-			NSAssert(totalDataBytesWritten == dataLogicalLength, @"Failed to write all data fork bytes for unknown reasons: should have written %llu, but actually wrote %llu", dataLogicalLength, totalDataBytesWritten);
+			NSAssert(totalDataBytesWritten == dataLogicalLength, @"Failed to %@ all data fork bytes due to %@: should have written %llu, but actually wrote %llu", dataReadError != nil ? @"read" : dataWriteError != nil ? @"write" : @"copy", dataReadError ?: dataWriteError, dataLogicalLength, totalDataBytesWritten);
 			[self reportSourceBlocksCopied:totalDataBlocksRead];
 
 			S(convertedFilePtr->dataFork.logicalSize, totalDataBytesWritten);
