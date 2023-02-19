@@ -211,8 +211,9 @@
 	}
 
 	off_t const readStart = self.volumeStartOffset + self.offsetOfFirstAllocationBlock + startBlock * self.numberOfBytesPerBlock;
+	size_t const numBytesToRead = intoData.length - offset;
 //	ImpPrintf(@"Reading 0x%lx bytes (%lu bytes = %lu blocks) from source volume starting at 0x%llx bytes (extent: [ start #%u, %u blocks ])", intoData.length, intoData.length, intoData.length / self.numberOfBytesPerBlock, readStart, startBlock, blockCount);
-	ssize_t const amtRead = pread(readFD, intoData.mutableBytes + offset, intoData.length - offset, readStart);
+	ssize_t const amtRead = pread(readFD, intoData.mutableBytes + offset, numBytesToRead, readStart);
 	if (outAmtRead != NULL) {
 		*outAmtRead = amtRead;
 	}
