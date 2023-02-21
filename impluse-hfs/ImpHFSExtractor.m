@@ -173,7 +173,7 @@
 		}
 	} else {
 		ImpDehydratedItem *_Nonnull const item = matches.firstObject;
-		ImpPrintf(@"Found an item named %@ with parent item #%u", item.name, item.parentFolderID);
+//		ImpPrintf(@"Found an item named %@ with parent item #%u", item.name, item.parentFolderID);
 		NSString *_Nonnull const destPath = self.destinationPath ?: [item.name stringByReplacingOccurrencesOfString:@"/" withString:@":"];
 		rehydrated = [item rehydrateAtRealWorldURL:[NSURL fileURLWithPath:destPath isDirectory:false] error:outError];
 		if (! rehydrated) {
@@ -181,7 +181,6 @@
 		}
 	}
 
-	NSLog(@"%@", rehydrated ? @"Success!" : @"Failure");
 	return rehydrated;
 }
 
