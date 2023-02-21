@@ -100,7 +100,6 @@
 	u_int32_t const bytesPerABlock = L(vh->blockSize);
 	u_int32_t const numBlocksInVolume = (u_int32_t)(volumeSizeInBytes / bytesPerABlock);
 	[dstVol initializeAllocationBitmapWithBlockSize:bytesPerABlock count:numBlocksInVolume];
-	[self reportDestinationExtentRecordCopied:vh->allocationFile.extents];
 
 	//We do need to create/have an extents overflow file, even if it's empty.
 	ImpBTreeFile *_Nonnull const srcExtentsOverflow = srcVol.extentsOverflowBTree;
