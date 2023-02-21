@@ -178,6 +178,8 @@
 		rehydrated = [item rehydrateAtRealWorldURL:[NSURL fileURLWithPath:destPath isDirectory:false] error:outError];
 		if (! rehydrated) {
 			ImpPrintf(@"Failed to rehydrate file named %@: %@", item.name, *outError);
+		} else {
+			[self deliverProgressUpdate:1.0 operationDescription:@"Extraction complete."];
 		}
 	}
 
