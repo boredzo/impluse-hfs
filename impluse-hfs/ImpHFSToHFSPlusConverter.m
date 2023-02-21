@@ -177,6 +177,9 @@
 - (void) reportSourceExtentRecordCopied:(struct HFSExtentDescriptor const *_Nonnull const)extRecPtr {
 	[self reportSourceBlocksCopied:ImpNumberOfBlocksInHFSExtentRecord(extRecPtr)];
 }
+- (void) reportDestinationExtentRecordCopied:(struct HFSPlusExtentDescriptor const *_Nonnull const)extRecPtr {
+	[self reportSourceBlocksCopied:ImpNumberOfBlocksInHFSPlusExtentRecord(extRecPtr)];
+}
 
 - (void) deliverProgressUpdate:(double)progress
 	operationDescription:(NSString *_Nonnull)operationDescription

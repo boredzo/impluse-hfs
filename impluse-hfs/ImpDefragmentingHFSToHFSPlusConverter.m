@@ -100,6 +100,7 @@
 	u_int32_t const bytesPerABlock = L(vh->blockSize);
 	u_int32_t const numBlocksInVolume = (u_int32_t)(volumeSizeInBytes / bytesPerABlock);
 	[dstVol initializeAllocationBitmapWithBlockSize:bytesPerABlock count:numBlocksInVolume];
+	[self reportDestinationExtentRecordCopied:vh->allocationFile.extents];
 
 	//We do need to create/have an extents overflow file, even if it's empty.
 	ImpBTreeFile *_Nonnull const srcExtentsOverflow = srcVol.extentsOverflowBTree;
@@ -239,6 +240,8 @@
 		];
 		return keepGoing;
 	}];
+
+	[self deliverProgressUpdateWithOperationDescription:NSLocalizedString(@"Updating catalog…", @"Conversion progress message")];
 
 	//Lastly (now that the catalog file has been populated with files' real extents), write the catalog and extents overflow files.
 	//TODO: Should this be a separate step in the superclass? Maybe make the ImpMutableBTreeFiles properties?

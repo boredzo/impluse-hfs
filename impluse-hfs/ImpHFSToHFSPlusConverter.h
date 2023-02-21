@@ -26,6 +26,8 @@ typedef void (^ImpConversionProgressUpdateBlock)(double progress, NSString *_Non
 - (void) reportSourceBlocksCopied:(NSUInteger const)thisManyMore;
 ///Increase self.numberOfSourceBlocksCopied by the total number of blocks indicated by an extent record.
 - (void) reportSourceExtentRecordCopied:(struct HFSExtentDescriptor const *_Nonnull const)extRecPtr;
+///Increase self.numberOfSourceBlocksCopied by the total number of blocks indicated by an extent record.
+- (void) reportDestinationExtentRecordCopied:(struct HFSPlusExtentDescriptor const *_Nonnull const)extRecPtr;
 
 ///This block is called for every progress update.
 @property(copy) ImpConversionProgressUpdateBlock _Nullable conversionProgressUpdateBlock;
