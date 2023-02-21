@@ -128,7 +128,7 @@
 
 	struct HFSExtentDescriptor const *_Nonnull const catExtDescs = _mdb->drCTExtRec;
 	NSData *_Nullable const catalogFileData = [self readDataFromFileDescriptor:readFD logicalLength:L(_mdb->drCTFlSize) extents:catExtDescs numExtents:kHFSExtentDensity error:outError];
-	ImpPrintf(@"Catalog file data: logical length 0x%x bytes (%lu a-blocks); read 0x%lx bytes", L(_mdb->drCTFlSize), catalogFileData.length / L(_mdb->drAlBlkSiz), catalogFileData.length);
+//	ImpPrintf(@"Catalog file data: logical length 0x%x bytes (%lu a-blocks); read 0x%lx bytes", L(_mdb->drCTFlSize), catalogFileData.length / L(_mdb->drAlBlkSiz), catalogFileData.length);
 
 	if (catalogFileData != nil) {
 		self.catalogBTree = [[ImpBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSCatalog data:catalogFileData];
@@ -139,7 +139,7 @@
 			}
 		}
 	}
-	ImpPrintf(@"Catalog file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", self.catalogBTree.numberOfLiveNodes, self.catalogBTree.numberOfPotentialNodes, self.catalogBTree.numberOfPotentialNodes > 0 ? (self.catalogBTree.numberOfLiveNodes / (double)self.catalogBTree.numberOfPotentialNodes) * 100.0 : 1.0);
+//	ImpPrintf(@"Catalog file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", self.catalogBTree.numberOfLiveNodes, self.catalogBTree.numberOfPotentialNodes, self.catalogBTree.numberOfPotentialNodes > 0 ? (self.catalogBTree.numberOfLiveNodes / (double)self.catalogBTree.numberOfPotentialNodes) * 100.0 : 1.0);
 
 	return (self.catalogBTree != nil);
 }
@@ -151,7 +151,7 @@
 
 	struct HFSExtentDescriptor const *_Nonnull const eoExtDescs = _mdb->drXTExtRec;
 	NSData *_Nullable const extentsFileData = [self readDataFromFileDescriptor:readFD logicalLength:L(_mdb->drXTFlSize) extents:eoExtDescs numExtents:kHFSExtentDensity error:outError];
-	ImpPrintf(@"Extents file data: 0x%lx bytes (%lu a-blocks)", extentsFileData.length, extentsFileData.length / L(_mdb->drAlBlkSiz));
+//	ImpPrintf(@"Extents file data: 0x%lx bytes (%lu a-blocks)", extentsFileData.length, extentsFileData.length / L(_mdb->drAlBlkSiz));
 
 	if (extentsFileData != nil) {
 		self.extentsOverflowBTree = [[ImpBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSExtentsOverflow data:extentsFileData];
@@ -162,7 +162,7 @@
 			}
 		}
 	}
-	ImpPrintf(@"Extents file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", self.extentsOverflowBTree.numberOfLiveNodes, self.extentsOverflowBTree.numberOfPotentialNodes, self.extentsOverflowBTree.numberOfPotentialNodes > 0 ? (self.extentsOverflowBTree.numberOfLiveNodes / (double)self.extentsOverflowBTree.numberOfPotentialNodes) * 100.0 : 1.0);
+//	ImpPrintf(@"Extents file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", self.extentsOverflowBTree.numberOfLiveNodes, self.extentsOverflowBTree.numberOfPotentialNodes, self.extentsOverflowBTree.numberOfPotentialNodes > 0 ? (self.extentsOverflowBTree.numberOfLiveNodes / (double)self.extentsOverflowBTree.numberOfPotentialNodes) * 100.0 : 1.0);
 
 	return (self.extentsOverflowBTree != nil);
 }
