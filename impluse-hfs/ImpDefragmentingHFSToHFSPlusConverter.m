@@ -92,6 +92,7 @@
 
 	struct HFSPlusVolumeHeader *_Nonnull const vh = dstVol.mutableVolumeHeaderPointer;
 	__block bool hasAnyFiles = false;
+	__block NSUInteger numFilesCopied = 0, numFoldersCopied = 0;
 
 	u_int64_t const volumeSizeInBytes = dstVol.sizeInBytes ?: srcVol.totalSizeInBytes;
 
@@ -233,13 +234,22 @@
 
 			cursor.payloadData = convertedFileRecData;
 
+			++numFilesCopied;
 			keepGoing = true;
 		}
-			folder:nil
+			folder:^(const struct HFSCatalogKey *const  _Nonnull keyPtr, const struct  HFSCatalogFolder *const _Nonnull fileRec) {
+			//The folder gets “copied” as part of copying the catalog, so we don't have anything to do here but bump the counter.
+			++numFoldersCopied;
+		}
 			thread:nil
 		];
 		return keepGoing;
 	}];
+
+	//One of the folders in the catalog is the root of the volume, which isn't counted in numberOfFolders, so decrement that back out.
+	--numFoldersCopied;
+
+	[self deliverProgressUpdateWithOperationDescription:[NSString stringWithFormat:NSLocalizedString(@"Copied %lu of %lu files and %lu of %lu folders", @"Conversion progress message"), numFilesCopied, srcVol.numberOfFiles, numFoldersCopied, srcVol.numberOfFolders]];
 
 	[self deliverProgressUpdateWithOperationDescription:NSLocalizedString(@"Updating catalog…", @"Conversion progress message")];
 
