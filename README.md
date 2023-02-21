@@ -173,3 +173,61 @@ If you provide a complete absolute path (or a relative path, starting with `:`, 
 If you provide only the name of an item, impluse will search the disk for items with that name. If there's only one match, impluse will extract it. If there are multiple matches, impluse will print their paths, and you can pick which one you want.
 
 The above warning about extracting aliases goes double when extracting specific items. Even if it's possible to automatically reconnect an alias if the alias and its destination are both extracted, this isn't possible if the alias is extracted without its destination.
+
+## Things to beware of
+
+### Alias fragility
+
+When you convert a volume to HFS+, expect aliases to be brittle. One of the elements that an alias uses to identify the volume that its target resides on is the volume's format signature, which identifies whether it's HFS, HFS+, or something else entirely. Alias files that refer to other items on the same HFS volume are referring to items on an HFS volume; since the converted volume *isn't* an HFS volume anymore, the alias will no longer match items on it via that search method.
+
+Finder's “Show Original” command will still find the target as long as the path to it hasn't changed. (So, the item hasn't been renamed, its parent directory hasn't been renamed, the item hasn't been moved, etc.) If you rename or move the target, aliases to it will break. If you rename its parent directory, aliases may break (the logic that involves parent directories is too convoluted to explain here; it boils down to a maybe).
+
+This is unavoidable as long as alias files are copied verbatim. They are referring to an HFS volume that isn't present. Working around this would require altering the alias record; I've looked into this, and it's non-trivial, and at any rate it would be optional and off by default since it's an alteration to the files on the volume.
+
+When you extract an alias file, it may or may not work, depending on the circumstances of the extraction. If you simply extract the alias file and its target right next to each other, that won't work unless they were right next to each other on the original volume. If you extract a folder hierarchy or the entire volume, the aliases so extracted may work but be brittle, the same as on a converted volume.
+
+Converting the volume gives the aliases on it one small advantage: Conversion preserves the catalog node IDs of every item on the volume, so an alias referring to file ID such-and-such will still refer to the same file in the converted volume. (*If* it can find that volume, which, see above.) Extracting an item into a pre-existing volume almost certainly gives it a new catalog node ID. An extracted alias file can pretty much *only* successfully match an extracted target by path.
+
+### Generic icons
+
+On modern macOS, custom icons do still seem to show up reliably (as of Monterey), but applications and documents may appear to have generic icons. As far as I can tell, this is because Finder no longer looks at the resources that applications used to use to identify which were their own icons and which belonged to their document types.
+
+Bundle-based applications (including some Carbon apps, such as the last versions of GraphicConverter that supported Mac OS 9) may still work. Also, `'icns'` resources seem to still show up even when palette-based and bitmap icons don't.
+
+All icons should show up as expected if you mount the converted volume on Mac OS 9.
+
+### Item positioning and window frames
+
+If you mount the converted volume on Mac OS 9, window frames and icon positions should still be respected, but modern macOS ignores them.
+
+### Comments
+
+Comments (in Finder's Info window) won't show up in modern macOS.
+
+As far as I can tell, any comments entered in Classic Mac OS are stored somewhere in the desktop database file(s). I don't know specifically where or how, and the format is undocumented.
+
+The modern Finder (which calls them “Spotlight comments” for no reason that has ever been clear) evidently does not look there.
+
+When you convert a volume, the desktop file(s) will be copied over along with everything else, but Finder won't consult them, so your comments will technically exist but not be accessible in the modern world. (Though they should show up if you mount the volume on Mac OS 9.)
+
+When you extract items, impluse would need to extract their comments from the desktop database and then apply them to the extracted copies, and I don't know how to do either of those things.
+
+### Finder reporting sizes inconsistently
+
+I have not been able to get a straight answer from Finder's Info window across all of time and space.
+
+Finder reports sizes in two ways: space taken up “on disk”, which is largely based on files' total physical sizes (i.e., block size times number of blocks), and a precise number of bytes, which is files' total logical sizes (the length of the data fork plus the length of the resource fork).
+
+“on disk” is useless for validating the conversion. Conversion may change the block size to something smaller, in which case many files will use less space “on disk” after conversion—indeed, this was one of HFS+'s selling points.
+
+As for total numbers of bytes, looking at a single file generally works consistently. If you examine the volume, however, examining the same volume on System 6, Mac OS 9, and modern macOS will give you *at least* three different answers.
+
+There is an app for Classic Mac OS called “List Files”, by Alessandro Levi Montalcini, which specifically reports the total lengths of data and resource forks, and gives numbers that agree with impluse's output.
+
+### Possible bugs
+
+It is, of course, entirely possible that this tool has some failure case I haven't encountered yet. Subtle data loss is the hardest failure mode to detect; it's entirely possible that an extraction or conversion could “succeed” but silently corrupt files in one or more ways, or forget to copy some files.
+
+**I strongly recommend preserving a verbatim copy of your original HFS volume, ideally as a read-only UDIF image. I further recommend keeping the original _physical_ copy if possible.** This is your best bet to avoid permanently losing data because you thought it was migrated and it wasn't.
+
+I disclaim all responsibility for any data loss that may occur because you used this tool and foolishly trusted it to copy all data correctly and completely.
