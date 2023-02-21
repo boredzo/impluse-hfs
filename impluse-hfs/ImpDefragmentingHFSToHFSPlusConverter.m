@@ -141,7 +141,7 @@
 			struct HFSPlusCatalogFile *_Nonnull const convertedFilePtr = convertedFileRecData.mutableBytes;
 
 			hasAnyFiles = true;
-			[self deliverProgressUpdateWithOperationDescription:[NSString stringWithFormat:@"Copying file “%@”…", [srcVol.textEncodingConverter stringFromHFSUniStr255:unicodeNamePtr]]];
+			[self deliverProgressUpdateWithOperationDescription:[NSString stringWithFormat:NSLocalizedString(@"Copying file “%@”…", @"Conversion progress message"), [srcVol.textEncodingConverter stringFromHFSUniStr255:unicodeNamePtr]]];
 
 			//Copy the data fork.
 			struct HFSExtentDescriptor const *_Nonnull const firstDataExtents = fileRec->dataExtents;
