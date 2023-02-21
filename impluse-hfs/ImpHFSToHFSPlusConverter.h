@@ -19,13 +19,17 @@ typedef void (^ImpConversionProgressUpdateBlock)(double progress, NSString *_Non
 @property TextEncoding hfsTextEncoding;
 
 ///Initialized during step 1 of conversion (the volume header) to the source volume's number of blocks used.
-@property(readonly) NSUInteger numberOfSourceBlocksToCopy;
+@property(readwrite) NSUInteger numberOfSourceBlocksToCopy;
 ///The number of blocks from the source volume that have been copied.
 @property(readwrite) NSUInteger numberOfSourceBlocksCopied;
 ///Increase self.numberOfSourceBlocksCopied by this number.
 - (void) reportSourceBlocksCopied:(NSUInteger const)thisManyMore;
+///Decrease self.numberOfSourceBlocksToCopy by this number.
+- (void) reportSourceBlocksWillNotBeCopied:(NSUInteger const)thisManyFewer;
 ///Increase self.numberOfSourceBlocksCopied by the total number of blocks indicated by an extent record.
 - (void) reportSourceExtentRecordCopied:(struct HFSExtentDescriptor const *_Nonnull const)extRecPtr;
+///Decrease self.numberOfSourceBlocksToCopy by the total number of blocks indicated by an extent record.
+- (void) reportSourceExtentRecordWillNotBeCopied:(struct HFSExtentDescriptor const *_Nonnull const)extRecPtr;
 
 ///This block is called for every progress update.
 @property(copy) ImpConversionProgressUpdateBlock _Nullable conversionProgressUpdateBlock;

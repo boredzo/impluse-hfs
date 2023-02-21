@@ -174,8 +174,14 @@
 - (void) reportSourceBlocksCopied:(NSUInteger const)thisManyMore {
 	self.numberOfSourceBlocksCopied = self.numberOfSourceBlocksCopied + thisManyMore;
 }
+- (void) reportSourceBlocksWillNotBeCopied:(NSUInteger const)thisManyFewer {
+	self.numberOfSourceBlocksToCopy = self.numberOfSourceBlocksToCopy - thisManyFewer;
+}
 - (void) reportSourceExtentRecordCopied:(struct HFSExtentDescriptor const *_Nonnull const)extRecPtr {
 	[self reportSourceBlocksCopied:ImpNumberOfBlocksInHFSExtentRecord(extRecPtr)];
+}
+- (void) reportSourceExtentRecordWillNotBeCopied:(struct HFSExtentDescriptor const *_Nonnull const)extRecPtr {
+	[self reportSourceBlocksWillNotBeCopied:ImpNumberOfBlocksInHFSExtentRecord(extRecPtr)];
 }
 
 - (void) deliverProgressUpdate:(double)progress

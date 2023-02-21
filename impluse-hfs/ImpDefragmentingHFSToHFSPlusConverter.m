@@ -105,7 +105,8 @@
 	ImpBTreeFile *_Nonnull const srcExtentsOverflow = srcVol.extentsOverflowBTree;
 	ImpMutableBTreeFile *_Nonnull const destExtentsOverflow = [[ImpMutableBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSPlusExtentsOverflow convertTree:srcExtentsOverflow];
 	[self copyFromHFSExtentsOverflowFile:srcExtentsOverflow toHFSPlusExtentsOverflowFile:destExtentsOverflow];
-	[self reportSourceExtentRecordCopied:extentsOverflowFileSourceExtents];
+	//Since we're not copying over anything from the original extents overflow file, deduct it from the amount of data to be copied.
+	[self reportSourceExtentRecordWillNotBeCopied:extentsOverflowFileSourceExtents];
 
 	ImpBTreeFile *_Nonnull const srcCatalog = srcVol.catalogBTree;
 	ImpMutableBTreeFile *_Nonnull const destCatalog = [[ImpMutableBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSPlusCatalog convertTree:srcCatalog];
