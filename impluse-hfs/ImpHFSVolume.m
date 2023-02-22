@@ -187,6 +187,19 @@
 
 #pragma mark -
 
+- (NSData *_Nullable) dataForBlocksStartingAt:(u_int32_t const)startBlock count:(u_int32_t const)blockCount {
+	NSUInteger const blockSize = self.numberOfBytesPerBlock;
+	NSMutableData *_Nonnull const intoData = [NSMutableData dataWithLength:blockSize * blockCount];
+	off_t const readStart = self.volumeStartOffset + self.offsetOfFirstAllocationBlock + startBlock * blockSize;
+	enum { offset = 0 };
+	size_t const numBytesToRead = intoData.length - offset;
+	ssize_t const amtRead = pread(self.fileDescriptor, intoData.mutableBytes + offset, numBytesToRead, readStart);
+	return amtRead > 0 ? intoData : nil;
+}
+- (NSData *_Nullable) dataForBlock:(u_int32_t)aBlock {
+	return [self dataForBlocksStartingAt:aBlock count:1];
+}
+
 - (bool) readIntoData:(NSMutableData *_Nonnull const)intoData
 	atOffset:(NSUInteger)offset
 	fromFileDescriptor:(int const)readFD
