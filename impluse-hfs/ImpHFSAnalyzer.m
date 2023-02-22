@@ -314,6 +314,8 @@
 			[node forEachHFSPlusCatalogRecord_file:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSPlusCatalogFile *const _Nonnull fileRec) {
 				struct FndrExtendedFileInfo const *_Nonnull const extFinderInfo = (struct FndrExtendedFileInfo const *)&(fileRec->finderInfo);
 				ImpPrintf(@"- 📄 “%@”, ID #%u (0x%x), type %@ creator %@, flags %@", [srcVol.textEncodingConverter stringFromHFSUniStr255:&catalogKeyPtr->nodeName], L(fileRec->fileID), L(fileRec->fileID),  NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdType)), NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdCreator)), flagsString(L(fileRec->flags), L(fileRec->userInfo.fdFlags), L(extFinderInfo->extended_flags)));
+				ImpPrintf(@"    Node flags: 0x%04x", L(fileRec->flags));
+				ImpPrintf(@"    Finder flags: 0x%04x + 0x%04x", L(fileRec->userInfo.fdFlags), L(extFinderInfo->extended_flags));
 				logFork("    ", "DF", &(fileRec->dataFork));
 				logFork("    ", "RF", &(fileRec->resourceFork));
 				++numFiles;
