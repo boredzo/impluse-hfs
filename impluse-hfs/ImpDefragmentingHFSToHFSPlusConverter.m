@@ -116,11 +116,11 @@
 
 	//Allocate the special files before anything else, so they get placed first on the disk.
 	u_int32_t const catFileLength = (u_int32_t)destCatalog.lengthInBytes;
-	[dstVol allocateLogicalLength:catFileLength forFork:ImpForkTypeSpecialFileContents populateExtentRecord:vh->catalogFile.extents];
+	[dstVol allocateBytes:catFileLength forFork:ImpForkTypeSpecialFileContents populateExtentRecord:vh->catalogFile.extents];
 	S(vh->catalogFile.logicalSize, catFileLength);
 	S(vh->catalogFile.totalBlocks, L(vh->catalogFile.extents[0].blockCount));
 	u_int32_t const extFileLength = (u_int32_t)destExtentsOverflow.lengthInBytes;
-	[dstVol allocateLogicalLength:extFileLength forFork:ImpForkTypeSpecialFileContents populateExtentRecord:vh->extentsFile.extents];
+	[dstVol allocateBytes:extFileLength forFork:ImpForkTypeSpecialFileContents populateExtentRecord:vh->extentsFile.extents];
 	S(vh->extentsFile.logicalSize, extFileLength);
 	S(vh->extentsFile.totalBlocks, L(vh->extentsFile.extents[0].blockCount));
 //	ImpPrintf(@"Catalog file will be %llu bytes in %u blocks", L(vh->catalogFile.logicalSize), L(vh->catalogFile.totalBlocks));
@@ -147,8 +147,9 @@
 			//Copy the data fork.
 			struct HFSExtentDescriptor const *_Nonnull const firstDataExtents = fileRec->dataExtents;
 			u_int64_t const dataLogicalLength = L(fileRec->dataLogicalSize);
+			u_int64_t const dataPhysicalLength = L(fileRec->dataPhysicalSize);
 
-			u_int64_t bytesNotYetAllocatedForData = [dstVol allocateLogicalLength:dataLogicalLength forFork:ImpForkTypeData populateExtentRecord:convertedFilePtr->dataFork.extents];
+			u_int64_t bytesNotYetAllocatedForData = [dstVol allocateBytes:dataPhysicalLength forFork:ImpForkTypeData populateExtentRecord:convertedFilePtr->dataFork.extents];
 			//TODO: Handle bytesNotYetAllocated > 0 (by inserting the fork into the extents overflow file)
 			NSAssert(bytesNotYetAllocatedForData == 0, @"Failed to allocate %llu contiguous bytes in destination volume; ended up with %llu left over", dataLogicalLength, bytesNotYetAllocatedForData);
 
@@ -181,10 +182,10 @@
 			[dataFH closeFile];
 
 //			ImpPrintf(@"Final tally: Wrote %llu out of %llu bytes", totalDataBytesWritten, dataLogicalLength);
-			NSAssert(totalDataBytesWritten == dataLogicalLength, @"Failed to %@ all data fork bytes due to %@: should have written %llu, but actually wrote %llu", dataReadError != nil ? @"read" : dataWriteError != nil ? @"write" : @"copy", dataReadError ?: dataWriteError, dataLogicalLength, totalDataBytesWritten);
+			NSAssert(totalDataBytesWritten == dataPhysicalLength, @"Failed to %@ all data fork bytes due to %@: should have written %llu, but actually wrote %llu", dataReadError != nil ? @"read" : dataWriteError != nil ? @"write" : @"copy", dataReadError ?: dataWriteError, dataPhysicalLength, totalDataBytesWritten);
 			[self reportSourceBlocksCopied:totalDataBlocksRead];
 
-			S(convertedFilePtr->dataFork.logicalSize, totalDataBytesWritten);
+			S(convertedFilePtr->dataFork.logicalSize, dataLogicalLength);
 			u_int64_t const totalDataBlocks = ImpNumberOfBlocksInHFSPlusExtentRecord(convertedFilePtr->dataFork.extents);
 			//TN1150 does not specify what to do if totalBlocks is greater than UINT32_MAX (which it theoretically can be, because the blockCount of each extent is also a u_int32_t and there are eight of them per extent record).
 			S(convertedFilePtr->dataFork.totalBlocks, totalDataBlocks > UINT32_MAX ? UINT32_MAX : (u_int32_t)totalDataBlocks);
@@ -193,8 +194,9 @@
 			//Copy the resource fork.
 			struct HFSExtentDescriptor const *_Nonnull const firstRsrcExtents = fileRec->rsrcExtents;
 			u_int64_t const rsrcLogicalLength = L(fileRec->rsrcLogicalSize);
+			u_int64_t const rsrcPhysicalLength = L(fileRec->rsrcPhysicalSize);
 
-			u_int64_t bytesNotYetAllocatedForRsrc = [dstVol allocateLogicalLength:rsrcLogicalLength forFork:ImpForkTypeResource populateExtentRecord:convertedFilePtr->resourceFork.extents];
+			u_int64_t bytesNotYetAllocatedForRsrc = [dstVol allocateBytes:rsrcPhysicalLength forFork:ImpForkTypeResource populateExtentRecord:convertedFilePtr->resourceFork.extents];
 			//TODO: Handle bytesNotYetAllocated > 0 (by inserting the fork into the extents overflow file)
 			NSAssert(bytesNotYetAllocatedForRsrc == 0, @"Failed to allocate %llu contiguous bytes in destination volume; ended up with %llu left over", rsrcLogicalLength, bytesNotYetAllocatedForRsrc);
 
@@ -223,10 +225,11 @@
 			}];
 			[rsrcFH closeFile];
 
-			NSAssert(totalRsrcBytesWritten == rsrcLogicalLength, @"Failed to write all resource fork bytes for unknown reasons: should have written %llu, but actually wrote %llu", rsrcLogicalLength, totalRsrcBytesWritten);
+			NSAssert(totalRsrcBytesWritten == rsrcPhysicalLength, @"Failed to write all resource fork bytes for unknown reasons: should have written %llu, but actually wrote %llu", rsrcPhysicalLength, totalRsrcBytesWritten);
+			ImpPrintf(@"This file's lengths are DF %llu bytes, RF %llu bytes. Physical sizes %u blocks + %u blocks = %u blocks. Copied %u blocks + %u blocks = %u blocks", dataLogicalLength, rsrcLogicalLength, ImpNumberOfBlocksInHFSExtentRecord(firstDataExtents), ImpNumberOfBlocksInHFSExtentRecord(firstRsrcExtents), ImpNumberOfBlocksInHFSExtentRecord(firstDataExtents) + ImpNumberOfBlocksInHFSExtentRecord(firstRsrcExtents), totalDataBlocksRead, totalRsrcBlocksRead, totalDataBlocksRead + totalRsrcBlocksRead);
 			[self reportSourceBlocksCopied:totalRsrcBlocksRead];
 
-			S(convertedFilePtr->resourceFork.logicalSize, totalRsrcBytesWritten);
+			S(convertedFilePtr->resourceFork.logicalSize, rsrcLogicalLength);
 			u_int64_t const totalRsrcBlocks = ImpNumberOfBlocksInHFSPlusExtentRecord(convertedFilePtr->resourceFork.extents);
 			//TN1150 does not specify what to do if totalBlocks is greater than UINT32_MAX (which it theoretically can be, because the blockCount of each extent is also a u_int32_t and there are eight of them per extent record).
 			S(convertedFilePtr->resourceFork.totalBlocks, totalRsrcBlocks > UINT32_MAX ? UINT32_MAX : (u_int32_t)totalRsrcBlocks);

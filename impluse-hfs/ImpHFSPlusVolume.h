@@ -95,7 +95,7 @@
  *Only the last non-empty extent in the record may be changed; others are assumed to already be optimal and will be left alone. The last non-empty extent may be extended or reallocated as described under allocateBlocks:forFork:getExtent:. If that isn't enough, this method will allocate further extents until either the extent record is full or the request is satisfied.
  *Like allocateBlocks:forFork:getExtent:, this method does not associate the returned extents with a file. It assumes you're doing that.
  */
-- (u_int64_t) allocateLogicalLength:(u_int64_t)numBytes
+- (u_int64_t) allocateBytes:(u_int64_t)numBytes
 	forFork:(ImpForkType)forkType
 	populateExtentRecord:(struct HFSPlusExtentDescriptor *_Nonnull const)outExts;
 

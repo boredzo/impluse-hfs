@@ -474,14 +474,13 @@
 		u_int64_t const logicalLengthRoundedUp = ImpNextMultipleOfSize(logicalLength, blockSize);
 
 		u_int64_t amtRead = 0;
-		[data setLength:logicalLengthRoundedUp];
+		[data setLength:physicalLength];
 		bool const success = [weakSelf readIntoData:data
 			atOffset:0
 			fromFileDescriptor:readFD
 			extent:oneExtent
 			actualAmountRead:&amtRead
 			error:&readError];
-		[data setLength:logicalLength];
 
 		if (success) {
 			bool const successfullyDelivered = block(data, MAX(amtRead, logicalBytesRemaining));

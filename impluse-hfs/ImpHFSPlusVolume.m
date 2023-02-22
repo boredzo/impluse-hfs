@@ -214,7 +214,7 @@
 	}
 	//And last but not least, allocate space for the allocations file that will hold our shiny new bitmap.
 	u_int32_t const numAllocationsBytes = (numABlocks + 7) / 8;
-	[self allocateLogicalLength:numAllocationsBytes forFork:ImpForkTypeSpecialFileContents populateExtentRecord:_vh->allocationFile.extents];
+	[self allocateBytes:numAllocationsBytes forFork:ImpForkTypeSpecialFileContents populateExtentRecord:_vh->allocationFile.extents];
 	_vh->allocationFile.totalBlocks = _vh->allocationFile.extents[0].blockCount;
 	//DiskWarrior seems to be of the opinion that the logical length should be equal to the physical length (total size of occupied blocks). TN1150 says this is allowed, but doesn't say it's necessary.
 //	S(_vh->allocationFile.logicalSize, numAllocationsBytes);
@@ -558,7 +558,7 @@
 	return fulfilled;
 }
 
-- (u_int64_t) allocateLogicalLength:(u_int64_t)numBytes
+- (u_int64_t) allocateBytes:(u_int64_t)numBytes
 	forFork:(ImpForkType)forkType
 	populateExtentRecord:(struct HFSPlusExtentDescriptor *_Nonnull const)outExts
 {
