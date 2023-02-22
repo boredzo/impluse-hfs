@@ -834,16 +834,23 @@
 	//Second, if we're not done yet, consult the extents overflow B*-tree for this item.
 	if (keepIterating && logicalBytesRemaining > 0) {
 		ImpBTreeFile *_Nonnull const extentsFile = self.extentsOverflowBTree;
-		[extentsFile searchExtentsOverflowTreeForCatalogNodeID:cnid
-			fork:forkType
-			firstExtentStart:L(initialExtRec[0].startBlock)
-			forEachRecord:^bool(NSData *_Nonnull const recordData)
-		{
-			struct HFSPlusExtentDescriptor const *_Nonnull const hfsExtRec = recordData.bytes;
-			NSUInteger const numExtentDescriptors = recordData.length / sizeof(struct HFSPlusExtentDescriptor);
-			processOneExtentRecord(hfsExtRec, numExtentDescriptors);
-			return keepIterating;
-		}];
+
+		__block u_int32_t precedingBlockCount = (u_int32_t) ImpNumberOfBlocksInHFSPlusExtentRecord(initialExtRec);
+		bool keepSearching = true;
+		while (keepSearching) {
+			NSUInteger const numRecordsEncountered = [extentsFile searchExtentsOverflowTreeForCatalogNodeID:cnid
+				fork:forkType
+				precededByNumberOfBlocks:precedingBlockCount
+				forEachRecord:^bool(NSData *_Nonnull const recordData)
+			{
+				struct HFSPlusExtentDescriptor const *_Nonnull const hfsExtRec = recordData.bytes;
+				NSUInteger const numExtentDescriptors = recordData.length / sizeof(struct HFSPlusExtentDescriptor);
+				processOneExtentRecord(hfsExtRec, numExtentDescriptors);
+				precedingBlockCount += ImpNumberOfBlocksInHFSPlusExtentRecord(hfsExtRec);
+				return keepIterating;
+			}];
+			keepSearching = numRecordsEncountered > 0;
+		}
 	}
 
 	return forkLength - logicalBytesRemaining;

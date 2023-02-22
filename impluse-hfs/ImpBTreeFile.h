@@ -113,7 +113,7 @@
 ///Search for nodes matching a catalog ID, and call the block with every record under its leaf nodes, in order. Return the number of records encountered. Undefined if called on a B*-tree that isn't an extents overflow tree.
 - (NSUInteger) searchExtentsOverflowTreeForCatalogNodeID:(HFSCatalogNodeID)cnid
 	fork:(ImpForkType)forkType
-	firstExtentStart:(u_int32_t)startBlock
+	precededByNumberOfBlocks:(u_int32_t)totalBlockCount
 	forEachRecord:(bool (^_Nonnull const)(NSData *_Nonnull const recordData))block;
 
 #pragma mark Node map

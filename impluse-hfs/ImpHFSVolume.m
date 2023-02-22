@@ -458,10 +458,6 @@
 			} else {
 				logicalBytesRemaining -= bytesConsumed;
 			}
-			if (logicalBytesRemaining == 0) {
-//				ImpPrintf(@"0 bytes remaining in logical length (all bytes consumed). No further reads warranted.");
-				keepIterating = false;
-			}
 		}
 	};
 
@@ -471,16 +467,23 @@
 	//Second, if we're not done yet, consult the extents overflow B*-tree for this item.
 	if (keepIterating && logicalBytesRemaining > 0) {
 		ImpBTreeFile *_Nonnull const extentsFile = self.extentsOverflowBTree;
-		[extentsFile searchExtentsOverflowTreeForCatalogNodeID:cnid
+
+		__block u_int32_t precedingBlockCount = ImpNumberOfBlocksInHFSExtentRecord(initialExtRec);
+		bool keepSearching = true;
+		while (keepSearching) {
+			NSUInteger const numRecordsEncountered = [extentsFile searchExtentsOverflowTreeForCatalogNodeID:cnid
 			fork:forkType
-			firstExtentStart:L(initialExtRec[0].startBlock)
+				precededByNumberOfBlocks:precedingBlockCount
 			forEachRecord:^bool(NSData *_Nonnull const recordData)
 		{
 			struct HFSExtentDescriptor const *_Nonnull const hfsExtRec = recordData.bytes;
 			NSUInteger const numExtentDescriptors = recordData.length / sizeof(struct HFSExtentDescriptor);
 			processOneExtentRecord(hfsExtRec, numExtentDescriptors);
+				precedingBlockCount += ImpNumberOfBlocksInHFSExtentRecord(hfsExtRec);
 			return keepIterating;
 		}];
+			keepSearching = numRecordsEncountered > 0;
+		}
 	}
 
 	return forkLength - logicalBytesRemaining;

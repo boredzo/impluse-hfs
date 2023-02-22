@@ -257,10 +257,7 @@
 
 	if (self.hasKeyedRecords) {
 		[self forEachKeyedRecord:^bool(NSData *const  _Nonnull keyData, NSData *const  _Nonnull payloadData) {
-			//Let's just focus on catalog keys for now.
-			bool const isExtentKey =
-				false &&
-				keyData.length == sizeof(struct HFSExtentKey);
+			bool const isExtentKey = keyData.length == sizeof(struct HFSExtentKey);
 			if (isExtentKey) {
 				struct HFSExtentKey const *_Nonnull const hfsExtKeyPtr = keyData.bytes;
 				descriptionComponents[0] = [NSString stringWithFormat:@"Extent key [%@ fork for file ID #%u, starting at block #%u]", L(hfsExtKeyPtr->forkType) == 0 ? @"data" : @"rsrc", L(hfsExtKeyPtr->fileID), L(hfsExtKeyPtr->startBlock)];

@@ -629,18 +629,18 @@
 
 - (NSUInteger) searchExtentsOverflowTreeForCatalogNodeID:(HFSCatalogNodeID)cnid
 	fork:(ImpForkType)forkType
-	firstExtentStart:(u_int32_t)startBlock
+	precededByNumberOfBlocks:(u_int32_t)totalBlockCount
 	forEachRecord:(bool (^_Nonnull const)(NSData *_Nonnull const recordData))block
 {
 	//TODO: Reimplement this in terms of searchTreeForItemWithKeyComparator:getNode:recordIndex:.
 
-	NSUInteger numRecords = 0;
+	__block NSUInteger numRecords = 0;
 
 	struct HFSExtentKey quarryExtentKey = {
 		.keyLength = sizeof(struct HFSExtentKey),
 		.forkType = forkType,
 		.fileID = cnid,
-		.startBlock = (u_int16_t)startBlock,
+		.startBlock = (u_int16_t)totalBlockCount,
 	};
 	quarryExtentKey.keyLength -= sizeof(quarryExtentKey.keyLength);
 
@@ -650,10 +650,11 @@
 		  //These keys are incomparable.
 		  return ImpBTreeComparisonQuarryIsIncomparable;
 		}
-		if (quarryExtentKey.forkType < L(foundExtentKeyPtr->forkType)) {
+		u_int8_t const foundForkType = L(foundExtentKeyPtr->forkType);
+		if (quarryExtentKey.forkType < foundForkType) {
 		  return ImpBTreeComparisonQuarryIsLesser;
 		}
-		if (quarryExtentKey.forkType > L(foundExtentKeyPtr->forkType)) {
+		if (quarryExtentKey.forkType > foundForkType) {
 		  return ImpBTreeComparisonQuarryIsGreater;
 		}
 		if (quarryExtentKey.fileID < L(foundExtentKeyPtr->fileID)) {
@@ -675,6 +676,9 @@
 	ImpBTreeNode *_Nullable const rootNode = headerNode.rootNode;
 	if (rootNode != nil) {
 		ImpBTreeNode *_Nullable leafNode = nil;
+		if (rootNode.nodeType == kBTLeafNode) {
+			leafNode = rootNode;
+		} else if (rootNode.nodeType == kBTIndexNode) {
 		ImpBTreeIndexNode *_Nullable indexNode = (ImpBTreeIndexNode *_Nullable const)rootNode;
 		while (indexNode != nil && indexNode.nodeType == kBTIndexNode) {
 			ImpBTreeNode *_Nullable nextNodeDown = [indexNode descendWithKeyComparator:compareKey];
@@ -685,7 +689,7 @@
 				leafNode = nextNodeDown;
 			}
 		}
-
+		}
 		/*There are several possibilities from here:
 		 - leafNode is nil. This should mean the tree is empty.
 		 - There is exactly one exactly-matching record, and it's in this node. (It may be the last record in the node.)
@@ -693,7 +697,14 @@
 		 - There are multiple exactly-matching records, and they start in this node and continue on into at least the next node.
 		 - There are no exactly-matching records. If our quarry was in this tree, it would be in this node, but it isn't, so it's not in the tree at all.
 		 */
-		//TODO: We still need to iterate over the records of leafNode and call the block.
+		[leafNode forEachKeyedRecord:^bool(NSData *_Nonnull const keyData, NSData *_Nonnull const payloadData) {
+			if (compareKey(keyData.bytes) == ImpBTreeComparisonQuarryIsEqual) {
+				block(payloadData);
+				++numRecords;
+				return false;
+			}
+			return true;
+		}];
 	}
 	return numRecords;
 }
