@@ -555,22 +555,24 @@
 
 			NSData *_Nonnull const keyData = item.destinationKey;
 			struct HFSPlusCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
-			NSData *_Nonnull const recData = item.destinationRecord;
-			void const *_Nonnull const recPtr = recData.bytes;
+			NSMutableData *_Nonnull const recData = item.destinationRecord;
+			void *_Nonnull const recPtr = recData.mutableBytes;
 			int16_t const *_Nonnull const recTypePtr = recPtr;
-			struct HFSPlusCatalogFile const *_Nonnull const filePtr = recPtr;
-			struct HFSPlusCatalogFolder const *_Nonnull const folderPtr = recPtr;
+			struct HFSPlusCatalogFile *_Nonnull const filePtr = recPtr;
+			struct HFSPlusCatalogFolder *_Nonnull const folderPtr = recPtr;
 
 			//In a thread record, the key holds the item's *own* ID (despite being called “parentID”) and an empty name, while the thread record holds the item's *parent*'s ID and the item's own name.
 			switch (L(*recTypePtr)) {
 				case kHFSPlusFileRecord:
 					threadKeyPtr->parentID = filePtr->fileID;
 					S(threadRecPtr->recordType, kHFSPlusFileThreadRecord);
+					S(filePtr->flags, L(filePtr->flags) | kHFSThreadExistsMask);
 					break;
 				case kHFSPlusFolderRecord:
 					//Technically we shouldn't get here, either, as thread records were required for folders under HFS.
 					threadKeyPtr->parentID = folderPtr->folderID;
 					S(threadRecPtr->recordType, kHFSPlusFolderThreadRecord);
+					S(folderPtr->flags, L(folderPtr->flags) | kHFSThreadExistsMask);
 					break;
 				default:
 					__builtin_unreachable();
