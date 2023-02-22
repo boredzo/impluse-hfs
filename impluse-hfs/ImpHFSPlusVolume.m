@@ -305,7 +305,7 @@
 
 ///Note that this may return a number larger than can fit in a u_int32_t, and thus larger than can be stored in a single extent. If the return value is greater than UINT_MAX, you should allocate multiple extents as needed to whittle it down to fit.
 - (u_int64_t) countOfBlocksOfSize:(u_int32_t const)blockSize neededForLogicalLength:(u_int64_t const)length {
-	u_int64_t numBlocks = length / blockSize + (length % blockSize != 0);
+	u_int64_t const numBlocks = ImpCeilingDivide(length, blockSize);
 
 	return numBlocks;
 }
