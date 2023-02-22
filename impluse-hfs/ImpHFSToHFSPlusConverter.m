@@ -194,6 +194,14 @@
 
 - (void) deliverProgressUpdateWithOperationDescription:(NSString *_Nonnull)operationDescription
 {
+#if LOG_NUMBER_OF_BLOCKS_REMAINING
+	static NSNumberFormatter *_Nullable numberFormatter = nil;
+	if (numberFormatter == nil) {
+		numberFormatter = [NSNumberFormatter new];
+		numberFormatter.format = @",##0";
+	}
+	ImpPrintf(@"(Blocks copied: %@ of %@; %@ remain)", [numberFormatter stringFromNumber:@(self.numberOfSourceBlocksCopied)], [numberFormatter stringFromNumber:@(self.numberOfSourceBlocksToCopy)], [numberFormatter stringFromNumber:@(self.numberOfSourceBlocksToCopy - self.numberOfSourceBlocksCopied)]);
+#endif
 	[self deliverProgressUpdate:self.numberOfSourceBlocksCopied / (double)self.numberOfSourceBlocksToCopy operationDescription:operationDescription];
 }
 
