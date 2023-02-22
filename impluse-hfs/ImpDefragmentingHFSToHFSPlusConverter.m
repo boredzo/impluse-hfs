@@ -166,7 +166,7 @@
 				block:^bool(NSData *const  _Nonnull fileData, const u_int64_t logicalLength)
 			{
 //				ImpPrintf(@"Read file data: %lu physical bytes (%llu length remaining)", fileData.length, logicalLength);
-				totalDataBlocksRead += (u_int32_t)(fileData.length / bytesPerSourceABlock);
+				totalDataBlocksRead += ImpCeilingDivide(fileData.length, bytesPerSourceABlock);
 				NSInteger const bytesWrittenThisTime = [dataFH writeData:fileData error:&dataWriteError];
 //				ImpPrintf(@"Wrote file data: %ld bytes", (long)bytesWrittenThisTime);
 				if (bytesWrittenThisTime >= 0) {
@@ -211,7 +211,7 @@
 				readDataOrReturnError:&rsrcReadError
 				block:^bool(NSData *const  _Nonnull fileData, const u_int64_t logicalLength)
 			{
-				totalRsrcBlocksRead += (u_int32_t)(fileData.length / bytesPerSourceABlock);
+				totalRsrcBlocksRead += ImpCeilingDivide(fileData.length, bytesPerSourceABlock);
 				NSInteger const bytesWrittenThisTime = [rsrcFH writeData:fileData error:&rsrcWriteError];
 				if (bytesWrittenThisTime >= 0) {
 					totalRsrcBytesWritten += bytesWrittenThisTime;
