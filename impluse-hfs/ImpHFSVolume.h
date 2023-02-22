@@ -47,6 +47,8 @@
 - (NSData *_Nonnull)volumeBitmap;
 ///Calculate the number of bits in the bitmap that are zero. Should match the drFreeBks/freeBlocks value in the volume header.
 - (u_int32_t) numberOfBlocksFreeAccordingToBitmap;
+///Identify which blocks are marked as allocated in the volume bitmap but have not been read from, and print those to the log.
+- (void) reportBlocksThatAreAllocatedButHaveNotBeenAccessed;
 
 @property(strong) ImpBTreeFile *_Nonnull catalogBTree;
 @property(strong) ImpBTreeFile *_Nonnull extentsOverflowBTree;

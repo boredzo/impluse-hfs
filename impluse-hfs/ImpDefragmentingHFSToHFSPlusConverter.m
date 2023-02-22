@@ -285,6 +285,8 @@
 
 	copiedEverything = copiedEverything && wroteCatalog && wroteExtentsOverflow;
 
+	[srcVol reportBlocksThatAreAllocatedButHaveNotBeenAccessed];
+
 	return copiedEverything;
 }
 

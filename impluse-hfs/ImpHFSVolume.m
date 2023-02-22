@@ -30,6 +30,7 @@
 	struct HFSMasterDirectoryBlock const *_mdb;
 	NSMutableData *_volumeBitmapData;
 	CFBitVectorRef _bitVector;
+	CFMutableBitVectorRef _blocksThatAreAllocatedButWereNotAccessed;
 }
 
 - (instancetype _Nonnull) initWithFileDescriptor:(int const)readFD textEncoding:(TextEncoding const)hfsTextEncoding {
@@ -82,6 +83,8 @@
 - (void) setAllocationBitmapData:(NSMutableData *_Nonnull const)bitmapData numberOfBits:(u_int32_t const)numBits {
 	_volumeBitmapData = bitmapData;
 	_bitVector = CFBitVectorCreate(kCFAllocatorDefault, _volumeBitmapData.bytes, numBits);
+
+	_blocksThatAreAllocatedButWereNotAccessed = CFBitVectorCreateMutableCopy(kCFAllocatorDefault, numBits, _bitVector);
 }
 - (bool)readAllocationBitmapFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
 	//Volume bitmap immediately follows MDB. We could look at drVBMSt, but it should always be 3.
@@ -212,7 +215,12 @@
 
 	off_t const readStart = self.volumeStartOffset + self.offsetOfFirstAllocationBlock + startBlock * self.numberOfBytesPerBlock;
 	size_t const numBytesToRead = intoData.length - offset;
-//	ImpPrintf(@"Reading 0x%lx bytes (%lu bytes = %lu blocks) from source volume starting at 0x%llx bytes (extent: [ start #%u, %u blocks ])", intoData.length, intoData.length, intoData.length / self.numberOfBytesPerBlock, readStart, startBlock, blockCount);
+	size_t const numBlocksToRead = ImpCeilingDivide(intoData.length, self.numberOfBytesPerBlock);
+	CFBitVectorSetBits(_blocksThatAreAllocatedButWereNotAccessed, (CFRange) { startBlock, numBlocksToRead }, false);
+//	ImpPrintf(@"Reading 0x%lx bytes (%lu bytes = %lu blocks) from source volume starting at 0x%llx bytes (extent: [ start #%u, %u blocks ])", intoData.length, intoData.length, ImpCeilingDivide(intoData.length, self.numberOfBytesPerBlock), readStart, startBlock, blockCount);
+	if (numBlocksToRead < blockCount) {
+		NSLog(@"Underrun alert! Data is not big enough to hold this extent. Only reading %zu blocks out of this extent's %u blocks", numBlocksToRead, blockCount);
+	}
 	ssize_t const amtRead = pread(readFD, intoData.mutableBytes + offset, numBytesToRead, readStart);
 	if (outAmtRead != NULL) {
 		*outAmtRead = amtRead;
@@ -349,6 +357,26 @@
 
 - (u_int32_t) numberOfBlocksFreeAccordingToBitmap {
 	return (u_int32_t)CFBitVectorGetCountOfBit(_bitVector, (CFRange){ 0, self.numberOfBlocksTotal }, false);
+}
+
+- (void) reportBlocksThatAreAllocatedButHaveNotBeenAccessed {
+	CFRange const entireRange = { 0, self.numberOfBlocksTotal };
+	CFRange searchRange = entireRange;
+	CFRange foundRange;
+	while ((foundRange.location = CFBitVectorGetFirstIndexOfBit(_blocksThatAreAllocatedButWereNotAccessed, searchRange, true)) != kCFNotFound) {
+		searchRange.length -= foundRange.location - searchRange.location;
+		searchRange.location = foundRange.location;
+		CFIndex const lastMissedBit = CFBitVectorGetLastIndexOfBit(_blocksThatAreAllocatedButWereNotAccessed, searchRange, true);
+		ImpPrintf(@"Blocks that have not been accessed: %lu through %lu", foundRange.location, lastMissedBit);
+
+		foundRange.length = (lastMissedBit - foundRange.location) + 1;
+		searchRange.length -= foundRange.length;
+		searchRange.location += foundRange.length;
+	}
+	NSUInteger const numUnreadBlocks = CFBitVectorGetCountOfBit(_blocksThatAreAllocatedButWereNotAccessed, entireRange, true);
+	if (numUnreadBlocks > 0) {
+		ImpPrintf(@"Of the %lu blocks that are marked as allocated, %lu have not been read from", CFBitVectorGetCountOfBit(_bitVector, entireRange, true), numUnreadBlocks);
+	}
 }
 
 - (off_t) offsetOfFirstAllocationBlock {
