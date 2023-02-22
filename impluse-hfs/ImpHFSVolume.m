@@ -216,7 +216,9 @@
 	off_t const readStart = self.volumeStartOffset + self.offsetOfFirstAllocationBlock + startBlock * self.numberOfBytesPerBlock;
 	size_t const numBytesToRead = intoData.length - offset;
 	size_t const numBlocksToRead = ImpCeilingDivide(intoData.length, self.numberOfBytesPerBlock);
-	CFBitVectorSetBits(_blocksThatAreAllocatedButWereNotAccessed, (CFRange) { startBlock, numBlocksToRead }, false);
+	if (_blocksThatAreAllocatedButWereNotAccessed != NULL) {
+		CFBitVectorSetBits(_blocksThatAreAllocatedButWereNotAccessed, (CFRange) { startBlock, numBlocksToRead }, false);
+	}
 //	ImpPrintf(@"Reading 0x%lx bytes (%lu bytes = %lu blocks) from source volume starting at 0x%llx bytes (extent: [ start #%u, %u blocks ])", intoData.length, intoData.length, ImpCeilingDivide(intoData.length, self.numberOfBytesPerBlock), readStart, startBlock, blockCount);
 	if (numBlocksToRead < blockCount) {
 		NSLog(@"Underrun alert! Data is not big enough to hold this extent. Only reading %zu blocks out of this extent's %u blocks", numBlocksToRead, blockCount);
