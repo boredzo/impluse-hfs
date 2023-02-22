@@ -224,6 +224,22 @@ As for total numbers of bytes, looking at a single file generally works consiste
 
 There is an app for Classic Mac OS called “List Files”, by Alessandro Levi Montalcini, which specifically reports the total lengths of data and resource forks, and gives numbers that agree with impluse's output.
 
+### This tool's purpose is preservation, not repair
+
+impluse's HFS+ converter will not attempt to repair errors in the original volume, unless the errors would make the HFS+ version of the volume unmountable or prevent a successful conversion.
+
+This means that “soft errors” in the original HFS volume will generally be reproduced in the converted volume. These may show up in DiskWarrior but not Disk First Aid/fsck. Among the known cases are:
+
+- forks that are allocated more blocks than they need for their length (DiskWarrior shortens them; impluse does not)
+- folders that have an icon file but no custom icon bit (DiskWarrior flags this as an error and will set the custom icon bit in its repair)
+- volumes whose root directory has a different creation date from the volume header (DiskWarrior flags this as an error; at least when the volume's creation date is earlier than the root directory, DiskWarrior changes the root directory to match the volume header)
+
+impluse's primary goal is to reproduce the original volume as faithfully as it can. If the original volume had soft errors that aren't fatal, impluse will generally reproduce them in the converted volume.
+
+If you discover an error in the converted volume, try running the tool that reported the error against the original HFS volume. (This includes fsck/Disk Utility, though you may have to run fsck_hfs directly. fsck_hfs still verifies HFS volumes, even though HFS isn't otherwise supported anymore. Use `fsck_hfs -d -D 0xc63` for verbose output.)
+
+If the original volume is clean, meaning that impluse *introduced* an error, then please file a bug.
+
 ### Possible bugs
 
 It is, of course, entirely possible that this tool has some failure case I haven't encountered yet. Subtle data loss is the hardest failure mode to detect; it's entirely possible that an extraction or conversion could “succeed” but silently corrupt files in one or more ways, or forget to copy some files.
