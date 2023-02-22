@@ -161,6 +161,7 @@
 		ImpHFSPlusVolume *_Nonnull const srcVolPlus = (ImpHFSPlusVolume *_Nonnull const)srcVol;
 		[srcVolPlus peekAtHFSPlusVolumeHeader:^(NS_NOESCAPE const struct HFSPlusVolumeHeader *const vhPtr) {
 			ImpPrintf(@"Volume attributes: 0x%08x", L(vhPtr->attributes));
+			ImpPrintf(@"Creation date: %u", L(vhPtr->createDate));
 			ImpPrintf(@"Space remaining (from volume header): %u blocks (0x%llx bytes)", L(vhPtr->freeBlocks), L(vhPtr->freeBlocks) * (u_int64_t)srcVolPlus.numberOfBytesPerBlock);
 			u_int32_t const numBitsFreeInBitmap = [srcVol numberOfBlocksFreeAccordingToBitmap];
 			ImpPrintf(@"Space remaining (from allocations bitmap): %u blocks (0x%llx bytes)", numBitsFreeInBitmap, numBitsFreeInBitmap * (u_int64_t)srcVolPlus.numberOfBytesPerBlock);
@@ -172,6 +173,7 @@
 		}];
 	} else {
 		[srcVol peekAtHFSVolumeHeader:^(NS_NOESCAPE struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr) {
+			ImpPrintf(@"Creation date: %u", L(mdbPtr->drCrDate));
 			ImpPrintf(@"First allocation block: 0x%llx", (u_int64_t)(L(mdbPtr->drAlBlSt) * kISOStandardBlockSize));
 			ImpPrintf(@"Space remaining: %u blocks (0x%llx bytes)", L(mdbPtr->drFreeBks), (u_int64_t)(L(mdbPtr->drFreeBks) * L(mdbPtr->drAlBlkSiz)));
 			ImpPrintf(@"Clump size is 0x%llx (0x200 * %.1f; ABS * %.1f)", (u_int64_t)L(mdbPtr->drClpSiz), L(mdbPtr->drClpSiz) / (double)kISOStandardBlockSize, L(mdbPtr->drClpSiz) / (double)L(mdbPtr->drAlBlkSiz));
@@ -284,13 +286,19 @@
 			//Each of these will only return HFS or HFS+ catalog entries, so call both. If it's an HFS volume, we'll get HFS entries; if it's HFS+, we'll get HFS+ entries.
 			[node forEachHFSCatalogRecord_file:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFile *const _Nonnull fileRec) {
 				ImpPrintf(@"- 📄 “%@”, ID #%u (0x%x), type %@ creator %@", [srcVol.textEncodingConverter stringForPascalString:catalogKeyPtr->nodeName], L(fileRec->fileID), L(fileRec->fileID),  NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdType)), NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdCreator)));
+				ImpPrintf(@"    Parent ID: #%u (0x%x)", L(catalogKeyPtr->parentID), L(catalogKeyPtr->parentID));
 				++numFiles;
 			} folder:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRec) {
+				struct FndrExtendedFileInfo const *_Nonnull const extFinderInfo = (struct FndrExtendedFileInfo const *)&(folderRec->finderInfo);
 				ImpPrintf(@"- 📁 “%@” with ID #%u, %u items", [srcVol.textEncodingConverter stringForPascalString:catalogKeyPtr->nodeName], L(folderRec->folderID), L(folderRec->valence));
+				ImpPrintf(@"    Node flags: 0x%04x", L(folderRec->flags));
+				ImpPrintf(@"    Finder flags: 0x%04x + 0x%04x", L(folderRec->userInfo.frFlags), L(extFinderInfo->extended_flags));
+				ImpPrintf(@"    Creation date: %u", L(folderRec->createDate));
 				++numFolders;
 			} thread:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogThread *const _Nonnull threadRec) {
-				u_int32_t const threadID = L(threadRec->parentID);
-				ImpPrintf(@"- 🧵 with ID #%u and name %@", threadID, [srcVol.textEncodingConverter stringForPascalString:threadRec->nodeName]);
+				u_int32_t const ownID = L(catalogKeyPtr->parentID);
+				u_int32_t const parentID = L(threadRec->parentID);
+				ImpPrintf(@"- %@🧵 puts item #%u, with name “%@”, in parent ID #%u", L(threadRec->recordType) == kHFSFileThreadRecord ? @"📄" : @"📁", ownID, [[srcVol.textEncodingConverter stringForPascalString:threadRec->nodeName] stringByReplacingOccurrencesOfString:@"\x0d" withString:@"\\r"], parentID);
 				++numThreads;
 			}];
 			NSString *_Nonnull (^_Nonnull const flagsString)(u_int16_t const itemFlags, u_int16_t const finderFlags, u_int16_t const extFinderFlags) = ^NSString *_Nonnull (u_int16_t const itemFlags, u_int16_t const finderFlags, u_int16_t const extFinderFlags) {
@@ -313,19 +321,23 @@
 			};
 			[node forEachHFSPlusCatalogRecord_file:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSPlusCatalogFile *const _Nonnull fileRec) {
 				struct FndrExtendedFileInfo const *_Nonnull const extFinderInfo = (struct FndrExtendedFileInfo const *)&(fileRec->finderInfo);
-				ImpPrintf(@"- 📄 “%@”, ID #%u (0x%x), type %@ creator %@, flags %@", [srcVol.textEncodingConverter stringFromHFSUniStr255:&catalogKeyPtr->nodeName], L(fileRec->fileID), L(fileRec->fileID),  NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdType)), NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdCreator)), flagsString(L(fileRec->flags), L(fileRec->userInfo.fdFlags), L(extFinderInfo->extended_flags)));
+				ImpPrintf(@"- 📄 “%@”, ID #%u (0x%x), type %@ creator %@, flags %@", [[srcVol.textEncodingConverter stringFromHFSUniStr255:&catalogKeyPtr->nodeName] stringByReplacingOccurrencesOfString:@"\x0d" withString:@"\\r"], L(fileRec->fileID), L(fileRec->fileID),  NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdType)), NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdCreator)), flagsString(L(fileRec->flags), L(fileRec->userInfo.fdFlags), L(extFinderInfo->extended_flags)));
 				ImpPrintf(@"    Node flags: 0x%04x", L(fileRec->flags));
 				ImpPrintf(@"    Finder flags: 0x%04x + 0x%04x", L(fileRec->userInfo.fdFlags), L(extFinderInfo->extended_flags));
 				logFork("    ", "DF", &(fileRec->dataFork));
 				logFork("    ", "RF", &(fileRec->resourceFork));
 				++numFiles;
 			} folder:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSPlusCatalogFolder *const _Nonnull folderRec) {
-				ImpPrintf(@"- 📁 “%@” with ID #%u, %u items", [srcVol.textEncodingConverter stringFromHFSUniStr255:&catalogKeyPtr->nodeName], L(folderRec->folderID), L(folderRec->valence));
+				struct FndrExtendedFileInfo const *_Nonnull const extFinderInfo = (struct FndrExtendedFileInfo const *)&(folderRec->finderInfo);
+				ImpPrintf(@"- 📁 “%@” with ID #%u, %u items", [[srcVol.textEncodingConverter stringFromHFSUniStr255:&catalogKeyPtr->nodeName] stringByReplacingOccurrencesOfString:@"\x0d" withString:@"\\r"], L(folderRec->folderID), L(folderRec->valence));
+				ImpPrintf(@"    Node flags: 0x%04x", L(folderRec->flags));
+				ImpPrintf(@"    Finder flags: 0x%04x + 0x%04x", L(folderRec->userInfo.frFlags), L(extFinderInfo->extended_flags));
+				ImpPrintf(@"    Creation date: %u", L(folderRec->createDate));
 				++numFolders;
 			} thread:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSPlusCatalogThread *const _Nonnull threadRec) {
 				u_int32_t const ownID = L(catalogKeyPtr->parentID);
 				u_int32_t const parentID = L(threadRec->parentID);
-				ImpPrintf(@"- %@🧵 puts item #%u, with name “%@”, in parent ID #%u", L(threadRec->recordType) == kHFSPlusFileThreadRecord ? @"📄" : @"📁", ownID, [srcVol.textEncodingConverter stringFromHFSUniStr255:&threadRec->nodeName], parentID);
+				ImpPrintf(@"- %@🧵 puts item #%u, with name “%@”, in parent ID #%u", L(threadRec->recordType) == kHFSPlusFileThreadRecord ? @"📄" : @"📁", ownID, [[srcVol.textEncodingConverter stringFromHFSUniStr255:&threadRec->nodeName] stringByReplacingOccurrencesOfString:@"\x0d" withString:@"\\r"], parentID);
 				++numThreads;
 			}];
 		}
