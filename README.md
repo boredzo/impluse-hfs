@@ -246,4 +246,4 @@ It is, of course, entirely possible that this tool has some failure case I haven
 
 **I strongly recommend preserving a verbatim copy of your original HFS volume, ideally as a read-only UDIF image. I further recommend keeping the original _physical_ copy if possible.** This is your best bet to avoid permanently losing data because you thought it was migrated and it wasn't.
 
-I disclaim all responsibility for any data loss that may occur because you used this tool and foolishly trusted it to copy all data correctly and completely.
+I disclaim all responsibility for any and all data loss that may occur when you use this tool. You use it at your own risk.
