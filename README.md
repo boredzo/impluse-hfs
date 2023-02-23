@@ -236,7 +236,7 @@ This means that “soft errors” in the original HFS volume will generally be r
 
 impluse's primary goal is to reproduce the original volume as faithfully as it can. If the original volume had soft errors that aren't fatal, impluse will generally reproduce them in the converted volume.
 
-If you discover an error in the converted volume, try running the tool that reported the error against the original HFS volume. (This includes fsck/Disk Utility, though you may have to run fsck_hfs directly. fsck_hfs still verifies HFS volumes, even though HFS isn't otherwise supported anymore. Use `fsck_hfs -d -D 0xc63` for verbose output.)
+If you discover an error in the converted volume, try running the tool that reported the error against the original HFS volume. (This includes fsck/Disk Utility, though you may have to run fsck_hfs directly. fsck_hfs still verifies HFS volumes, even though HFS isn't otherwise supported anymore. Use `fsck_hfs -d -D 0xc63` for verbose output, including hex dumps of relevant volume data for some errors.)
 
 If the original volume is clean, meaning that impluse *introduced* an error, then please file a bug.
 
