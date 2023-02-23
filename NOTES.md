@@ -151,6 +151,20 @@ So yeah, an empty leaf node will not work. An empty B*-tree has exactly one node
 
 (As will be discussed later, the extents overflow file in a converted volume ends up empty, so knowing how to create a valid empty B*-tree is necessary.)
 
+## Extents overflow records
+
+The definition of a key in the extents overflow file as given in IM:F is rather confusingly worded. The last member, called `xkrFABN` (extent key record?, first allocation block number) in IM:F and `startBlock` in hfs_format.h, is defined as follows:
+
+>The starting file allocation block number. In the list of the allocation blocks belonging to this file, this number is the index of the first allocation block of the first extent descriptor of the extent record.
+
+I had misunderstood that to mean the `startBlock` value from the first extent in the catalog record's extent record (or in the volume header, in the case of the special files' own initial extent records).
+
+Turns out that by “the first allocation block of the first extent descriptor of the extent record”, they mean _the extent record associated with this key_.
+
+This is synonymous with the total block count of all of the preceding extents for that file. So, if you're looking up a file whose initial extents' lengths are { 16, 4, 2 }, that's 16+4+2=22, and so the `startBlock` of the extent key is 22. Where that first extent starts is irrelevant.
+
+Presumably this is also used for successive extent records. If the second extent record contains, say, three extents whose lengths are { 5, 5, 9 }, that's 19 more blocks, so I predict that the third extent record will be under a key whose `startBlock` is 22+19=41.
+
 ## Catalog records
 
 There are four kinds of records in a catalog leaf node:
