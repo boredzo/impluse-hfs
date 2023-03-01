@@ -1024,6 +1024,7 @@
 - (instancetype _Nonnull) initWithVolume:(ImpHFSPlusVolume *_Nonnull const)dstVol extents:(struct HFSPlusExtentDescriptor const *_Nonnull const)extentRecPtr {
 	if ((self = [super init])) {
 		_backingVolume = dstVol;
+
 		_extentsData = [NSMutableData dataWithLength:sizeof(struct HFSPlusExtentDescriptor) * kHFSPlusExtentDensity];
 		_extentsPtr = _extentsData.mutableBytes;
 		NSUInteger totalSize = 0;
@@ -1039,6 +1040,7 @@
 			++_numExtents;
 		}
 		_numExtentsIncludingEmpties += kHFSPlusExtentDensity;
+
 		_totalPhysicalSize = totalSize;
 		_blockSize = dstVol.blockSize;
 		dataNotYetWritten = [NSMutableData dataWithCapacity:_blockSize * 2];
