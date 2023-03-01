@@ -808,8 +808,8 @@
 			loadedSuccessfully = [srcVol loadAndReturnError:outError];
 			self.sourceVolume = srcVol;
 
-			u_int64_t const sizeInBytes = srcVol.totalSizeInBytes;
-			self.destinationVolume = [[ImpHFSPlusVolume alloc] initForWritingToFileDescriptor:writeFD volumeSizeInBytes:sizeInBytes];
+			u_int64_t const lengthInBytes = srcVol.lengthInBytes;
+			self.destinationVolume = [[ImpHFSPlusVolume alloc] initForWritingToFileDescriptor:writeFD expectedLengthInBytes:lengthInBytes];
 
 			haveFoundHFSVolume = true;
 		}

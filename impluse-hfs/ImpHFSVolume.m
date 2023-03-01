@@ -31,7 +31,6 @@
 	NSMutableData *_volumeBitmapData;
 	CFBitVectorRef _bitVector;
 	CFMutableBitVectorRef _blocksThatAreAllocatedButWereNotAccessed;
-	u_int64_t _lengthInBytes;
 }
 
 - (instancetype _Nonnull) initWithFileDescriptor:(int const)readFD
@@ -409,7 +408,7 @@
 	//TODO: Use ImpTextEncodingConverter and connect this to any user-facing configuration options for HFS text encoding.
 	return CFAutorelease(CFStringCreateWithPascalStringNoCopy(kCFAllocatorDefault, _mdb->drVN, kCFStringEncodingMacRoman, kCFAllocatorNull));
 }
-- (u_int64_t) totalSizeInBytes {
+- (u_int64_t) lengthInBytes {
 	return (
 		_lengthInBytes > 0
 		? _lengthInBytes

@@ -54,31 +54,18 @@
 	bool _hasVolumeHeader;
 }
 
-- (instancetype _Nonnull)initForWritingToFileDescriptor:(int)writeFD volumeSizeInBytes:(u_int64_t)sizeInBytes {
+- (instancetype _Nonnull)initForWritingToFileDescriptor:(int)writeFD expectedLengthInBytes:(u_int64_t)lengthInBytes {
 	if ((self = [super init])) {
 		_writeFD = writeFD;
 
-		_sizeInBytes = sizeInBytes;
+		_lengthInBytes = lengthInBytes;
 		//Make sure our output file is as large as it's supposed to be.
-		ftruncate(_writeFD, _sizeInBytes);
+		ftruncate(_writeFD, _lengthInBytes);
 
 		_preamble = [NSMutableData dataWithLength:kISOStandardBlockSize * 3];
 		_vh = _preamble.mutableBytes + (kISOStandardBlockSize * 2);
 	}
 	return self;
-}
-
-- (instancetype _Nonnull)initForWritingToFileDescriptor:(int)writeFD {
-	u_int64_t sizeInBytes = 0;
-	struct stat sb;
-	int const statResult = fstat(_writeFD, &sb);
-	if (statResult == 0) {
-		off_t const sizeAccordingToStat = sb.st_size;
-		if (sizeAccordingToStat > 0) {
-			sizeInBytes = (u_int64_t)sizeAccordingToStat;
-		}
-	}
-	return [self initForWritingToFileDescriptor:writeFD volumeSizeInBytes:sizeInBytes];
 }
 
 - (bool) flushVolumeStructures:(NSError *_Nullable *_Nullable const)outError {
@@ -115,7 +102,7 @@
 
 	//The postamble is the last 1 K of the volume, containing the alternate volume header and the footer.
 	//The postamble needs to be in the very last 1 K of the disk, regardless of where the a-block boundary is. TN1150 is explicit that this region can lie outside of an a-block and any a-blocks it does lie inside of must be marked as used.
-	off_t const last1KStart = self.sizeInBytes - (kISOStandardBlockSize * 2);
+	off_t const last1KStart = self.lengthInBytes - (kISOStandardBlockSize * 2);
 	amtWritten = pwrite(_writeFD, volumeHeader.bytes, volumeHeader.length, last1KStart);
 	if (amtWritten < volumeHeader.length) {
 		NSError *_Nonnull const cantWriteAltVolumeHeaderError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Could not write alternate volume header", @"") }];
@@ -203,7 +190,7 @@
 	//Do this a little differently for the postamble, which isn't guaranteed to be in an allocation block. (E.g., if the allocation block size is 0x800 bytes, and the volume length is a multiple of 0x400 but not 0x800, there is no allocation block for the last 0x400 bytes—which is where the postamble goes.) So this extent may start after the last allocation block and be zero length because of that. Or it may start on an actual a-block and be one or two a-blocks long.
 	//This assumes that the volume will have more than five blocks (i.e., that the preamble and postamble won't run into each other).
 	u_int32_t const postambleLengthInBytes = kISOStandardBlockSize * 2;
-	_postambleStartInBytes = self.sizeInBytes - postambleLengthInBytes;
+	_postambleStartInBytes = self.lengthInBytes - postambleLengthInBytes;
 	_postambleExtent = [self extentFromByteOffset:_postambleStartInBytes size:postambleLengthInBytes];
 	u_int32_t const firstPostambleBlock = L(_postambleExtent.startBlock);
 	u_int32_t const numPostambleBlocks = L(_postambleExtent.blockCount);

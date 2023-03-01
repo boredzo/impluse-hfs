@@ -94,12 +94,12 @@
 	__block bool hasAnyFiles = false;
 	__block NSUInteger numFilesCopied = 0, numFoldersCopied = 0;
 
-	u_int64_t const volumeSizeInBytes = dstVol.sizeInBytes ?: srcVol.totalSizeInBytes;
+	u_int64_t const volumeLengthInBytes = dstVol.lengthInBytes ?: srcVol.lengthInBytes;
 
 	u_int32_t const bytesPerSourceABlock = (u_int32_t)srcVol.numberOfBytesPerBlock;
 
 	u_int32_t const bytesPerABlock = L(vh->blockSize);
-	u_int32_t const numBlocksInVolume = (u_int32_t)(volumeSizeInBytes / bytesPerABlock);
+	u_int32_t const numBlocksInVolume = (u_int32_t)(volumeLengthInBytes / bytesPerABlock);
 	[dstVol initializeAllocationBitmapWithBlockSize:bytesPerABlock count:numBlocksInVolume];
 
 	//We do need to create/have an extents overflow file, even if it's empty.

@@ -13,6 +13,9 @@
 #import "ImpForkUtilities.h"
 
 @interface ImpHFSVolume : NSObject
+{
+	u_int64_t _startOffsetInBytes, _lengthInBytes;
+}
 
 ///startOffset should be 0 for volumes from bare-volume images. For volumes found in a partition map, startOffset should be the offset into the device/image in bytes where the preamble starts.
 ///lengthInBytes can be 0, in which case the whole device/image should be used.
@@ -30,7 +33,7 @@
 @property(readonly) u_int64_t startOffsetInBytes;
 
 ///The total length of the volume, from preamble to postamble. May be an estimate based on the volume header, if the volume was created from a device.
-@property(nonatomic, readonly) u_int64_t totalSizeInBytes;
+@property(nonatomic, readonly) u_int64_t lengthInBytes;
 
 ///Read the boot blocks, volume header, and allocation bitmap in that order, followed by the extents overflow file and catalog file.
 - (bool)loadAndReturnError:(NSError *_Nullable *_Nonnull const)outError;
