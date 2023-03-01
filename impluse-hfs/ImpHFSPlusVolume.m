@@ -746,7 +746,7 @@
 		bigExtents:_vh->catalogFile.extents
 		numExtents:kHFSPlusExtentDensity
 		error:outError];
-	ImpPrintf(@"Catalog file data: logical length 0x%lx bytes (%lu a-blocks); read 0x%lx bytes", L(_vh->catalogFile.logicalSize), L(_vh->catalogFile.totalBlocks), catalogFileData.length);
+	ImpPrintf(@"Catalog file data: logical length 0x%llx bytes (%u a-blocks); read 0x%lx bytes", L(_vh->catalogFile.logicalSize), L(_vh->catalogFile.totalBlocks), catalogFileData.length);
 
 	if (catalogFileData != nil) {
 		self.catalogBTree = [[ImpBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSPlusCatalog data:catalogFileData];
@@ -772,7 +772,7 @@
 		bigExtents:_vh->extentsFile.extents
 		numExtents:kHFSPlusExtentDensity
 		error:outError];
-	ImpPrintf(@"Extents overflow file data: logical length 0x%lx bytes (%lu a-blocks); read 0x%lx bytes", L(_vh->extentsFile.logicalSize), L(_vh->extentsFile.totalBlocks), extentsFileData.length);
+	ImpPrintf(@"Extents overflow file data: logical length 0x%llx bytes (%u a-blocks); read 0x%lx bytes", L(_vh->extentsFile.logicalSize), L(_vh->extentsFile.totalBlocks), extentsFileData.length);
 	if (extentsFileData != nil) {
 		self.extentsOverflowBTree = [[ImpBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSPlusExtentsOverflow data:extentsFileData];
 		if (self.extentsOverflowBTree == nil) {

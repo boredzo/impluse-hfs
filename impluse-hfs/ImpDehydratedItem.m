@@ -808,7 +808,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 			}
 			case ImpDehydratedItemTypeFolder:
 			case ImpDehydratedItemTypeVolume:
-				ImpPrintf(@"%@ contains %u items", firstColumnForItem(item, depth), [item countOfChildren]);
+				ImpPrintf(@"%@ contains %lu items", firstColumnForItem(item, depth), (unsigned long)[item countOfChildren]);
 				break;
 			default:
 				ImpPrintf(@"%@", firstColumnForItem(item, depth));
