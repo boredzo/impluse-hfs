@@ -603,11 +603,11 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 			return @"📁";
 		case ImpDehydratedItemTypeVolume:
 			if (volume != nil) {
-				if (volume.totalSizeInBytes <= floppyMaxSize) {
+				if (volume.lengthInBytes <= floppyMaxSize) {
 					return @"💾";
-				} else if (volume.totalSizeInBytes <= cdMaxSize) {
+				} else if (volume.lengthInBytes <= cdMaxSize) {
 					return @"💿";
-				} else if (volume.totalSizeInBytes <= dvdMaxSize) {
+				} else if (volume.lengthInBytes <= dvdMaxSize) {
 					return @"📀";
 				} else {
 					return @"🗄";
@@ -628,11 +628,11 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 			return NSFileTypeForHFSTypeCode(kGenericFolderIcon);
 		case ImpDehydratedItemTypeVolume:
 			if (volume != nil) {
-				if (volume.totalSizeInBytes <= floppyMaxSize) {
+				if (volume.lengthInBytes <= floppyMaxSize) {
 					return NSFileTypeForHFSTypeCode(kGenericFloppyIcon);
-				} else if (volume.totalSizeInBytes <= cdMaxSize) {
+				} else if (volume.lengthInBytes <= cdMaxSize) {
 					return NSFileTypeForHFSTypeCode(kGenericCDROMIcon);
-				} else if (volume.totalSizeInBytes <= dvdMaxSize) {
+				} else if (volume.lengthInBytes <= dvdMaxSize) {
 					//Unlike emoji, there's no DVD icon.
 					return NSFileTypeForHFSTypeCode(kGenericCDROMIcon);
 				} else {

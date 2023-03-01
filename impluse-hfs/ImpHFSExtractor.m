@@ -8,6 +8,7 @@
 #import "ImpHFSExtractor.h"
 
 #import "ImpHFSVolume.h"
+#import "ImpVolumeProbe.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
 #import "ImpDehydratedItem.h"
@@ -107,81 +108,89 @@
 		return false;
 	}
 
-	[self deliverProgressUpdate:0.0 operationDescription:@"Reading HFS volume structures"];
+	[self deliverProgressUpdate:0.0 operationDescription:@"Finding HFS volume"];
 
-	ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD textEncoding:self.hfsTextEncoding];
-	if (! [srcVol loadAndReturnError:outError])
-		return false;
-
-	bool const grabEverything = (self.quarryNameOrPath == nil);
-	if (grabEverything) {
-		self.quarryNameOrPath = [srcVol.volumeName stringByAppendingString:@":"];
-	}
-	bool const grabAnyFileWithThisName = ! [self isHFSPath:self.quarryNameOrPath];
-	//TODO: Possibly in need of special-casing: When parsedPath is @[ @"" ], it means the user asked for ':'. Treat this as a relative path to the root directory, and unarchive the entire root volume.
-	NSArray <NSString *> *_Nonnull const parsedPath = [self parseHFSPath:self.quarryNameOrPath];
-
-	//TODO: Need to implement the smarter destination path logic promised in the help. This requires the user to specify the destination path including filename.
-	__block ImpDehydratedItem *_Nullable matchedByPath = nil;
-	NSMutableSet <ImpDehydratedItem *> *_Nonnull const matchedByName = [NSMutableSet setWithCapacity:1];
-
-	ImpBTreeFile *_Nonnull const catalog = srcVol.catalogBTree;
-	[catalog walkLeafNodes:^bool(ImpBTreeNode *_Nonnull const node) {
-		@autoreleasepool {
-			[node forEachHFSCatalogRecord_file:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFile *const _Nonnull fileRec) {
-				ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSVolume:srcVol catalogNodeID:L(fileRec->fileID) key:catalogKeyPtr fileRecord:fileRec];
-	//				ImpPrintf(@"We're looking for “%@” and found a file named “%@”", self.quarryName, dehydratedFile.name);
-				bool const nameIsEqual = [dehydratedFile.name isEqualToString:self.quarryName];
-				bool const shouldRehydrateBecauseName = (grabAnyFileWithThisName && nameIsEqual);
-				bool const shouldRehydrateBecausePath = [self isQuarryPath:parsedPath isEqualToCatalogPath:dehydratedFile.path];
-				if (shouldRehydrateBecauseName) {
-					[matchedByName addObject:dehydratedFile];
-				}
-				if (shouldRehydrateBecausePath) {
-					matchedByPath = dehydratedFile;
-				}
-			} folder:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRec) {
-				ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSVolume:srcVol catalogNodeID:L(folderRec->folderID) key:catalogKeyPtr folderRecord:folderRec];
-	//				ImpPrintf(@"We're looking for “%@” and found a file named “%@”", self.quarryName, dehydratedFile.name);
-				bool const nameIsEqual = [dehydratedFolder.name isEqualToString:self.quarryName];
-				bool const shouldRehydrateBecauseName = (grabAnyFileWithThisName && nameIsEqual);
-				bool const shouldRehydrateBecausePath = [self isQuarryPath:parsedPath isEqualToCatalogPath:dehydratedFolder.path];
-				if (shouldRehydrateBecauseName) {
-					[matchedByName addObject:dehydratedFolder];
-				}
-				if (shouldRehydrateBecausePath) {
-					matchedByPath = dehydratedFolder;
-				}
-			} thread:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogThread *const _Nonnull threadRec) {
-				//Ignore thread records.
-			}];
+	ImpVolumeProbe *_Nonnull const probe = [[ImpVolumeProbe alloc] initWithFileDescriptor:readFD];
+	[probe findVolumes:^(const u_int64_t startOffsetInBytes, const u_int64_t lengthInBytes, Class  _Nullable const __unsafe_unretained volumeClass) {
+		if (volumeClass != Nil && volumeClass != [ImpHFSVolume class]) {
+			//We only extract from HFS volumes. Skip.
+			return;
 		}
 
-		return true;
-	}];
+		ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
+		if (! [srcVol loadAndReturnError:outError])
+			return;
 
-	NSMutableArray <ImpDehydratedItem *> *_Nonnull const matches = [NSMutableArray arrayWithCapacity:(matchedByPath != nil) + matchedByName.count];
-	if (matchedByPath != nil) [matches addObject:matchedByPath];
-	[matches addObjectsFromArray:matchedByName.allObjects];
-
-	if (matches.count == 0) {
-		ImpPrintf(@"No such item found.");
-	} else if (matches.count > 1) {
-		ImpPrintf(@"Multiple matches found:");
-		for (ImpDehydratedItem *_Nonnull const item in matches) {
-			ImpPrintf(@"- %@", [item.path componentsJoinedByString:@":"]);
+		bool const grabEverything = (self.quarryNameOrPath == nil);
+		if (grabEverything) {
+			self.quarryNameOrPath = [srcVol.volumeName stringByAppendingString:@":"];
 		}
-	} else {
-		ImpDehydratedItem *_Nonnull const item = matches.firstObject;
-//		ImpPrintf(@"Found an item named %@ with parent item #%u", item.name, item.parentFolderID);
-		NSString *_Nonnull const destPath = self.destinationPath ?: [item.name stringByReplacingOccurrencesOfString:@"/" withString:@":"];
-		rehydrated = [item rehydrateAtRealWorldURL:[NSURL fileURLWithPath:destPath isDirectory:false] error:outError];
-		if (! rehydrated) {
-			ImpPrintf(@"Failed to rehydrate file named %@: %@", item.name, *outError);
+		bool const grabAnyFileWithThisName = ! [self isHFSPath:self.quarryNameOrPath];
+		//TODO: Possibly in need of special-casing: When parsedPath is @[ @"" ], it means the user asked for ':'. Treat this as a relative path to the root directory, and unarchive the entire root volume.
+		NSArray <NSString *> *_Nonnull const parsedPath = [self parseHFSPath:self.quarryNameOrPath];
+
+		//TODO: Need to implement the smarter destination path logic promised in the help. This requires the user to specify the destination path including filename.
+		__block ImpDehydratedItem *_Nullable matchedByPath = nil;
+		NSMutableSet <ImpDehydratedItem *> *_Nonnull const matchedByName = [NSMutableSet setWithCapacity:1];
+
+		ImpBTreeFile *_Nonnull const catalog = srcVol.catalogBTree;
+		[catalog walkLeafNodes:^bool(ImpBTreeNode *_Nonnull const node) {
+			@autoreleasepool {
+				[node forEachHFSCatalogRecord_file:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFile *const _Nonnull fileRec) {
+					ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSVolume:srcVol catalogNodeID:L(fileRec->fileID) key:catalogKeyPtr fileRecord:fileRec];
+		//				ImpPrintf(@"We're looking for “%@” and found a file named “%@”", self.quarryName, dehydratedFile.name);
+					bool const nameIsEqual = [dehydratedFile.name isEqualToString:self.quarryName];
+					bool const shouldRehydrateBecauseName = (grabAnyFileWithThisName && nameIsEqual);
+					bool const shouldRehydrateBecausePath = [self isQuarryPath:parsedPath isEqualToCatalogPath:dehydratedFile.path];
+					if (shouldRehydrateBecauseName) {
+						[matchedByName addObject:dehydratedFile];
+					}
+					if (shouldRehydrateBecausePath) {
+						matchedByPath = dehydratedFile;
+					}
+				} folder:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRec) {
+					ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSVolume:srcVol catalogNodeID:L(folderRec->folderID) key:catalogKeyPtr folderRecord:folderRec];
+		//				ImpPrintf(@"We're looking for “%@” and found a file named “%@”", self.quarryName, dehydratedFile.name);
+					bool const nameIsEqual = [dehydratedFolder.name isEqualToString:self.quarryName];
+					bool const shouldRehydrateBecauseName = (grabAnyFileWithThisName && nameIsEqual);
+					bool const shouldRehydrateBecausePath = [self isQuarryPath:parsedPath isEqualToCatalogPath:dehydratedFolder.path];
+					if (shouldRehydrateBecauseName) {
+						[matchedByName addObject:dehydratedFolder];
+					}
+					if (shouldRehydrateBecausePath) {
+						matchedByPath = dehydratedFolder;
+					}
+				} thread:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogThread *const _Nonnull threadRec) {
+					//Ignore thread records.
+				}];
+			}
+
+			return true;
+		}];
+
+		NSMutableArray <ImpDehydratedItem *> *_Nonnull const matches = [NSMutableArray arrayWithCapacity:(matchedByPath != nil) + matchedByName.count];
+		if (matchedByPath != nil) [matches addObject:matchedByPath];
+		[matches addObjectsFromArray:matchedByName.allObjects];
+
+		if (matches.count == 0) {
+			ImpPrintf(@"No such item found.");
+		} else if (matches.count > 1) {
+			ImpPrintf(@"Multiple matches found:");
+			for (ImpDehydratedItem *_Nonnull const item in matches) {
+				ImpPrintf(@"- %@", [item.path componentsJoinedByString:@":"]);
+			}
 		} else {
-			[self deliverProgressUpdate:1.0 operationDescription:@"Extraction complete."];
+			ImpDehydratedItem *_Nonnull const item = matches.firstObject;
+	//		ImpPrintf(@"Found an item named %@ with parent item #%u", item.name, item.parentFolderID);
+			NSString *_Nonnull const destPath = self.destinationPath ?: [item.name stringByReplacingOccurrencesOfString:@"/" withString:@":"];
+			rehydrated = [item rehydrateAtRealWorldURL:[NSURL fileURLWithPath:destPath isDirectory:false] error:outError];
+			if (! rehydrated) {
+				ImpPrintf(@"Failed to rehydrate file named %@: %@", item.name, *outError);
+			} else {
+				[self deliverProgressUpdate:1.0 operationDescription:@"Extraction complete."];
+			}
 		}
-	}
+	}];
 
 	return rehydrated;
 }

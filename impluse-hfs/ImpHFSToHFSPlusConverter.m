@@ -16,6 +16,7 @@
 #import "ImpErrorUtilities.h"
 #import "ImpHFSVolume.h"
 #import "ImpHFSPlusVolume.h"
+#import "ImpVolumeProbe.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
 #import "ImpBTreeHeaderNode.h"
@@ -99,6 +100,8 @@
 {
 	TextEncoding _hfsTextEncoding, _hfsPlusTextEncoding;
 	TextToUnicodeInfo _ttui;
+	int _readFD, _writeFD;
+	bool _hasReportedPostVolumeLength;
 }
 
 - (instancetype _Nonnull)init {
@@ -173,6 +176,9 @@
 
 - (void) reportSourceBlocksCopied:(NSUInteger const)thisManyMore {
 	self.numberOfSourceBlocksCopied = self.numberOfSourceBlocksCopied + thisManyMore;
+}
+- (void) reportSourceBlocksWillBeCopied:(NSUInteger const)thisManyMore {
+	self.numberOfSourceBlocksToCopy = self.numberOfSourceBlocksToCopy + thisManyMore;
 }
 - (void) reportSourceBlocksWillNotBeCopied:(NSUInteger const)thisManyFewer {
 	self.numberOfSourceBlocksToCopy = self.numberOfSourceBlocksToCopy - thisManyFewer;
@@ -777,38 +783,64 @@
 		return false;
 	}
 
-	int const readFD = open(self.sourceDevice.fileSystemRepresentation, O_RDONLY);
-	if (readFD < 0) {
+	_readFD = open(self.sourceDevice.fileSystemRepresentation, O_RDONLY);
+	if (_readFD < 0) {
 		NSError *_Nonnull const cantOpenForReadingError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: @"Can't open source device for reading" }];
 		if (outError != NULL) *outError = cantOpenForReadingError;
 		return false;
 	}
-	int const writeFD = open(self.destinationDevice.fileSystemRepresentation, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-	if (writeFD < 0) {
+	_writeFD = open(self.destinationDevice.fileSystemRepresentation, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	if (_writeFD < 0) {
 		NSError *_Nonnull const cantOpenForWritingError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: @"Can't open destination device for writing" }];
 		if (outError != NULL) *outError = cantOpenForWritingError;
 		return false;
 	}
 
-	ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD textEncoding:self.hfsTextEncoding];
-	if (! [srcVol loadAndReturnError:outError])
-		return false;
-	self.sourceVolume = srcVol;
+	ImpVolumeProbe *_Nonnull const probe = [[ImpVolumeProbe alloc] initWithFileDescriptor:_readFD];
+	__block bool haveFoundHFSVolume = false;
+	__block bool loadedSuccessfully = false;
+	[probe findVolumes:^(u_int64_t const startOffsetInBytes, u_int64_t const lengthInBytes, Class _Nullable const volumeClass) {
+		if (! haveFoundHFSVolume) {
+			if (volumeClass != Nil && volumeClass != [ImpHFSVolume class]) {
+				//We have an identified volume class, but it isn't HFS. Most likely, this is already HFS+. Skip.
+				return;
+			}
 
-	u_int64_t sizeInBytes = 0;
-	struct stat sb;
-	int const statResult = fstat(readFD, &sb);
-	if (statResult == 0) {
-		off_t const sizeAccordingToStat = sb.st_size;
-		sizeInBytes = sizeAccordingToStat > 0 ? sizeAccordingToStat : 0;
+			ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:self->_readFD
+				startOffsetInBytes:startOffsetInBytes
+				lengthInBytes:lengthInBytes
+				textEncoding:self.hfsTextEncoding];
+			loadedSuccessfully = [srcVol loadAndReturnError:outError];
+			self.sourceVolume = srcVol;
+
+			u_int64_t const lengthInBytes = srcVol.lengthInBytes;
+			self.destinationVolume = [[ImpHFSPlusVolume alloc] initForWritingToFileDescriptor:self->_writeFD
+				startAtOffset:startOffsetInBytes
+				expectedLengthInBytes:lengthInBytes];
+
+			haveFoundHFSVolume = true;
+		}
+	}];
+
+	if (haveFoundHFSVolume) {
+		//Strictly speaking, the data before and after the volume doesn't need to be a multiple of the block size.
+		//But the denominator of our progress calculation is in source allocation blocks, so using ISO standard blocks for surrounding data could exaggerate its proportion of what remains to be copied.
+		u_int64_t const volumeStartOffset = self.sourceVolume.startOffsetInBytes;
+		u_int64_t const blockSize = self.sourceVolume.numberOfBytesPerBlock;
+		[self reportSourceBlocksWillBeCopied:ImpCeilingDivide(volumeStartOffset, blockSize)];
+
+		struct stat sb;
+		int const statResult = fstat(_readFD, &sb);
+		if (statResult == 0 && sb.st_size >= 0) {
+			u_int64_t const overallSourceLength = sb.st_size;
+			u_int64_t const volumeLength = self.sourceVolume.lengthInBytes;
+			u_int64_t const volumeEndOffset = (volumeStartOffset + volumeLength);
+			[self reportSourceBlocksWillBeCopied:ImpCeilingDivide((overallSourceLength - volumeEndOffset), blockSize)];
+			_hasReportedPostVolumeLength = true;
+		}
 	}
-	if (sizeInBytes == 0) {
-		sizeInBytes = srcVol.totalSizeInBytes;
-	}
 
-	self.destinationVolume = [[ImpHFSPlusVolume alloc] initForWritingToFileDescriptor:writeFD volumeSizeInBytes:sizeInBytes];
-
-	return true;
+	return haveFoundHFSVolume;
 }
 
 - (bool) step1_convertPreamble_error:(NSError *_Nullable *_Nullable const)outError {
@@ -822,7 +854,7 @@
 		//We currently do this so the volume's _hasVolumeHeader gets set to true. Maybe that should have a setter method so we can use mutableVolumeHeaderPointer instead?
 		self.destinationVolume.volumeHeader = volumeHeaderData;
 	}];
-	_numberOfSourceBlocksToCopy = self.sourceVolume.numberOfBlocksUsed;
+	[self reportSourceBlocksWillBeCopied:self.sourceVolume.numberOfBlocksUsed];
 
 	return [self.destinationVolume writeTemporaryPreamble:outError];
 }
@@ -832,7 +864,88 @@
 	return false;
 }
 
+///Copy the partition map (if any) and any other partitions before the volume.
+- (bool) copyBytesBeforeVolume_error:(NSError *_Nullable *_Nullable const)outError {
+	lseek(_readFD, 0, SEEK_SET);
+	lseek(_writeFD, 0, SEEK_SET);
+
+	ImpHFSVolume *_Nonnull const srcVol = self.sourceVolume;
+	u_int64_t const blockSize = srcVol.numberOfBytesPerBlock;
+	NSMutableData *_Nonnull const bufferData = [NSMutableData dataWithLength:blockSize];
+	void *_Nonnull const buf = bufferData.mutableBytes;
+
+	u_int64_t const numBytesBeforeVolume = srcVol.startOffsetInBytes;
+	u_int64_t const numBlocksBeforeVolume = ImpCeilingDivide(numBytesBeforeVolume, blockSize);
+	for (u_int64_t i = 0; i < numBlocksBeforeVolume; ++i) {
+		ssize_t amtRead = read(_readFD, buf, blockSize);
+		if (amtRead < 0) {
+			NSError *_Nonnull const readError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Failure to read data prior to volume", @"Converter error") }];
+			if (outError != NULL) {
+				*outError = readError;
+			}
+			return false;
+		}
+
+		ssize_t amtWritten = write(_writeFD, buf, blockSize);
+		if (amtWritten < 0) {
+			NSError *_Nonnull const writeError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Failure to write data prior to volume", @"Converter error") }];
+			if (outError != NULL) {
+				*outError = writeError;
+			}
+			return false;
+		}
+
+		[self reportSourceBlocksCopied:1];
+	}
+
+	return true;
+}
+///Copy any other partitions after the volume.
+- (bool) copyBytesAfterVolume_error:(NSError *_Nullable *_Nullable const)outError {
+	ImpHFSVolume *_Nonnull const srcVol = self.sourceVolume;
+	u_int64_t const numBytesBeforeEndOfVolume = srcVol.startOffsetInBytes + srcVol.lengthInBytes;
+	lseek(_readFD, numBytesBeforeEndOfVolume, SEEK_SET);
+	lseek(_writeFD, numBytesBeforeEndOfVolume, SEEK_SET);
+
+	u_int64_t const blockSize = srcVol.numberOfBytesPerBlock;
+
+	NSMutableData *_Nonnull const bufferData = [NSMutableData dataWithLength:blockSize];
+	void *_Nonnull const buf = bufferData.mutableBytes;
+
+	ssize_t amtRead = 0;
+	while ((amtRead = read(_readFD, buf, blockSize)) > 0) {
+		ssize_t amtWritten = write(_writeFD, buf, blockSize);
+		if (amtWritten < 0) {
+			NSError *_Nonnull const writeError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Failure to write data following volume", @"Converter error") }];
+			if (outError != NULL) {
+				*outError = writeError;
+			}
+			return false;
+		}
+
+		//If we haven't previously reported the number of these blocks to be copied, don't worry about reporting them copied.
+		if (_hasReportedPostVolumeLength) {
+			[self reportSourceBlocksCopied:1];
+		}
+	}
+	if (amtRead < 0) {
+		NSError *_Nonnull const readError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Failure to read data following volume", @"Converter error") }];
+		if (outError != NULL) {
+			*outError = readError;
+		}
+		return false;
+	}
+
+	return true;
+}
 - (bool) step3_flushVolume_error:(NSError *_Nullable *_Nullable const)outError {
+	if (! [self copyBytesBeforeVolume_error:outError]) {
+		return false;
+	}
+	if (! [self copyBytesAfterVolume_error:outError]) {
+		return false;
+	}
+
 	bool const flushed = [self.destinationVolume flushVolumeStructures:outError];
 	if (flushed) {
 		[self reportSourceBlocksCopied:5]; //Two for the boot blocks, one for the volume header, one for the alternate volume header, and one for the reserved footer.

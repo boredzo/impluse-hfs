@@ -35,12 +35,9 @@
 ///ImpHFSPlusVolume is a subclass of ImpHFSVolume so that the same methods can be used to read (or diagnose) an HFS+ volume.
 @interface ImpHFSPlusVolume : ImpHFSVolume
 
-- (instancetype _Nonnull)initForWritingToFileDescriptor:(int)writeFD volumeSizeInBytes:(u_int64_t)sizeInBytes;
-
-- (instancetype _Nonnull)initForWritingToFileDescriptor:(int)writeFD;
-
-///The total size in bytes of the volume. The initializer will attempt to automatically set this based on statting the file descriptor. However, if the output file is empty, this will achieve very little.
-@property u_int64_t sizeInBytes;
+- (instancetype _Nonnull)initForWritingToFileDescriptor:(int)writeFD
+	startAtOffset:(u_int64_t)startOffsetInBytes
+	expectedLengthInBytes:(u_int64_t)lengthInBytes;
 
 ///Write all of the volume structures, including the volume header and all special files (catalog, etc.). to the appropriate extents in the file descriptor.
 ///This should be the very last step after copying user data into the volume, since writing these structures makes the volume mountable, and closing the file descriptor will cue Disk Arbitration to search the file for mountable volumes.

@@ -22,10 +22,14 @@ typedef void (^ImpConversionProgressUpdateBlock)(double progress, NSString *_Non
 @property(readwrite) NSUInteger numberOfSourceBlocksToCopy;
 ///The number of blocks from the source volume that have been copied.
 @property(readwrite) NSUInteger numberOfSourceBlocksCopied;
+
 ///Increase self.numberOfSourceBlocksCopied by this number.
 - (void) reportSourceBlocksCopied:(NSUInteger const)thisManyMore;
+///Increase self.numberOfSourceBlocksToCopy by this number.
+- (void) reportSourceBlocksWillBeCopied:(NSUInteger const)thisManyMore;
 ///Decrease self.numberOfSourceBlocksToCopy by this number.
 - (void) reportSourceBlocksWillNotBeCopied:(NSUInteger const)thisManyFewer;
+
 ///Increase self.numberOfSourceBlocksCopied by the total number of blocks indicated by an extent record.
 - (void) reportSourceExtentRecordCopied:(struct HFSExtentDescriptor const *_Nonnull const)extRecPtr;
 ///Decrease self.numberOfSourceBlocksToCopy by the total number of blocks indicated by an extent record.

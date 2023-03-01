@@ -54,31 +54,20 @@
 	bool _hasVolumeHeader;
 }
 
-- (instancetype _Nonnull)initForWritingToFileDescriptor:(int)writeFD volumeSizeInBytes:(u_int64_t)sizeInBytes {
+- (instancetype _Nonnull)initForWritingToFileDescriptor:(int)writeFD
+	startAtOffset:(u_int64_t)startOffsetInBytes
+	expectedLengthInBytes:(u_int64_t)lengthInBytes
+{
 	if ((self = [super init])) {
 		_writeFD = writeFD;
 
-		_sizeInBytes = sizeInBytes;
-		//Make sure our output file is as large as it's supposed to be.
-		ftruncate(_writeFD, _sizeInBytes);
+		_startOffsetInBytes = startOffsetInBytes;
+		_lengthInBytes = lengthInBytes;
 
 		_preamble = [NSMutableData dataWithLength:kISOStandardBlockSize * 3];
 		_vh = _preamble.mutableBytes + (kISOStandardBlockSize * 2);
 	}
 	return self;
-}
-
-- (instancetype _Nonnull)initForWritingToFileDescriptor:(int)writeFD {
-	u_int64_t sizeInBytes = 0;
-	struct stat sb;
-	int const statResult = fstat(_writeFD, &sb);
-	if (statResult == 0) {
-		off_t const sizeAccordingToStat = sb.st_size;
-		if (sizeAccordingToStat > 0) {
-			sizeInBytes = (u_int64_t)sizeAccordingToStat;
-		}
-	}
-	return [self initForWritingToFileDescriptor:writeFD volumeSizeInBytes:sizeInBytes];
 }
 
 - (bool) flushVolumeStructures:(NSError *_Nullable *_Nullable const)outError {
@@ -89,8 +78,9 @@
 		return false;
 	}
 
+	u_int64_t const volumeStartInBytes = self.startOffsetInBytes;
 	NSData *_Nonnull const bootBlocks = self.bootBlocks;
-	ssize_t amtWritten = pwrite(_writeFD, bootBlocks.bytes, bootBlocks.length, 0);
+	ssize_t amtWritten = pwrite(_writeFD, bootBlocks.bytes, bootBlocks.length, volumeStartInBytes + 0);
 	if (amtWritten < bootBlocks.length) {
 		NSError *_Nonnull const cantWriteBootBlocksError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Could not copy boot blocks from original volume to converted volume", @"") }];
 		if (outError != NULL) {
@@ -104,7 +94,7 @@
 //	ImpPrintf(@"Final catalog file will be %llu bytes in %u blocks", L(vh->catalogFile.logicalSize), L(vh->catalogFile.totalBlocks));
 //	ImpPrintf(@"Final extents overflow file will be %llu bytes in %u blocks", L(vh->extentsFile.logicalSize), L(vh->extentsFile.totalBlocks));
 
-	amtWritten = pwrite(_writeFD, volumeHeader.bytes, volumeHeader.length, bootBlocks.length);
+	amtWritten = pwrite(_writeFD, volumeHeader.bytes, volumeHeader.length, volumeStartInBytes + bootBlocks.length);
 	if (amtWritten < volumeHeader.length) {
 		NSError *_Nonnull const cantWriteVolumeHeaderError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Could not write converted volume header", @"") }];
 		if (outError != NULL) {
@@ -115,8 +105,8 @@
 
 	//The postamble is the last 1 K of the volume, containing the alternate volume header and the footer.
 	//The postamble needs to be in the very last 1 K of the disk, regardless of where the a-block boundary is. TN1150 is explicit that this region can lie outside of an a-block and any a-blocks it does lie inside of must be marked as used.
-	off_t const last1KStart = self.sizeInBytes - (kISOStandardBlockSize * 2);
-	amtWritten = pwrite(_writeFD, volumeHeader.bytes, volumeHeader.length, last1KStart);
+	off_t const last1KStart = self.lengthInBytes - (kISOStandardBlockSize * 2);
+	amtWritten = pwrite(_writeFD, volumeHeader.bytes, volumeHeader.length, volumeStartInBytes + last1KStart);
 	if (amtWritten < volumeHeader.length) {
 		NSError *_Nonnull const cantWriteAltVolumeHeaderError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Could not write alternate volume header", @"") }];
 		if (outError != NULL) {
@@ -164,6 +154,7 @@
 	NSAssert(false, @"%@ sent to %@", NSStringFromSelector(_cmd), self);
 }
 - (void) peekAtHFSPlusVolumeHeader:(void (^_Nonnull const)(struct HFSPlusVolumeHeader const *_Nonnull const vhPtr NS_NOESCAPE))block {
+	NSAssert(_hasVolumeHeader, @"Can't peek at volume header that hasn't been read yet");
 	block(_vh);
 }
 
@@ -202,7 +193,7 @@
 	//Do this a little differently for the postamble, which isn't guaranteed to be in an allocation block. (E.g., if the allocation block size is 0x800 bytes, and the volume length is a multiple of 0x400 but not 0x800, there is no allocation block for the last 0x400 bytes—which is where the postamble goes.) So this extent may start after the last allocation block and be zero length because of that. Or it may start on an actual a-block and be one or two a-blocks long.
 	//This assumes that the volume will have more than five blocks (i.e., that the preamble and postamble won't run into each other).
 	u_int32_t const postambleLengthInBytes = kISOStandardBlockSize * 2;
-	_postambleStartInBytes = self.sizeInBytes - postambleLengthInBytes;
+	_postambleStartInBytes = self.lengthInBytes - postambleLengthInBytes;
 	_postambleExtent = [self extentFromByteOffset:_postambleStartInBytes size:postambleLengthInBytes];
 	u_int32_t const firstPostambleBlock = L(_postambleExtent.startBlock);
 	u_int32_t const numPostambleBlocks = L(_postambleExtent.blockCount);
@@ -627,8 +618,9 @@
 	}
 	 */
 
+	u_int64_t const volumeStartInBytes = self.startOffsetInBytes;
 	off_t const extentStartInBytes = L(oneExtent->startBlock) * self.blockSize;
-	int64_t const amtWritten = pwrite(_writeFD, bytesPtr + offsetInData, bytesToWrite, extentStartInBytes);
+	int64_t const amtWritten = pwrite(_writeFD, bytesPtr + offsetInData, bytesToWrite, volumeStartInBytes + extentStartInBytes);
 
 	if (amtWritten < 0) {
 		NSError *_Nonnull const writeError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Failed to write 0x%llx (%llu) bytes (range of data { %llu, %lu }) starting at 0x%llx bytes", @""), bytesToWrite, bytesToWrite, offsetInData, data.length, extentStartInBytes] }];
@@ -672,7 +664,8 @@
 	NSData *_Nonnull const preambleData1 = [preambleText1 dataUsingEncoding:NSUTF8StringEncoding];
 	NSAssert(preambleData1.length == kISOStandardBlockSize, @"Temporary preamble chunk #1 was wrong length; needed to be 0x%x bytes, but got 0x%lx bytes", kISOStandardBlockSize, preambleData1.length);
 
-	ssize_t amtWritten = pwrite(_writeFD, preambleData0.bytes, preambleData0.length, 0);
+	u_int64_t const volumeStartInBytes = self.startOffsetInBytes;
+	ssize_t amtWritten = pwrite(_writeFD, preambleData0.bytes, preambleData0.length, volumeStartInBytes + 0);
 	if (amtWritten < preambleData0.length) {
 		NSError *_Nonnull const cantWriteTempPreambleChunk0Error = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Could not write temporary preamble chunk #0 to converted volume", @"") }];
 		if (outError != NULL) {
@@ -682,7 +675,7 @@
 	}
 
 	NSData *_Nonnull const volumeHeader = self.volumeHeader;
-	amtWritten = pwrite(_writeFD, volumeHeader.bytes, volumeHeader.length, preambleData0.length);
+	amtWritten = pwrite(_writeFD, volumeHeader.bytes, volumeHeader.length, volumeStartInBytes + preambleData0.length);
 	if (amtWritten < volumeHeader.length) {
 		NSError *_Nonnull const cantWriteVolumeHeaderError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Could not write converted volume header in temporary location", @"") }];
 		if (outError != NULL) {
@@ -691,7 +684,7 @@
 		return false;
 	}
 
-	amtWritten = pwrite(_writeFD, preambleData1.bytes, preambleData1.length, 0);
+	amtWritten = pwrite(_writeFD, preambleData1.bytes, preambleData1.length, volumeStartInBytes + preambleData0.length + preambleData1.length);
 	if (amtWritten < preambleData1.length) {
 		NSError *_Nonnull const cantWriteTempPreambleChunk2Error = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Could not write temporary preamble chunk #2 to converted volume", @"") }];
 		if (outError != NULL) {
@@ -708,7 +701,7 @@
 
 - (bool) readBootBlocksFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
 	_preamble = [NSMutableData dataWithLength:kISOStandardBlockSize * 3];
-	ssize_t const amtRead = read(readFD, _preamble.mutableBytes, _preamble.length);
+	ssize_t const amtRead = pread(readFD, _preamble.mutableBytes, _preamble.length, self.startOffsetInBytes + kISOStandardBlockSize * 0);
 	if (amtRead < _preamble.length) {
 		NSError *_Nonnull const underrunError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: @"Unexpected end of file reading volume preamble — are you sure this is an HFS+ volume?" }];
 		if (outError != NULL) *outError = underrunError;
@@ -728,6 +721,7 @@
 		return false;
 	}
 
+	_hasVolumeHeader = true;
 	return true;
 }
 

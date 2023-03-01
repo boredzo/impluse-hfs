@@ -9,6 +9,7 @@
 
 #import "ImpHFSVolume.h"
 #import "ImpHFSPlusVolume.h"
+#import "ImpVolumeProbe.h"
 #import "ImpDehydratedItem.h"
 
 @implementation ImpHFSLister
@@ -21,24 +22,20 @@
 		return false;
 	}
 
-	NSError *_Nullable errorLoadingHFS, *errorLoadingHFSPlus;
-	ImpHFSVolume *_Nonnull srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD textEncoding:self.hfsTextEncoding];
-	bool const loadedHFS = [srcVol loadAndReturnError:&errorLoadingHFS];
-	bool loadedHFSPlus = false;
-	if (! loadedHFS) {
-		lseek(readFD, 0, SEEK_SET);
-		srcVol = [[ImpHFSPlusVolume alloc] initWithFileDescriptor:readFD textEncoding:self.hfsTextEncoding];
-		loadedHFSPlus = [srcVol loadAndReturnError:&errorLoadingHFSPlus];
-	}
-	if (! (loadedHFS || loadedHFSPlus)) {
-		*outError = errorLoadingHFS ?: errorLoadingHFSPlus;
-		return false;
-	}
+	__block bool listed = false;
+	ImpVolumeProbe *_Nonnull const probe = [[ImpVolumeProbe alloc] initWithFileDescriptor:readFD];
+	[probe findVolumes:^(const u_int64_t startOffsetInBytes, const u_int64_t lengthInBytes, Class  _Nullable const __unsafe_unretained volumeClass) {
+		ImpHFSVolume *_Nonnull srcVol = [[volumeClass alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
+		bool const loaded = [srcVol loadAndReturnError:outError];
 
-	ImpDehydratedItem *_Nonnull const rootDirectory = [ImpDehydratedItem rootDirectoryOfHFSVolume:srcVol];
-	[rootDirectory printDirectoryHierarchy_asPaths:self.printAbsolutePaths];
+		if (loaded) {
+			ImpDehydratedItem *_Nonnull const rootDirectory = [ImpDehydratedItem rootDirectoryOfHFSVolume:srcVol];
+			[rootDirectory printDirectoryHierarchy_asPaths:self.printAbsolutePaths];
+			listed = true;
+		}
+	}];
 
-	return true;
+	return listed;
 }
 
 @end

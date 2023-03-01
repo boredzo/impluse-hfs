@@ -12,6 +12,7 @@
 
 #import "ImpHFSVolume.h"
 #import "ImpHFSPlusVolume.h"
+#import "ImpVolumeProbe.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
 #import "ImpBTreeHeaderNode.h"
@@ -19,38 +20,10 @@
 
 @interface ImpHFSAnalyzer ()
 
-- (ImpHFSVolume *_Nullable) tryLoadingAsHFSFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull) outError;
-- (ImpHFSPlusVolume *_Nullable) tryLoadingAsHFSPlusFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull) outError;
-
 - (bool) analyzeVolume:(ImpHFSPlusVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError;
 
 @end
 @implementation ImpHFSAnalyzer
-
-- (ImpHFSVolume *_Nullable) tryLoadingAsHFSFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull) outError {
-	ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD textEncoding:self.hfsTextEncoding];
-	if (! [srcVol readBootBlocksFromFileDescriptor:readFD error:outError]) {
-		ImpPrintf(@"Failed to read boot blocks (most likely means the volume is too small to hold an HFS volume): %@", (*outError).localizedDescription);
-		return nil;
-	}
-	if (! [srcVol readVolumeHeaderFromFileDescriptor:readFD error:outError]) {
-		ImpPrintf(@"Failed to read volume header (most likely means the volume is too small to hold an HFS volume): %@", (*outError).localizedDescription);
-		return nil;
-	}
-	return srcVol;
-}
-- (ImpHFSPlusVolume *_Nullable) tryLoadingAsHFSPlusFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull) outError {
-	ImpHFSPlusVolume *_Nonnull const srcVol = [[ImpHFSPlusVolume alloc] initWithFileDescriptor:readFD textEncoding:self.hfsTextEncoding];
-	if (! [srcVol readBootBlocksFromFileDescriptor:readFD error:outError]) {
-		ImpPrintf(@"Failed to read boot blocks (most likely means the volume is too small to hold an HFS or HFS+ volume): %@", (*outError).localizedDescription);
-		return nil;
-	}
-	if (! [srcVol readVolumeHeaderFromFileDescriptor:readFD error:outError]) {
-		ImpPrintf(@"Failed to read volume header (most likely means the volume is too small to hold an HFS or HFS+ volume): %@", (*outError).localizedDescription);
-		return nil;
-	}
-	return srcVol;
-}
 
 - (bool)performAnalysisOrReturnError:(NSError *_Nullable *_Nonnull) outError {
 	int const readFD = open(self.sourceDevice.fileSystemRepresentation, O_RDONLY);
@@ -60,25 +33,14 @@
 		return false;
 	}
 
-	ImpHFSVolume *_Nonnull const srcVol = [self tryLoadingAsHFSFromFileDescriptor:readFD error:outError];
-	if (srcVol != nil) {
-		return [self analyzeVolume:srcVol error:outError];
-	} else if ([*outError domain] == NSOSStatusErrorDomain && [*outError code] == noMacDskErr) {
-		//We can read it, but it's not an HFS volume. Rewind and try HFS+.
-		off_t const seekResult = lseek(readFD, 0, SEEK_SET);
-		if (seekResult < 0) {
-			NSError *_Nonnull const noSeekAllowedError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Volume is not HFS and could not rewind to try HFS+", @"") }];
-			if (outError != NULL) {
-				*outError = noSeekAllowedError;
-			}
-			return false;
-		}
-		ImpHFSPlusVolume *_Nonnull const srcVolPlus = [self tryLoadingAsHFSPlusFromFileDescriptor:readFD error:outError];
-		if (srcVolPlus != nil) {
-			return [self analyzeVolume:srcVolPlus error:outError];
-		}
-	}
-	return false;
+	__block bool analyzed = false;
+	ImpVolumeProbe *_Nonnull const probe = [[ImpVolumeProbe alloc] initWithFileDescriptor:readFD];
+	[probe findVolumes:^(const u_int64_t startOffsetInBytes, const u_int64_t lengthInBytes, Class  _Nullable const __unsafe_unretained volumeClass) {
+		ImpHFSVolume *_Nonnull const srcVol = [[volumeClass alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
+		analyzed = ([srcVol loadAndReturnError:outError] && [self analyzeVolume:srcVol error:outError]) || analyzed;
+	}];
+
+	return analyzed;
 }
 - (bool) analyzeVolume:(ImpHFSVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError {
 	if ([srcVol isKindOfClass:[ImpHFSPlusVolume class]]) {
@@ -91,6 +53,7 @@
 			fmtr.hasThousandSeparators = true;
 
 			struct HFSPlusExtentDescriptor const *_Nonnull const catExtDescs = vhPtr->catalogFile.extents;
+			ImpPrintf(@"Catalog extent record pointer: %p", catExtDescs);
 			for (NSUInteger i = 0; i < kHFSPlusExtentDensity && catExtDescs[i].blockCount > 0; ++i) {
 				ImpPrintf(@"Catalog extent #%lu: start block #%@, length %@ blocks", i, [fmtr stringFromNumber:@(L(catExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[0].blockCount))]);
 			}
