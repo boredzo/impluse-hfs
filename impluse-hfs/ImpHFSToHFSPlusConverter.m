@@ -809,7 +809,11 @@
 			self.sourceVolume = srcVol;
 
 			u_int64_t const lengthInBytes = srcVol.lengthInBytes;
-			self.destinationVolume = [[ImpHFSPlusVolume alloc] initForWritingToFileDescriptor:writeFD expectedLengthInBytes:lengthInBytes];
+			self.destinationVolume = [[ImpHFSPlusVolume alloc] initForWritingToFileDescriptor:writeFD
+				startAtOffset:startOffsetInBytes
+				expectedLengthInBytes:lengthInBytes];
+
+			//TODO: Copy whatever's before and after that volume
 
 			haveFoundHFSVolume = true;
 		}
