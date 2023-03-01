@@ -63,8 +63,6 @@
 
 		_startOffsetInBytes = startOffsetInBytes;
 		_lengthInBytes = lengthInBytes;
-		//Make sure our output file is as large as it's supposed to be.
-		ftruncate(_writeFD, _lengthInBytes);
 
 		_preamble = [NSMutableData dataWithLength:kISOStandardBlockSize * 3];
 		_vh = _preamble.mutableBytes + (kISOStandardBlockSize * 2);
