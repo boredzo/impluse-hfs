@@ -164,6 +164,7 @@
 	NSAssert(false, @"%@ sent to %@", NSStringFromSelector(_cmd), self);
 }
 - (void) peekAtHFSPlusVolumeHeader:(void (^_Nonnull const)(struct HFSPlusVolumeHeader const *_Nonnull const vhPtr NS_NOESCAPE))block {
+	NSAssert(_hasVolumeHeader, @"Can't peek at volume header that hasn't been read yet");
 	block(_vh);
 }
 
@@ -708,7 +709,7 @@
 
 - (bool) readBootBlocksFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
 	_preamble = [NSMutableData dataWithLength:kISOStandardBlockSize * 3];
-	ssize_t const amtRead = read(readFD, _preamble.mutableBytes, _preamble.length);
+	ssize_t const amtRead = pread(readFD, _preamble.mutableBytes, _preamble.length, self.startOffsetInBytes + kISOStandardBlockSize * 0);
 	if (amtRead < _preamble.length) {
 		NSError *_Nonnull const underrunError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: @"Unexpected end of file reading volume preamble — are you sure this is an HFS+ volume?" }];
 		if (outError != NULL) *outError = underrunError;
@@ -728,6 +729,7 @@
 		return false;
 	}
 
+	_hasVolumeHeader = true;
 	return true;
 }
 

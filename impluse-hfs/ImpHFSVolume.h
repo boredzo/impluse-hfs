@@ -14,14 +14,23 @@
 
 @interface ImpHFSVolume : NSObject
 
-- (instancetype _Nonnull) initWithFileDescriptor:(int const)readFD textEncoding:(TextEncoding const)hfsTextEncoding;
+///startOffset should be 0 for volumes from bare-volume images. For volumes found in a partition map, startOffset should be the offset into the device/image in bytes where the preamble starts.
+///lengthInBytes can be 0, in which case the whole device/image should be used.
+- (instancetype _Nonnull) initWithFileDescriptor:(int const)readFD
+	startOffsetInBytes:(u_int64_t)startOffset
+	lengthInBytes:(u_int64_t)lengthInBytes
+	textEncoding:(TextEncoding const)hfsTextEncoding;
 
 ///Returns an object that can convert strings (names) between this HFS volume's 8-bit-per-character encoding and Unicode.
 @property(readonly, nonnull, strong) ImpTextEncodingConverter *textEncodingConverter;
 
 @property(readonly) int fileDescriptor;
 
-@property off_t volumeStartOffset; //Defaults to 0. Set to something else if your HFS volume starts somewhere in the middle of a file (e.g., after a partition map).
+///The offset in bytes into the volume at which the volume's preamble is expected to start. For raw volume images, this will be 0. For volumes extracted from partitioned images, this will be non-zero.
+@property(readonly) u_int64_t startOffsetInBytes;
+
+///The total length of the volume, from preamble to postamble. May be an estimate based on the volume header, if the volume was created from a device.
+@property(nonatomic, readonly) u_int64_t totalSizeInBytes;
 
 ///Read the boot blocks, volume header, and allocation bitmap in that order, followed by the extents overflow file and catalog file.
 - (bool)loadAndReturnError:(NSError *_Nullable *_Nonnull const)outError;
@@ -54,8 +63,8 @@
 @property(strong) ImpBTreeFile *_Nonnull extentsOverflowBTree;
 
 - (NSString *_Nonnull) volumeName;
-- (u_int64_t) totalSizeInBytes;
 - (NSUInteger) numberOfBytesPerBlock;
+///The total number of allocation blocks in the volume, according to the volume header.
 - (NSUInteger) numberOfBlocksTotal;
 - (NSUInteger) numberOfBlocksUsed;
 - (NSUInteger) numberOfBlocksFree;

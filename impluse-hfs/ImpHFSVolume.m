@@ -31,11 +31,18 @@
 	NSMutableData *_volumeBitmapData;
 	CFBitVectorRef _bitVector;
 	CFMutableBitVectorRef _blocksThatAreAllocatedButWereNotAccessed;
+	u_int64_t _lengthInBytes;
 }
 
-- (instancetype _Nonnull) initWithFileDescriptor:(int const)readFD textEncoding:(TextEncoding const)hfsTextEncoding {
+- (instancetype _Nonnull) initWithFileDescriptor:(int const)readFD
+	startOffsetInBytes:(u_int64_t)startOffset
+	lengthInBytes:(u_int64_t)lengthInBytes
+	textEncoding:(TextEncoding const)hfsTextEncoding
+{
 	if ((self = [super init])) {
 		_fileDescriptor = readFD;
+		_startOffsetInBytes = startOffset;
+		_lengthInBytes = lengthInBytes;
 		_textEncodingConverter = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:hfsTextEncoding];
 	}
 	return self;
@@ -49,7 +56,7 @@
 
 - (bool) readBootBlocksFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
 	_bootBlocksData = [NSMutableData dataWithLength:kISOStandardBlockSize * 2];
-	ssize_t const amtRead = read(readFD, _bootBlocksData.mutableBytes, _bootBlocksData.length);
+	ssize_t const amtRead = pread(readFD, _bootBlocksData.mutableBytes, _bootBlocksData.length, _startOffsetInBytes + kISOStandardBlockSize * 0);
 	if (amtRead < _bootBlocksData.length) {
 		NSError *_Nonnull const underrunError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: @"Unexpected end of file reading source volume boot blocks — are you sure this is an HFS volume?" }];
 		if (outError != NULL) *outError = underrunError;
@@ -62,7 +69,7 @@
 - (bool) readVolumeHeaderFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
 	//The volume header occupies the first sizeof(HFSMasterDirectoryBlock) bytes of one 512-byte block.
 	NSMutableData *_Nonnull const mdbData = [NSMutableData dataWithLength:ImpNextMultipleOfSize(sizeof(HFSMasterDirectoryBlock), kISOStandardBlockSize)];
-	ssize_t const amtRead = read(readFD, mdbData.mutableBytes, mdbData.length);
+	ssize_t const amtRead = pread(readFD, mdbData.mutableBytes, mdbData.length, _startOffsetInBytes + kISOStandardBlockSize * 2);
 	if (amtRead < mdbData.length) {
 		NSError *_Nonnull const underrunError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: @"Unexpected end of file reading source volume HFS header — are you sure this is an HFS volume?" }];
 		if (outError != NULL) *outError = underrunError;
@@ -111,7 +118,7 @@
 #if ImpHFS_DEBUG_LOGGING
 	ImpPrintf(@"Reading %zu (0x%zx) bytes (%zu blocks) of VBM starting from offset 0x%llx bytes", volumeBitmap.length, volumeBitmap.length, volumeBitmap.length / kISOStandardBlockSize, lseek(readFD, 0, SEEK_CUR));
 #endif
-	ssize_t const amtRead = read(readFD, volumeBitmap.mutableBytes, volumeBitmap.length);
+	ssize_t const amtRead = pread(readFD, volumeBitmap.mutableBytes, volumeBitmap.length, _startOffsetInBytes + kISOStandardBlockSize * 3);
 	if (amtRead < volumeBitmap.length) {
 		NSError *_Nonnull const underrunError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: @"Unexpected end of file reading source volume allocation bitmap — are you sure this is an HFS volume?" }];
 		if (outError != NULL) *outError = underrunError;
@@ -190,7 +197,7 @@
 - (NSData *_Nullable) dataForBlocksStartingAt:(u_int32_t const)startBlock count:(u_int32_t const)blockCount {
 	NSUInteger const blockSize = self.numberOfBytesPerBlock;
 	NSMutableData *_Nonnull const intoData = [NSMutableData dataWithLength:blockSize * blockCount];
-	off_t const readStart = self.volumeStartOffset + self.offsetOfFirstAllocationBlock + startBlock * blockSize;
+	off_t const readStart = self.startOffsetInBytes + self.offsetOfFirstAllocationBlock + startBlock * blockSize;
 	enum { offset = 0 };
 	size_t const numBytesToRead = intoData.length - offset;
 	ssize_t const amtRead = pread(self.fileDescriptor, intoData.mutableBytes + offset, numBytesToRead, readStart);
@@ -226,7 +233,7 @@
 		return false;
 	}
 
-	off_t const readStart = self.volumeStartOffset + self.offsetOfFirstAllocationBlock + startBlock * self.numberOfBytesPerBlock;
+	off_t const readStart = self.startOffsetInBytes + self.offsetOfFirstAllocationBlock + startBlock * self.numberOfBytesPerBlock;
 	size_t const numBytesToRead = intoData.length - offset;
 	size_t const numBlocksToRead = ImpCeilingDivide(intoData.length, self.numberOfBytesPerBlock);
 	if (_blocksThatAreAllocatedButWereNotAccessed != NULL) {
@@ -403,7 +410,11 @@
 	return CFAutorelease(CFStringCreateWithPascalStringNoCopy(kCFAllocatorDefault, _mdb->drVN, kCFStringEncodingMacRoman, kCFAllocatorNull));
 }
 - (u_int64_t) totalSizeInBytes {
-	return self.numberOfBytesPerBlock * (u_int64_t)self.numberOfBlocksTotal;
+	return (
+		_lengthInBytes > 0
+		? _lengthInBytes
+		: self.numberOfBytesPerBlock * (u_int64_t)self.numberOfBlocksTotal
+	);
 }
 - (NSUInteger) numberOfBytesPerBlock {
 	return L(_mdb->drAlBlkSiz);

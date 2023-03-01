@@ -16,6 +16,7 @@
 #import "ImpErrorUtilities.h"
 #import "ImpHFSVolume.h"
 #import "ImpHFSPlusVolume.h"
+#import "ImpVolumeProbe.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
 #import "ImpBTreeHeaderNode.h"
@@ -790,25 +791,31 @@
 		return false;
 	}
 
-	ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD textEncoding:self.hfsTextEncoding];
-	if (! [srcVol loadAndReturnError:outError])
-		return false;
-	self.sourceVolume = srcVol;
+	ImpVolumeProbe *_Nonnull const probe = [[ImpVolumeProbe alloc] initWithFileDescriptor:readFD];
+	__block bool haveFoundHFSVolume = false;
+	__block bool loadedSuccessfully = false;
+	[probe findVolumes:^(u_int64_t const startOffsetInBytes, u_int64_t const lengthInBytes, Class _Nullable const volumeClass) {
+		if (! haveFoundHFSVolume) {
+			if (volumeClass != Nil && volumeClass != [ImpHFSVolume class]) {
+				//We have an identified volume class, but it isn't HFS. Most likely, this is already HFS+. Skip.
+				return;
+			}
 
-	u_int64_t sizeInBytes = 0;
-	struct stat sb;
-	int const statResult = fstat(readFD, &sb);
-	if (statResult == 0) {
-		off_t const sizeAccordingToStat = sb.st_size;
-		sizeInBytes = sizeAccordingToStat > 0 ? sizeAccordingToStat : 0;
-	}
-	if (sizeInBytes == 0) {
-		sizeInBytes = srcVol.totalSizeInBytes;
-	}
+			ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD
+				startOffsetInBytes:startOffsetInBytes
+				lengthInBytes:lengthInBytes
+				textEncoding:self.hfsTextEncoding];
+			loadedSuccessfully = [srcVol loadAndReturnError:outError];
+			self.sourceVolume = srcVol;
 
-	self.destinationVolume = [[ImpHFSPlusVolume alloc] initForWritingToFileDescriptor:writeFD volumeSizeInBytes:sizeInBytes];
+			u_int64_t const sizeInBytes = srcVol.totalSizeInBytes;
+			self.destinationVolume = [[ImpHFSPlusVolume alloc] initForWritingToFileDescriptor:writeFD volumeSizeInBytes:sizeInBytes];
 
-	return true;
+			haveFoundHFSVolume = true;
+		}
+	}];
+
+	return haveFoundHFSVolume;
 }
 
 - (bool) step1_convertPreamble_error:(NSError *_Nullable *_Nullable const)outError {
