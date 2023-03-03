@@ -287,7 +287,7 @@
 	quarryCatalogKey.keyLength -= sizeof(quarryCatalogKey.keyLength);
 //	ImpPrintf(@"Input node name is %u characters; node name in search key is %u characters", L(nodeName->length), L(quarryCatalogKey.nodeName.length));
 
-	ImpTextEncodingConverter *_Nonnull const tec = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:kTextEncodingMacRoman];
+//	ImpTextEncodingConverter *_Nonnull const tec = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:kTextEncodingMacRoman];
 	ImpBTreeRecordKeyComparator _Nonnull const compareKeys = ^ImpBTreeComparisonResult(const void *const  _Nonnull foundKeyPtr) {
 		struct HFSPlusCatalogKey const *_Nonnull const foundCatKeyPtr = foundKeyPtr;
 		ImpBTreeComparisonResult const result = ImpBTreeCompareHFSPlusCatalogKeys(&quarryCatalogKey, foundCatKeyPtr);
