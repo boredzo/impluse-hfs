@@ -275,7 +275,7 @@
 	//The VBM is implied by IM:F to be necessarily contiguous (only the catalog and extents overflow files are expressly not), and is guaranteed to always be at block #3 in HFS. On HFS+, the VBM isn't necessarily contiguous.
 	//The VBM (at least in HFS+) indicates the allocation state of the entire volume, so its length in bits is the number of allocation blocks for the whole volume. Divide by eight to get bytes, and then by the allocation block size to get blocks.
 	u_int32_t const numABlocks = L(mdbPtr->drNmAlBlks);
-	u_int16_t const allocationFileSizeInBytes = (u_int16_t)((numABlocks + 7) / 8); //drNmAlBlks is u_int16_t; we don't need to go any bigger than that for the result of this computation.
+	u_int16_t const allocationFileSizeInBytes = (u_int16_t)ImpCeilingDivide(numABlocks, 8); //drNmAlBlks is u_int16_t; we don't need to go any bigger than that for the result of this computation.
 	u_int16_t const allocationFileSizeInBlocks = allocationFileSizeInBytes / L(vh.blockSize);
 	S(vh.allocationFile.totalBlocks, allocationFileSizeInBlocks);
 	vh.allocationFile.clumpSize = mdbPtr->drClpSiz;

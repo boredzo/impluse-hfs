@@ -12,6 +12,7 @@
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
 #import "ImpDehydratedItem.h"
+#import "ImpSizeUtilities.h"
 
 @implementation ImpHFSExtractor
 
@@ -30,7 +31,7 @@
 ///Parse an HFS-style (colon-separated) path string and return the components in order as an array of strings. TN1041 gives the rules for parsing pathnames. If the path is relative (begins with a colon), the returned array will begin with an empty string. (In our case, it probably makes the most sense to consider the path relative to the volume.) Returns nil if the pathname is invalid (e.g., too many consecutive colons).
 - (NSArray <NSString *> *_Nullable const) parseHFSPath:(NSString *_Nonnull const)hfsPathString {
 	//As a rough heuristic, assume filenames average 8 characters long and preallocate that much space.
-	NSMutableArray *_Nonnull const path = [NSMutableArray arrayWithCapacity:(hfsPathString.length + 7) / 8];
+	NSMutableArray *_Nonnull const path = [NSMutableArray arrayWithCapacity:ImpCeilingDivide(hfsPathString.length, 8)];
 
 	@autoreleasepool {
 		//Ignore a single trailing colon (by pruning it off before we feed the string to the scanner).

@@ -72,7 +72,7 @@
 
 - (bool) flushVolumeStructures:(NSError *_Nullable *_Nullable const)outError {
 	NSUInteger const numABlocks = self.numberOfBlocksTotal;
-	NSMutableData *_Nonnull const bitmapData = [NSMutableData dataWithLength:(numABlocks + 7) / 8];
+	NSMutableData *_Nonnull const bitmapData = [NSMutableData dataWithLength:ImpCeilingDivide(numABlocks, 8)];
 	CFBitVectorGetBits(_allocationsBitmap, (CFRange){ 0, numABlocks }, bitmapData.mutableBytes);
 	if (! [self writeData:bitmapData startingFrom:0 toExtents:_vh->allocationFile.extents error:outError]) {
 		return false;
@@ -204,7 +204,7 @@
 		}
 	}
 	//And last but not least, allocate space for the allocations file that will hold our shiny new bitmap.
-	u_int32_t const numAllocationsBytes = (numABlocks + 7) / 8;
+	u_int32_t const numAllocationsBytes = ImpCeilingDivide(numABlocks, 8);
 	[self allocateBytes:numAllocationsBytes forFork:ImpForkTypeSpecialFileContents populateExtentRecord:_vh->allocationFile.extents];
 	_vh->allocationFile.totalBlocks = _vh->allocationFile.extents[0].blockCount;
 	//DiskWarrior seems to be of the opinion that the logical length should be equal to the physical length (total size of occupied blocks). TN1150 says this is allowed, but doesn't say it's necessary.
