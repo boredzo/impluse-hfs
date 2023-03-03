@@ -1120,7 +1120,7 @@
 		u_int32_t *_Nonnull const pointerRecordPtr = payloadData.mutableBytes;
 		S(*pointerRecordPtr, obj.nodeNumber);
 
-		NSString *_Nonnull const filename = [ImpBTreeNode nodeNameFromHFSPlusCatalogKey:key];
+//		NSString *_Nonnull const filename = [ImpBTreeNode nodeNameFromHFSPlusCatalogKey:key];
 //		ImpPrintf(@"Node #%u: Wrote index record for file “%@”: %u -(swap)-> %u", realIndexNode.nodeNumber, filename, obj.nodeNumber, *pointerRecordPtr);
 
 		[realIndexNode appendRecordWithKey:key payload:payloadData];

@@ -90,7 +90,7 @@
 	}
 
 	NSData *_Nonnull const volumeHeader = self.volumeHeader;
-	struct HFSPlusVolumeHeader const *_Nonnull const vh = volumeHeader.bytes;
+//	struct HFSPlusVolumeHeader const *_Nonnull const vh = volumeHeader.bytes;
 //	ImpPrintf(@"Final catalog file will be %llu bytes in %u blocks", L(vh->catalogFile.logicalSize), L(vh->catalogFile.totalBlocks));
 //	ImpPrintf(@"Final extents overflow file will be %llu bytes in %u blocks", L(vh->extentsFile.logicalSize), L(vh->extentsFile.totalBlocks));
 

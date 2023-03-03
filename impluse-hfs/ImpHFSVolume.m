@@ -525,9 +525,6 @@
 	{
 //		ImpPrintf(@"Reading extent starting at #%u for %u blocks; %llu bytes remain…", L(oneExtent->startBlock), L(oneExtent->blockCount), logicalBytesRemaining);
 		u_int64_t const physicalLength = blockSize * L(oneExtent->blockCount);
-		u_int64_t const logicalLength = logicalBytesRemaining < physicalLength ? logicalBytesRemaining : physicalLength;
-		//When reading from rdisk devices, reads must be multiples of kISOStandardBlockSize. So, round up to the volume's block size (which has the same constraint), then truncate to the logical length.
-		u_int64_t const logicalLengthRoundedUp = ImpNextMultipleOfSize(logicalLength, blockSize);
 
 		u_int64_t amtRead = 0;
 		[data setLength:physicalLength];
