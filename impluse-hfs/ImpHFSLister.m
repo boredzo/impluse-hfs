@@ -23,10 +23,12 @@
 	}
 
 	__block bool listed = false;
+	__block NSError *_Nullable volumeLoadError = nil;
+
 	ImpVolumeProbe *_Nonnull const probe = [[ImpVolumeProbe alloc] initWithFileDescriptor:readFD];
 	[probe findVolumes:^(const u_int64_t startOffsetInBytes, const u_int64_t lengthInBytes, Class  _Nullable const __unsafe_unretained volumeClass) {
 		ImpHFSVolume *_Nonnull srcVol = [[volumeClass alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
-		bool const loaded = [srcVol loadAndReturnError:outError];
+		bool const loaded = [srcVol loadAndReturnError:&volumeLoadError];
 
 		if (loaded) {
 			ImpDehydratedItem *_Nonnull const rootDirectory = [ImpDehydratedItem rootDirectoryOfHFSVolume:srcVol];
@@ -34,6 +36,12 @@
 			listed = true;
 		}
 	}];
+
+	if (! listed) {
+		if (outError != NULL) {
+			*outError = volumeLoadError;
+		}
+	}
 
 	return listed;
 }
