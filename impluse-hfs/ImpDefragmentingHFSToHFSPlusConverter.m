@@ -227,7 +227,7 @@
 
 			NSAssert(totalRsrcBytesWritten == rsrcPhysicalLength, @"Failed to %@ all resource fork bytes due to %@: should have written %llu, but actually wrote %llu", rsrcReadError != nil ? @"read" : rsrcWriteError != nil ? @"write" : @"copy", rsrcReadError ?: rsrcWriteError, rsrcPhysicalLength, totalRsrcBytesWritten);
 
-			ImpPrintf(@"This file's lengths are DF %llu bytes, RF %llu bytes. Physical sizes %u blocks + %u blocks = %u blocks. Copied %u blocks + %u blocks = %u blocks", dataLogicalLength, rsrcLogicalLength, ImpNumberOfBlocksInHFSExtentRecord(firstDataExtents), ImpNumberOfBlocksInHFSExtentRecord(firstRsrcExtents), ImpNumberOfBlocksInHFSExtentRecord(firstDataExtents) + ImpNumberOfBlocksInHFSExtentRecord(firstRsrcExtents), totalDataBlocksRead, totalRsrcBlocksRead, totalDataBlocksRead + totalRsrcBlocksRead);
+//			ImpPrintf(@"This file's lengths are DF %llu bytes, RF %llu bytes. Physical sizes %u blocks + %u blocks = %u blocks. Copied %u blocks + %u blocks = %u blocks", dataLogicalLength, rsrcLogicalLength, ImpNumberOfBlocksInHFSExtentRecord(firstDataExtents), ImpNumberOfBlocksInHFSExtentRecord(firstRsrcExtents), ImpNumberOfBlocksInHFSExtentRecord(firstDataExtents) + ImpNumberOfBlocksInHFSExtentRecord(firstRsrcExtents), totalDataBlocksRead, totalRsrcBlocksRead, totalDataBlocksRead + totalRsrcBlocksRead);
 			[self reportSourceBlocksCopied:totalRsrcBlocksRead];
 
 			S(convertedFilePtr->resourceFork.logicalSize, rsrcLogicalLength);
