@@ -20,7 +20,7 @@
 
 @interface ImpHFSAnalyzer ()
 
-- (bool) analyzeVolume:(ImpHFSPlusVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError;
+- (bool) analyzeVolume:(ImpHFSVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError;
 
 @end
 @implementation ImpHFSAnalyzer
