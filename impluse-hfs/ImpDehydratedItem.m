@@ -553,14 +553,14 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 				}
 				return rehydrated;
 			}
-			folder:^bool(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFolder const *_Nonnull const folderRec) {
-				ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSVolume:volume catalogNodeID:L(folderRec->folderID) key:keyPtr folderRecord:folderRec];
-				NSString *_Nonnull const folderName = [[tec stringForPascalString:keyPtr->nodeName] stringByReplacingOccurrencesOfString:@"/" withString:@":"];
-				NSURL *_Nonnull const folderURL = [realWorldURL URLByAppendingPathComponent:folderName isDirectory:true];
-				ImpPrintf(@"Rehydrating descendant 📁 “%@”", folderName);
-				bool const rehydrated = [dehydratedFolder rehydrateFolderAtRealWorldURL:folderURL error:&rehydrationError];
+			folder:^bool(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFolder const *_Nonnull const subfolderRec) {
+				ImpDehydratedItem *_Nonnull const dehydratedSubfolder = [[ImpDehydratedItem alloc] initWithHFSVolume:volume catalogNodeID:L(subfolderRec->folderID) key:keyPtr folderRecord:subfolderRec];
+				NSString *_Nonnull const subfolderName = [[tec stringForPascalString:keyPtr->nodeName] stringByReplacingOccurrencesOfString:@"/" withString:@":"];
+				NSURL *_Nonnull const subfolderURL = [realWorldURL URLByAppendingPathComponent:subfolderName isDirectory:true];
+				ImpPrintf(@"Rehydrating descendant 📁 “%@”", subfolderName);
+				bool const rehydrated = [dehydratedSubfolder rehydrateFolderAtRealWorldURL:subfolderURL error:&rehydrationError];
 				if (! rehydrated) {
-					ImpPrintf(@"%@ in rehydrating descendant 📄 “%@”", rehydrated ? @"Success" : @"Failure", folderName);
+					ImpPrintf(@"%@ in rehydrating descendant 📄 “%@”", rehydrated ? @"Success" : @"Failure", subfolderName);
 					anyRehydrationFailed = true;
 				}
 				return rehydrated;
@@ -767,14 +767,14 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 				@" " @" " @" " @" "
 				@" " @" " @" " @" "
 				mutableCopy];
-			NSString *_Nonnull(^_Nonnull const indentWithDepth)(NSUInteger const depth) = ^NSString *_Nonnull(NSUInteger const depth) {
-				if (depth > spaces.length) {
-					NSRange extendRange = { spaces.length, depth - spaces.length };
-					for (NSUInteger i = extendRange.location; i < depth; ++i) {
+			NSString *_Nonnull(^_Nonnull const indentWithDepth)(NSUInteger const depth) = ^NSString *_Nonnull(NSUInteger const numSpacesRequested) {
+				if (numSpacesRequested > spaces.length) {
+					NSRange extendRange = { spaces.length, numSpacesRequested - spaces.length };
+					for (NSUInteger i = extendRange.location; i < numSpacesRequested; ++i) {
 						[spaces appendString:@" "];
 					}
 				}
-				return [spaces substringToIndex:depth];
+				return [spaces substringToIndex:numSpacesRequested];
 			};
 			return [NSString stringWithFormat:@"%@%@ %@", indentWithDepth(depth), item.iconEmojiString, item.name];
 		}

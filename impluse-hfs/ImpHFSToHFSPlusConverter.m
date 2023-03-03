@@ -818,7 +818,6 @@
 			if (loadedSuccessfully) {
 				self.sourceVolume = srcVol;
 
-				u_int64_t const lengthInBytes = srcVol.lengthInBytes;
 				self.destinationVolume = [[ImpHFSPlusVolume alloc] initForWritingToFileDescriptor:self->_writeFD
 					startAtOffset:startOffsetInBytes
 					expectedLengthInBytes:lengthInBytes];
