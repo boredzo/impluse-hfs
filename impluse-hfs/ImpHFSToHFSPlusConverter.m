@@ -178,6 +178,9 @@
 	self.numberOfSourceBlocksCopied = self.numberOfSourceBlocksCopied + thisManyMore;
 }
 - (void) reportSourceBlocksWillBeCopied:(NSUInteger const)thisManyMore {
+	if (thisManyMore > UINT32_MAX) {
+		NSLog(@"Strange number of pending blocks reported: %lu", thisManyMore);
+	}
 	self.numberOfSourceBlocksToCopy = self.numberOfSourceBlocksToCopy + thisManyMore;
 }
 - (void) reportSourceBlocksWillNotBeCopied:(NSUInteger const)thisManyFewer {
@@ -839,7 +842,7 @@
 
 		struct stat sb;
 		int const statResult = fstat(_readFD, &sb);
-		if (statResult == 0 && sb.st_size >= 0) {
+		if (statResult == 0 && sb.st_size > 0) {
 			u_int64_t const overallSourceLength = sb.st_size;
 			u_int64_t const volumeLength = self.sourceVolume.lengthInBytes;
 			u_int64_t const volumeEndOffset = (volumeStartOffset + volumeLength);
