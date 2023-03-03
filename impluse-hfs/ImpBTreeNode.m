@@ -747,8 +747,6 @@
 	}
 
 	void *_Nonnull const nodeBytes = ((NSMutableData *)_nodeData).mutableBytes;
-	struct BTNodeDescriptor *_Nonnull const nodeDesc = nodeBytes;
-
 	BTreeNodeOffset const destOffset = offsetOfEmptySpace;
 	void *_Nonnull const destPtr = nodeBytes + destOffset;
 	[data getBytes:destPtr length:data.length];
