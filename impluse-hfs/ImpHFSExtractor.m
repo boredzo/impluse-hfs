@@ -110,6 +110,9 @@
 
 	[self deliverProgressUpdate:0.0 operationDescription:@"Finding HFS volume"];
 
+	__block NSError *_Nullable volumeLoadError = nil;
+	__block NSError *_Nullable rehydrationError = nil;
+
 	ImpVolumeProbe *_Nonnull const probe = [[ImpVolumeProbe alloc] initWithFileDescriptor:readFD];
 	[probe findVolumes:^(const u_int64_t startOffsetInBytes, const u_int64_t lengthInBytes, Class  _Nullable const __unsafe_unretained volumeClass) {
 		if (volumeClass != Nil && volumeClass != [ImpHFSVolume class]) {
@@ -118,7 +121,7 @@
 		}
 
 		ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
-		if (! [srcVol loadAndReturnError:outError])
+		if (! [srcVol loadAndReturnError:&volumeLoadError])
 			return;
 
 		bool const grabEverything = (self.quarryNameOrPath == nil);
@@ -183,14 +186,20 @@
 			ImpDehydratedItem *_Nonnull const item = matches.firstObject;
 	//		ImpPrintf(@"Found an item named %@ with parent item #%u", item.name, item.parentFolderID);
 			NSString *_Nonnull const destPath = self.destinationPath ?: [item.name stringByReplacingOccurrencesOfString:@"/" withString:@":"];
-			rehydrated = [item rehydrateAtRealWorldURL:[NSURL fileURLWithPath:destPath isDirectory:false] error:outError];
+			rehydrated = [item rehydrateAtRealWorldURL:[NSURL fileURLWithPath:destPath isDirectory:false] error:&rehydrationError];
 			if (! rehydrated) {
-				ImpPrintf(@"Failed to rehydrate file named %@: %@", item.name, *outError);
+				ImpPrintf(@"Failed to rehydrate file named %@: %@", item.name, rehydrationError);
 			} else {
 				[self deliverProgressUpdate:1.0 operationDescription:@"Extraction complete."];
 			}
 		}
 	}];
+
+	if (! rehydrated) {
+		if (outError != NULL) {
+			*outError = volumeLoadError ?: rehydrationError;
+		}
+	}
 
 	return rehydrated;
 }

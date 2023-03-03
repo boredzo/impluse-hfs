@@ -799,6 +799,7 @@
 	ImpVolumeProbe *_Nonnull const probe = [[ImpVolumeProbe alloc] initWithFileDescriptor:_readFD];
 	__block bool haveFoundHFSVolume = false;
 	__block bool loadedSuccessfully = false;
+	__block NSError *_Nullable volumeLoadError = nil;
 	[probe findVolumes:^(u_int64_t const startOffsetInBytes, u_int64_t const lengthInBytes, Class _Nullable const volumeClass) {
 		if (! haveFoundHFSVolume) {
 			if (volumeClass != Nil && volumeClass != [ImpHFSVolume class]) {
@@ -810,17 +811,24 @@
 				startOffsetInBytes:startOffsetInBytes
 				lengthInBytes:lengthInBytes
 				textEncoding:self.hfsTextEncoding];
-			loadedSuccessfully = [srcVol loadAndReturnError:outError];
-			self.sourceVolume = srcVol;
+			loadedSuccessfully = [srcVol loadAndReturnError:&volumeLoadError];
+			if (loadedSuccessfully) {
+				self.sourceVolume = srcVol;
 
-			u_int64_t const lengthInBytes = srcVol.lengthInBytes;
-			self.destinationVolume = [[ImpHFSPlusVolume alloc] initForWritingToFileDescriptor:self->_writeFD
-				startAtOffset:startOffsetInBytes
-				expectedLengthInBytes:lengthInBytes];
+				u_int64_t const lengthInBytes = srcVol.lengthInBytes;
+				self.destinationVolume = [[ImpHFSPlusVolume alloc] initForWritingToFileDescriptor:self->_writeFD
+					startAtOffset:startOffsetInBytes
+					expectedLengthInBytes:lengthInBytes];
 
-			haveFoundHFSVolume = true;
+				haveFoundHFSVolume = true;
+			}
 		}
 	}];
+	if (! loadedSuccessfully) {
+		if (outError) {
+			*outError = volumeLoadError;
+		}
+	}
 
 	if (haveFoundHFSVolume) {
 		//Strictly speaking, the data before and after the volume doesn't need to be a multiple of the block size.
@@ -1120,7 +1128,7 @@
 		u_int32_t *_Nonnull const pointerRecordPtr = payloadData.mutableBytes;
 		S(*pointerRecordPtr, obj.nodeNumber);
 
-		NSString *_Nonnull const filename = [ImpBTreeNode nodeNameFromHFSPlusCatalogKey:key];
+//		NSString *_Nonnull const filename = [ImpBTreeNode nodeNameFromHFSPlusCatalogKey:key];
 //		ImpPrintf(@"Node #%u: Wrote index record for file “%@”: %u -(swap)-> %u", realIndexNode.nodeNumber, filename, obj.nodeNumber, *pointerRecordPtr);
 
 		[realIndexNode appendRecordWithKey:key payload:payloadData];

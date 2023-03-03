@@ -56,11 +56,6 @@
 ///aBlockSize must be a multiple of kISOStandardBlockSize (0x200 bytes), and a power of two.
 - (void) initializeAllocationBitmapWithBlockSize:(u_int32_t)aBlockSize count:(u_int32_t)numABlocks;
 
-///Set the size of each allocation block, and the total number of them based on the overall size of the volume.
-///You should not call this method after anything that has allocated blocks past the volume header (including populating the catalog file), because this method creates the allocations bitmap and initializes it to allocate only the minimum set of a-blocks (those containing the volume header and other required sectors and nothing else).
-///aBlockSize must be a multiple of kISOStandardBlockSize (0x200 bytes), and a power of two.
-- (void) initializeAllocationBitmapWithBlockSize:(u_int32_t const)aBlockSize volumeSize:(u_int64_t const)volumeSizeInBytes;
-
 ///Convenience method that adds enough blocks to contain the required sectors (volume header, etc.) that aren't considered allocation blocks under HFS. For large block sizes, this may add as few as two blocks; for the smallest block size of 0x200 bytes, it will add five (two for the boot blocks, a third for the volume header, and two more at the end for the alternate volume header and the footer).
 - (void) setAllocationBlockSize:(u_int32_t)aBlockSize countOfUserBlocks:(u_int32_t)numABlocks;
 

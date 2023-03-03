@@ -42,7 +42,6 @@
 	//Populate the header node of this data.
 	//Do this before super init in case the superclass initializer needs to consult the header node.
 	[ImpBTreeHeaderNode convertHeaderNode:sourceTree.headerNode forTreeVersion:version intoData:fileData nodeSize:nodeSize maxKeyLength:maxKeyLength];
-	u_int8_t const *_Nonnull const bytePtr = fileData.bytes + sizeof(struct BTNodeDescriptor) + sizeof(struct BTHeaderRec) + 128;
 
 	if ((self = [super initWithVersion:version data:fileData nodeSize:nodeSize copyData:false])) {
 		_mutableBTreeData = fileData;
@@ -140,43 +139,6 @@
 	while (sourceLeaf != nil) {
 
 	}
-}
-
-///This method MUST be called after both the creation of the index (allocateNodesForIndexOfSize:) and the population of the leaf row (convertLeafNodesFromSourceTree:).
-- (void) convertIndexNodesFromSourceTree:(ImpBTreeFile *_Nonnull const)sourceTree {
-	ImpBTreeHeaderNode *_Nonnull const sourceHeaderNode = sourceTree.headerNode;
-	NSMutableArray <NSMutableArray <ImpBTreeNode *> *> *_Nonnull const indexRows = [NSMutableArray arrayWithCapacity:sourceHeaderNode.treeDepth];
-
-	NSUInteger rowWidth = 0;
-	//Each index row starts with the first index node of a given height. When we hit a leaf node, we've exhausted the index rows.
-	//The first index row is the row that starts with the root node.
-	ImpBTreeNode *_Nonnull sourceNode = sourceHeaderNode.rootNode;
-	while (sourceNode != nil && sourceNode.nodeType == kBTIndexNode) {
-		NSData *_Nonnull const sourceNodeFirstPointerRecordPayload = [sourceNode recordPayloadDataAtIndex:0];
-		ImpBTreeNode *_Nonnull const nextSourceNodeDown = [sourceTree nodeAtIndex:L(*(u_int32_t const *)sourceNodeFirstPointerRecordPayload.bytes)];
-
-		while (sourceNode != nil)  {
-			++rowWidth;
-			sourceNode = sourceNode.nextNode;
-		}
-		NSMutableArray <ImpBTreeNode *> *_Nonnull const thisRow = [NSMutableArray arrayWithCapacity:rowWidth];
-
-		sourceNode = nextSourceNodeDown;
-		[indexRows addObject:thisRow];
-		rowWidth = 0;
-	}
-
-	u_int32_t leafRowWidth = 0;
-	//Iterate over our leaf row (not the source one!), populating the last index row with a record for every key.
-	//Note that number of keys != number of records != number of nodes. HFS+ has two records for every key (a file or folder record and a thread record), and keys vary in size so the number of keys per node varies.
-
-	//Filter the keys upward through the index rows up to the root node.
-	//Note that the first key must ALWAYS remain in the tree:
-	// 0            40          80       <-root node
-	// 0      20    40    60    80
-	// 0   10 20 30 40 50 60 70 80 90
-	// 0 5 10   ...   ...   ...    90 95 <-last index row
-
 }
 
 - (void) reserveSpaceForNodes:(u_int32_t)numNodes ofKind:(BTreeNodeKind)kind {
@@ -325,12 +287,12 @@
 	quarryCatalogKey.keyLength -= sizeof(quarryCatalogKey.keyLength);
 //	ImpPrintf(@"Input node name is %u characters; node name in search key is %u characters", L(nodeName->length), L(quarryCatalogKey.nodeName.length));
 
-	ImpTextEncodingConverter *_Nonnull const tec = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:kTextEncodingMacRoman];
+//	ImpTextEncodingConverter *_Nonnull const tec = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:kTextEncodingMacRoman];
 	ImpBTreeRecordKeyComparator _Nonnull const compareKeys = ^ImpBTreeComparisonResult(const void *const  _Nonnull foundKeyPtr) {
 		struct HFSPlusCatalogKey const *_Nonnull const foundCatKeyPtr = foundKeyPtr;
 		ImpBTreeComparisonResult const result = ImpBTreeCompareHFSPlusCatalogKeys(&quarryCatalogKey, foundCatKeyPtr);
-		NSString *_Nonnull const quarryName = [tec stringFromHFSUniStr255:&(quarryCatalogKey.nodeName)];
-		NSString *_Nonnull const foundName = [tec stringFromHFSUniStr255:&(foundCatKeyPtr->nodeName)];
+//		NSString *_Nonnull const quarryName = [tec stringFromHFSUniStr255:&(quarryCatalogKey.nodeName)];
+//		NSString *_Nonnull const foundName = [tec stringFromHFSUniStr255:&(foundCatKeyPtr->nodeName)];
 //		ImpPrintf(@"Parent ID #%u, name “%@” vs parent ID #%u, name “%@” => %+d", L(quarryCatalogKey.parentID), quarryName, L(foundCatKeyPtr->parentID), foundName, result);
 		return result;
 	};

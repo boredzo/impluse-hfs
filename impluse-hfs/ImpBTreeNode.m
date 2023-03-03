@@ -86,6 +86,14 @@
 	return self;
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wobjc-designated-initializers"
+- (instancetype) init {
+	NSAssert(false, @"Can't init an %@ with no arguments; you want one of the other initializers", self.class);
+	return nil;
+}
+#pragma clang diagnostic pop
+
 #pragma mark Node connections
 
 - (ImpBTreeNode *_Nullable) previousNode {
@@ -747,8 +755,6 @@
 	}
 
 	void *_Nonnull const nodeBytes = ((NSMutableData *)_nodeData).mutableBytes;
-	struct BTNodeDescriptor *_Nonnull const nodeDesc = nodeBytes;
-
 	BTreeNodeOffset const destOffset = offsetOfEmptySpace;
 	void *_Nonnull const destPtr = nodeBytes + destOffset;
 	[data getBytes:destPtr length:data.length];

@@ -516,6 +516,8 @@ static UInt16 tn1150_gLowerCaseTable[] = {
 			0xFFF8, 0xFFF9, 0xFFFA, 0xFFFB, 0xFFFC, 0xFFFD, 0xFFFE, 0xFFFF,
 };
 
+#if ORIGINAL_IMPLEMENTATION
+
 static UInt16 tn1150_gLowerCaseTables[11][256] = {
 
 	// High-byte indices ( == 0 iff no case mapping and no ignorables )
@@ -915,3 +917,5 @@ static UInt16 tn1150_gLowerCaseTables[11][256] = {
 				0xFFF8, 0xFFF9, 0xFFFA, 0xFFFB, 0xFFFC, 0xFFFD, 0xFFFE, 0xFFFF,
 	}
 };
+
+#endif // ORIGINAL_IMPLEMENTATION

@@ -721,7 +721,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 				[itemsThatNeedToBeAddedToTheirParents addObject:dehydratedFile];
 			}
 		} folder:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSPlusCatalogFolder const *_Nonnull const folderRec) {
-			ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSPlusVolume:hfsVol catalogNodeID:L(folderRec->folderID) key:catalogKeyPtr folderRecord:folderRec];
+			ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSPlusVolume:(ImpHFSPlusVolume *)hfsVol catalogNodeID:L(folderRec->folderID) key:catalogKeyPtr folderRecord:folderRec];
 			dehydratedFolder->_children = [NSMutableArray arrayWithCapacity:L(folderRec->valence)];
 
 			dehydratedFolders[@(dehydratedFolder.catalogNodeID)] = dehydratedFolder;

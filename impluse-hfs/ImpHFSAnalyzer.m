@@ -20,7 +20,7 @@
 
 @interface ImpHFSAnalyzer ()
 
-- (bool) analyzeVolume:(ImpHFSPlusVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError;
+- (bool) analyzeVolume:(ImpHFSVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError;
 
 @end
 @implementation ImpHFSAnalyzer
@@ -34,11 +34,20 @@
 	}
 
 	__block bool analyzed = false;
+	__block NSError *_Nullable volumeLoadError = nil;
+	__block NSError *_Nullable analysisError = nil;
+
 	ImpVolumeProbe *_Nonnull const probe = [[ImpVolumeProbe alloc] initWithFileDescriptor:readFD];
 	[probe findVolumes:^(const u_int64_t startOffsetInBytes, const u_int64_t lengthInBytes, Class  _Nullable const __unsafe_unretained volumeClass) {
 		ImpHFSVolume *_Nonnull const srcVol = [[volumeClass alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
-		analyzed = ([srcVol loadAndReturnError:outError] && [self analyzeVolume:srcVol error:outError]) || analyzed;
+		analyzed = ([srcVol loadAndReturnError:&volumeLoadError] && [self analyzeVolume:srcVol error:&analysisError]) || analyzed;
 	}];
+
+	if (! analyzed) {
+		if (outError != NULL) {
+			*outError = volumeLoadError ?: analysisError;
+		}
+	}
 
 	return analyzed;
 }
