@@ -1,0 +1,6 @@
+// Project default configuration. To override locally, create a file 
+// named local.xcconfig in the directory containing the xcodeproj file and put
+// the overrides there. For instance, to build with a signing team ID, put
+// the line "DEVELOPMENT_TEAM = XXXXXXXXXX" (without quotes) in the
+// local.xcconfig file.
+#include? "../local.xcconfig"

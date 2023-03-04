@@ -104,6 +104,7 @@
 		31F719C1293D4C5F0055EEA3 /* UnitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UnitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		31F719C3293D4C5F0055EEA3 /* TestDangerouslyFastSubdata.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TestDangerouslyFastSubdata.m; sourceTree = "<group>"; };
 		31FD38C32978E29D00B44404 /* ImpSizeUtilities.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpSizeUtilities.m; sourceTree = "<group>"; };
+		BF139B3029B3533A005EDF5F /* project.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = project.xcconfig; path = "impluse-hfs.xcodeproj/project.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -127,6 +128,7 @@
 		314EFFCE2932CF3700CE74E9 = {
 			isa = PBXGroup;
 			children = (
+				BF139B3029B3533A005EDF5F /* project.xcconfig */,
 				314EFFE12932CF5B00CE74E9 /* README.md */,
 				314EFFF4293542AE00CE74E9 /* NOTES.md */,
 				314EFFD92932CF3700CE74E9 /* common */,
@@ -460,6 +462,7 @@
 		};
 		314EFFDF2932CF3700CE74E9 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = BF139B3029B3533A005EDF5F /* project.xcconfig */;
 			buildSettings = {
 				CLANG_ANALYZER_LOCALIZABILITY_EMPTY_CONTEXT = YES;
 				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
@@ -469,10 +472,10 @@
 				CLANG_WARN_SEMICOLON_BEFORE_METHOD_BODY = YES;
 				CLANG_WARN_SUSPICIOUS_IMPLICIT_CONVERSION = YES;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = FX6BN52BK9;
+				DEVELOPMENT_TEAM = "$(inherited)";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
-				GCC_PREFIX_HEADER = "impluse-hfs/Prefix.h";
+				GCC_PREFIX_HEADER = common/Prefix.h;
 				GCC_WARN_ABOUT_MISSING_FIELD_INITIALIZERS = YES;
 				GCC_WARN_INITIALIZER_NOT_FULLY_BRACKETED = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
@@ -482,6 +485,7 @@
 		};
 		314EFFE02932CF3700CE74E9 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = BF139B3029B3533A005EDF5F /* project.xcconfig */;
 			buildSettings = {
 				CLANG_ANALYZER_LOCALIZABILITY_EMPTY_CONTEXT = YES;
 				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
@@ -491,10 +495,10 @@
 				CLANG_WARN_SEMICOLON_BEFORE_METHOD_BODY = YES;
 				CLANG_WARN_SUSPICIOUS_IMPLICIT_CONVERSION = YES;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = FX6BN52BK9;
+				DEVELOPMENT_TEAM = "$(inherited)";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
-				GCC_PREFIX_HEADER = "impluse-hfs/Prefix.h";
+				GCC_PREFIX_HEADER = common/Prefix.h;
 				GCC_WARN_ABOUT_MISSING_FIELD_INITIALIZERS = YES;
 				GCC_WARN_INITIALIZER_NOT_FULLY_BRACKETED = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
@@ -504,10 +508,11 @@
 		};
 		31F719C6293D4C5F0055EEA3 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = BF139B3029B3533A005EDF5F /* project.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = FX6BN52BK9;
+				DEVELOPMENT_TEAM = "$(inherited)";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.boredzo.UnitTests;
@@ -518,10 +523,11 @@
 		};
 		31F719C7293D4C5F0055EEA3 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = BF139B3029B3533A005EDF5F /* project.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = FX6BN52BK9;
+				DEVELOPMENT_TEAM = "$(inherited)";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.boredzo.UnitTests;
