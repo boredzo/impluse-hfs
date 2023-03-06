@@ -960,8 +960,7 @@
 
 	bool const flushed = [self.destinationVolume flushVolumeStructures:outError];
 	if (flushed) {
-		[self reportSourceBlocksCopied:5]; //Two for the boot blocks, one for the volume header, one for the alternate volume header, and one for the reserved footer.
-		ImpPrintf(@"Successfully wrote volume to %@", self.destinationDevice.absoluteURL.path);
+		[self deliverProgressUpdateWithOperationDescription:NSLocalizedString(@"Successfully wrote volume", @"Conversion progress message")];
 	}
 	return flushed;
 }
