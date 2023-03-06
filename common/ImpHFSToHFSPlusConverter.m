@@ -818,9 +818,11 @@
 			if (loadedSuccessfully) {
 				self.sourceVolume = srcVol;
 
+				u_int64_t const totalSizeOfSourceBlocks = self.sourceVolume.numberOfBytesPerBlock * self.sourceVolume.numberOfBlocksTotal;
+				u_int64_t const destinationLengthInBytes = MAX(lengthInBytes, totalSizeOfSourceBlocks);
 				self.destinationVolume = [[ImpHFSPlusVolume alloc] initForWritingToFileDescriptor:self->_writeFD
 					startAtOffset:startOffsetInBytes
-					expectedLengthInBytes:lengthInBytes];
+					expectedLengthInBytes:destinationLengthInBytes];
 
 				haveFoundHFSVolume = true;
 			}
