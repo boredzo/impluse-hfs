@@ -14,6 +14,9 @@
 
 @interface ImpBTreeNode : NSObject
 
+///Returns a name for this B*-tree variant. Mainly for debugging.
++ (NSString *_Nonnull) describeBTreeVersion:(ImpBTreeVersion const)version;
+
 ///May return an instance of a subclass, such as ImpBTreeHeaderNode. Tree is used to convert inter-node references such as firstLeafNode into pointers to node objects.
 + (instancetype _Nullable) nodeWithTree:(ImpBTreeFile *_Nonnull const)tree data:(NSData *_Nonnull const)nodeData;
 

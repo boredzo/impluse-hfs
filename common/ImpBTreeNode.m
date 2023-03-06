@@ -32,6 +32,23 @@
 	bool _dataIsMutable;
 }
 
++ (NSString *_Nonnull) describeBTreeVersion:(ImpBTreeVersion const)version {
+	switch (version) {
+		case ImpBTreeVersionHFSCatalog:
+			return @"HFS catalog";
+		case ImpBTreeVersionHFSPlusCatalog:
+			return @"HFS+ catalog";
+		case ImpBTreeVersionHFSExtentsOverflow:
+			return @"HFS extents overflow";
+		case ImpBTreeVersionHFSPlusExtentsOverflow:
+			return @"HFS+ extents overflow";
+		case ImpBTreeVersionHFSPlusAttributes:
+			return @"HFS+ attributes";
+		default:
+			return @"unknown";
+	}
+}
+
 ///Peek at the kind of node this is, and choose an appropriate subclass based on that.
 + (Class _Nonnull) nodeClassForData:(NSData *_Nonnull const)nodeData {
 	Class nodeClass = self;
