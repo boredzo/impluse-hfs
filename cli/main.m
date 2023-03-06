@@ -128,7 +128,9 @@ int main(int argc, const char * argv[]) {
 	};
 	NSError *_Nullable error = nil;
 	bool const converted = [converter performConversionOrReturnError:&error];
-	if (! converted) {
+	if (converted) {
+		ImpPrintf(@"Successfully wrote volume to %@", converter.destinationDevice.absoluteURL.path);
+	} else {
 		NSLog(@"Failed: %@", error.localizedDescription);
 		self.status = EXIT_FAILURE;
 	}

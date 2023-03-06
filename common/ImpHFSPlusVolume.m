@@ -214,60 +214,6 @@
 	return numBlocksUsed;
 }
 
-///Search the allocations bitmap for a range of unused blocks at least requestedNumABlocks long. If no such range exists, reduces requestedNumABlocks and tries again. Returns the length of an available extent, in a-blocks.
-//TODO: Would it be better to make this a block-allocating method? Find such a range, then immediately allocate it and return its extent?
-//TODO: Also, this currently doesn't take a forkType. The search should proceed in a direction determined by forkType (searching for openings for data forks from the end). (… although isn't that just allocateBlocks:forFork:getExtent:?)
-//TODO: Possible optimization (if we add the forkType thing): If we encounter a big extent of open space that includes the 25% or 50% marks of the drive (between the resources world and the data world), stop the search there. If we've already found a suitable range, use that; else, carve one out of the big pool in the middle and use that.
-- (u_int32_t) countOfBlocksInLargestUnusedExtentUpToCount:(u_int32_t)requestedNumABlocks {
-	CFRange initialRange = {
-		L(_vh->nextAllocation),
-		0,
-	};
-	//We could use totalBlocks (all a-blocks), but the postamble is always occupied anyway so there's no point searching for available a-blocks there.
-	CFIndex const numBlocksBeforePostamble = L(_postambleExtent.startBlock);
-	initialRange.length = numBlocksBeforePostamble - initialRange.location;
-
-	CFRange currentBestRange = { 0, 0 };
-
-	u_int32_t numBlocksFound = 0;
-	while (numBlocksFound == 0) {
-		CFRange range = initialRange;
-		CFIndex indexOfFirstUnusedBlock = CFBitVectorGetFirstIndexOfBit(_allocationsBitmap, range, false);
-		if (indexOfFirstUnusedBlock == kCFNotFound) {
-			if (initialRange.location > 0) {
-				//Hm. Maybe nextAllocation is past some unused blocks; that can happen (in theory). Try searching the portion of the disk before nextAllocation.
-				//Also, since a lack of unused blocks after nextAllocation is not going to change, reset our initialRange to the whole disk for the sake of future loops.
-				initialRange.location = 0;
-				initialRange.length = L(_vh->nextAllocation);
-				indexOfFirstUnusedBlock = CFBitVectorGetFirstIndexOfBit(_allocationsBitmap, range, false);
-				if (indexOfFirstUnusedBlock == kCFNotFound) {
-					//Nope, no unused blocks at all. Bummer.
-					break;
-				}
-			}
-		}
-
-		while (range.location < numBlocksBeforePostamble) {
-			range.location = indexOfFirstUnusedBlock;
-			range.length = numBlocksBeforePostamble - range.location;
-			CFIndex indexOfLastUnusedBlock = CFBitVectorGetLastIndexOfBit(_allocationsBitmap, range, false);
-			range.length = indexOfLastUnusedBlock - indexOfFirstUnusedBlock;
-			if (range.length >= requestedNumABlocks) {
-				if (range.length - requestedNumABlocks < currentBestRange.length - requestedNumABlocks) {
-					//This is a better fit for this number of blocks. This is our new best range.
-					currentBestRange = range;
-				}
-			}
-			range.location = indexOfLastUnusedBlock + 1;
-			range.length = numBlocksBeforePostamble - range.location;
-		}
-
-		numBlocksFound = (u_int32_t)currentBestRange.length;
-	}
-
-	return numBlocksFound;
-}
-
 - (void) initializeAllocationBitmapWithBlockSize:(u_int32_t)aBlockSize count:(u_int32_t)numABlocks {
 	//IMPORTANT: These must be set before we attempt to initialize the allocation bitmap so the postamble offset can be computed and the corresponding bit(s), if any, set.
 	S(_vh->blockSize, aBlockSize);
@@ -345,35 +291,50 @@
 {
 	if (requestedBlocks == 0) {
 		//This can legitimately happen if a fork is empty, which is pretty common for files that have a data xor resource fork but not both.
-		struct HFSPlusExtentDescriptor extent = { _vh->nextAllocation, 0 };
+		struct HFSPlusExtentDescriptor const extent = { _vh->nextAllocation, 0 };
 		*outExt = extent;
 		return true;
 	}
 
+	CFIndex const firstOutOfBoundsBlock = wholeSearchRange.location + wholeSearchRange.length;
+
 	CFRange rangeToSearch = wholeSearchRange;
 	CFRange rangeToAllocate = { kCFNotFound, 0 };
-	while (rangeToAllocate.length < requestedBlocks) {
+	while (rangeToSearch.location < firstOutOfBoundsBlock && rangeToSearch.length > 0 && rangeToAllocate.length < requestedBlocks) {
 		CFIndex const firstAvailableBlockNumber = CFBitVectorGetFirstIndexOfBit(_allocationsBitmap, rangeToSearch, false);
 		if (firstAvailableBlockNumber == kCFNotFound) {
 			break;
 		}
 		CFRange const remainingRange = { firstAvailableBlockNumber, rangeToSearch.length - (firstAvailableBlockNumber - rangeToSearch.location) };
 		CFIndex const lastAvailableBlockNumber = CFBitVectorGetLastIndexOfBit(_allocationsBitmap, remainingRange, false);
-		rangeToAllocate = (CFRange){ firstAvailableBlockNumber, (lastAvailableBlockNumber + 1) - firstAvailableBlockNumber };
+		rangeToAllocate = (CFRange){
+			.location = firstAvailableBlockNumber,
+			.length = (lastAvailableBlockNumber + 1) - firstAvailableBlockNumber,
+		};
 		if (rangeToAllocate.length > requestedBlocks) {
 			rangeToAllocate.length = requestedBlocks;
 		}
 		if (rangeToAllocate.length < requestedBlocks && ! acceptPartial) {
 			break;
 		}
+
+		//+2 because the block after lastAvailableBlockNumber is already known to be unavailable, so skip over it.
+		CFRange nextRangeToSearch = {
+			.location = lastAvailableBlockNumber + 2,
+		};
+		CFIndex const startToStartDistance = nextRangeToSearch.location - rangeToSearch.location;
+		if (startToStartDistance > rangeToSearch.length) {
+			nextRangeToSearch.length = 0;
+		} else {
+			nextRangeToSearch.length = rangeToSearch.length - startToStartDistance;
+		}
+		rangeToSearch = nextRangeToSearch;
 	}
 
 	bool const success = rangeToAllocate.length >= requestedBlocks || (acceptPartial && rangeToAllocate.location != kCFNotFound);
 	if (success) {
-		CFBitVectorSetBits(_allocationsBitmap, rangeToAllocate, true);
 		S(outExt->startBlock, (u_int32_t)rangeToAllocate.location);
 		S(outExt->blockCount, (u_int32_t)rangeToAllocate.length);
-		S(_vh->nextAllocation, (u_int32_t)(rangeToAllocate.location + rangeToAllocate.length));
 	}
 
 	return success;
@@ -448,6 +409,7 @@
 		L(oneExtent->blockCount),
 	};
 	CFBitVectorSetBits(_allocationsBitmap, range, true);
+	S(_vh->nextAllocation, (u_int32_t)(range.location + range.length));
 }
 
 - (void) deallocateBlocksOfExtent:(const struct HFSPlusExtentDescriptor *_Nonnull const)oneExtent {
@@ -536,8 +498,31 @@
 	}
 
 	if (! fulfilled) {
-		CFRange searchRange = { nextAllocation, numAllBlocks - nextAllocation };
-		fulfilled = [self findBlocksForward:requestedBlocks inRange:searchRange acceptPartial:false getExtent:outExt];
+		CFRange const firstSearchRange = { nextAllocation, numAllBlocks - nextAllocation };
+		CFRange const secondSearchRange = { 0, nextAllocation };
+		//First search for a big enough opening to satisfy the request. If there isn't one, take any opening we can find. (If the volume is fragmented, we may be able to cobble together multiple openings. If not, taking the last remaining available blocks but still needing more only delays inevitable failure.)
+		fulfilled = [self findBlocksForward:requestedBlocks inRange:firstSearchRange acceptPartial:false getExtent:outExt];
+		if (fulfilled) {
+			ImpPrintf(@"Successfully allocated { %u, %u } from a sufficient opening in the latter half", L(outExt->startBlock), L(outExt->blockCount));
+		} else {
+			fulfilled = [self findBlocksForward:requestedBlocks inRange:secondSearchRange acceptPartial:false getExtent:outExt];
+			if (fulfilled) {
+				ImpPrintf(@"Successfully allocated { %u, %u } from a sufficient opening in the former half", L(outExt->startBlock), L(outExt->blockCount));
+			} else {
+				fulfilled = [self findBlocksForward:requestedBlocks inRange:firstSearchRange acceptPartial:true getExtent:outExt];
+				if (fulfilled) {
+					ImpPrintf(@"Successfully allocated { %u, %u } from a partial opening in the latter half", L(outExt->startBlock), L(outExt->blockCount));
+				} else {
+					fulfilled = [self findBlocksForward:requestedBlocks inRange:secondSearchRange acceptPartial:true getExtent:outExt];
+					if (fulfilled) {
+						ImpPrintf(@"Successfully allocated { %u, %u } from a partial opening in the former half", L(outExt->startBlock), L(outExt->blockCount));
+					} else {
+						ImpPrintf(@"Failed to allocate %u blocks", requestedBlocks);
+					}
+				}
+			}
+		}
+
 		if (fulfilled) {
 			if (existingSizeOfExtent > 0) {
 				[self deallocateBlocksOfExtent:&backupExtent];
@@ -556,6 +541,12 @@
 	u_int32_t const aBlockSize = self.blockSize;
 	u_int64_t remaining = numBytes;
 	NSUInteger extentIdx = 0;
+
+	//Skip over any extents already populated.
+	while (L(outExts[extentIdx].blockCount) != 0 && extentIdx < kHFSPlusExtentDensity) {
+		++extentIdx;
+	}
+
 	while (remaining > 0 && extentIdx < kHFSPlusExtentDensity) {
 		//How big of an extent do we need for this number of bytes?
 		u_int64_t numBlocksThisExtent = [self countOfBlocksOfSize:aBlockSize neededForLogicalLength:remaining];
@@ -563,15 +554,10 @@
 
 		//Try to allocate that many.
 		bool allocated = [self allocateBlocks:(u_int32_t)numBlocksThisExtent forFork:forkType getExtent:outExts + extentIdx];
-		if (! allocated) {
-			//OK, maybe not. What's the biggest extent we *can* allocate out of this volume?
-			numBlocksThisExtent = [self countOfBlocksInLargestUnusedExtentUpToCount:(u_int32_t)numBlocksThisExtent];
-			//Try to allocate that.
-			allocated = [self allocateBlocks:(u_int32_t)numBlocksThisExtent forFork:forkType getExtent:outExts + extentIdx];
-		}
 
 		//Whatever we allocated, deduct it from our number of bytes remaining and advance to the next slot in the extent record.
 		if (allocated) {
+			numBlocksThisExtent = L(outExts[extentIdx].blockCount);
 			u_int64_t const numBytesAllocated = aBlockSize * numBlocksThisExtent;
 			if (numBytesAllocated < remaining) {
 				remaining -= numBytesAllocated;
@@ -583,7 +569,7 @@
 			//Well then. We failed to allocate anything at all. Either we're *completely* out of space (largest unused extent was zero), or something else is wrong.
 			//TODO: Probably should warn or something about having failed to allocate enough blocks. Maybe an NSError return?
 			//TODO: Deallocate any extents we did allocate.
-			ImpPrintf(@"Block allocation failure: Tried to allocate %llu bytes for fork 0x%02x but fell %llu bytes short", numBytes, forkType, remaining);
+			ImpPrintf(@"Block allocation failure: Tried to allocate 0x%llx bytes for fork 0x%02x but fell 0x%llx bytes short", numBytes, forkType, remaining);
 			break;
 		}
 	}

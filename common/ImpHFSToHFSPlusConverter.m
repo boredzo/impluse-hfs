@@ -731,9 +731,12 @@
 		S(vhPtr->attributes, L(vhPtr->attributes) | kHFSCatalogNodeIDsReusedMask);
 	}
 
-//	NSUInteger const numSrcLiveNodes = sourceTree.numberOfLiveNodes;
-//	NSUInteger const numDstLiveNodes = destTree.numberOfLiveNodes;
-//	ImpPrintf(@"HFS tree had %lu live nodes; HFS+ tree has %lu live nodes", numSrcLiveNodes, numDstLiveNodes);
+	NSUInteger const numSrcLiveNodes = sourceTree.numberOfLiveNodes;
+	NSUInteger const numSrcPotentialNodes = sourceTree.numberOfPotentialNodes;
+	NSUInteger const numDstLiveNodes = destTree.numberOfLiveNodes;
+	NSUInteger const numDstPotentialNodes = destTree.numberOfPotentialNodes;
+//	ImpPrintf(@"HFS tree had %lu live nodes out of %lu; HFS+ tree has %lu live nodes out of %lu", numSrcLiveNodes, numSrcPotentialNodes, numDstLiveNodes, numDstPotentialNodes);
+	NSAssert(numDstLiveNodes <= numDstPotentialNodes, @"Conversion failure: Produced more catalog nodes than the catalog file was preallocated for (please file a bug, include this message, and if possible and legal attach the disk image you were trying to convert)");
 }
 
 ///Map the number of an allocation block from the source volume (e.g., the start block of an extent) to the number of the corresponding block on the destination volume. By default, returns sourceBlock plus the source volume's first block number. You may need to override this method if the destination volume uses a different block size, or if you need to make exceptions for certain blocks (in extents that were relocated due to not fitting in the new volume).
@@ -818,9 +821,11 @@
 			if (loadedSuccessfully) {
 				self.sourceVolume = srcVol;
 
+				u_int64_t const totalSizeOfSourceBlocks = self.sourceVolume.numberOfBytesPerBlock * self.sourceVolume.numberOfBlocksTotal;
+				u_int64_t const destinationLengthInBytes = MAX(lengthInBytes, totalSizeOfSourceBlocks);
 				self.destinationVolume = [[ImpHFSPlusVolume alloc] initForWritingToFileDescriptor:self->_writeFD
 					startAtOffset:startOffsetInBytes
-					expectedLengthInBytes:lengthInBytes];
+					expectedLengthInBytes:destinationLengthInBytes];
 
 				haveFoundHFSVolume = true;
 			}
@@ -958,8 +963,7 @@
 
 	bool const flushed = [self.destinationVolume flushVolumeStructures:outError];
 	if (flushed) {
-		[self reportSourceBlocksCopied:5]; //Two for the boot blocks, one for the volume header, one for the alternate volume header, and one for the reserved footer.
-		ImpPrintf(@"Successfully wrote volume to %@", self.destinationDevice.absoluteURL.path);
+		[self deliverProgressUpdateWithOperationDescription:NSLocalizedString(@"Successfully wrote volume", @"Conversion progress message")];
 	}
 	return flushed;
 }
