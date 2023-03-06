@@ -38,9 +38,9 @@
 ///Size of the keyLength field at the start of every record key. In HFS trees, this is always 1. In HFS+ trees, this is 2 if a particular attribute is set in the header record's attributes, and that attribute is always set.
 - (u_int16_t) keyLengthSize;
 
-///Debugging method. Returns the number of total nodes in the tree, live or otherwise (that is, the total length in bytes of the file divided by the size of one node).
+///Returns the number of total nodes in the tree, live or otherwise (that is, the total length in bytes of the file divided by the size of one node).
 - (NSUInteger) numberOfPotentialNodes;
-///Debugging method. Returns the number of nodes in the tree that are reachable: 1 for the header node, plus the number of map nodes (siblings to the header node), the number of index nodes, and the number of leaf nodes.
+///Returns the number of nodes in the tree that are reachable: 1 for the header node, plus the number of map nodes (siblings to the header node), the number of index nodes, and the number of leaf nodes.
 - (NSUInteger) numberOfLiveNodes;
 
 ///Returns the length that this B*-tree would take up on disk, in bytes.
