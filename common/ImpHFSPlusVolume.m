@@ -569,7 +569,7 @@
 			//Well then. We failed to allocate anything at all. Either we're *completely* out of space (largest unused extent was zero), or something else is wrong.
 			//TODO: Probably should warn or something about having failed to allocate enough blocks. Maybe an NSError return?
 			//TODO: Deallocate any extents we did allocate.
-			ImpPrintf(@"Block allocation failure: Tried to allocate %llu bytes for fork 0x%02x but fell %llu bytes short", numBytes, forkType, remaining);
+			ImpPrintf(@"Block allocation failure: Tried to allocate 0x%llx bytes for fork 0x%02x but fell 0x%llx bytes short", numBytes, forkType, remaining);
 			break;
 		}
 	}
