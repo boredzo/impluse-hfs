@@ -731,8 +731,8 @@
 		S(vhPtr->attributes, L(vhPtr->attributes) | kHFSCatalogNodeIDsReusedMask);
 	}
 
-	NSUInteger const numSrcLiveNodes = sourceTree.numberOfLiveNodes;
-	NSUInteger const numSrcPotentialNodes = sourceTree.numberOfPotentialNodes;
+//	NSUInteger const numSrcLiveNodes = sourceTree.numberOfLiveNodes;
+//	NSUInteger const numSrcPotentialNodes = sourceTree.numberOfPotentialNodes;
 	NSUInteger const numDstLiveNodes = destTree.numberOfLiveNodes;
 	NSUInteger const numDstPotentialNodes = destTree.numberOfPotentialNodes;
 //	ImpPrintf(@"HFS tree had %lu live nodes out of %lu; HFS+ tree has %lu live nodes out of %lu", numSrcLiveNodes, numSrcPotentialNodes, numDstLiveNodes, numDstPotentialNodes);
