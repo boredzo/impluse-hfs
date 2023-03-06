@@ -370,10 +370,8 @@
 
 	bool const success = rangeToAllocate.length >= requestedBlocks || (acceptPartial && rangeToAllocate.location != kCFNotFound);
 	if (success) {
-		CFBitVectorSetBits(_allocationsBitmap, rangeToAllocate, true);
 		S(outExt->startBlock, (u_int32_t)rangeToAllocate.location);
 		S(outExt->blockCount, (u_int32_t)rangeToAllocate.length);
-		S(_vh->nextAllocation, (u_int32_t)(rangeToAllocate.location + rangeToAllocate.length));
 	}
 
 	return success;
@@ -448,6 +446,7 @@
 		L(oneExtent->blockCount),
 	};
 	CFBitVectorSetBits(_allocationsBitmap, range, true);
+	S(_vh->nextAllocation, (u_int32_t)(range.location + range.length));
 }
 
 - (void) deallocateBlocksOfExtent:(const struct HFSPlusExtentDescriptor *_Nonnull const)oneExtent {
