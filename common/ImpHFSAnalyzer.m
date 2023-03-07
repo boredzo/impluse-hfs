@@ -52,6 +52,8 @@
 	return analyzed;
 }
 - (bool) analyzeVolume:(ImpHFSVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError {
+	NSByteCountFormatter *_Nonnull const bcf = [NSByteCountFormatter new];
+
 	if ([srcVol isKindOfClass:[ImpHFSPlusVolume class]]) {
 		ImpHFSPlusVolume *_Nonnull const srcVolPlus = (ImpHFSPlusVolume *_Nonnull const)srcVol;
 		[srcVolPlus peekAtHFSPlusVolumeHeader:^(NS_NOESCAPE const struct HFSPlusVolumeHeader *const vhPtr) {
@@ -61,15 +63,22 @@
 			fmtr.numberStyle = NSNumberFormatterDecimalStyle;
 			fmtr.hasThousandSeparators = true;
 
+			u_int64_t const catNumBytes = L(vhPtr->catalogFile.logicalSize);
+			ImpPrintf(@"Catalog file logical length: 0x%llx bytes (%@)", catNumBytes, [bcf stringFromByteCount:catNumBytes]);
 			struct HFSPlusExtentDescriptor const *_Nonnull const catExtDescs = vhPtr->catalogFile.extents;
 			for (NSUInteger i = 0; i < kHFSPlusExtentDensity && catExtDescs[i].blockCount > 0; ++i) {
 				ImpPrintf(@"Catalog extent #%lu: start block #%@, length %@ blocks", i, [fmtr stringFromNumber:@(L(catExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[0].blockCount))]);
 			}
 
+			u_int64_t const eoNumBytes = L(vhPtr->extentsFile.logicalSize);
+			ImpPrintf(@"Extents overflow file logical length: 0x%llx bytes (%@)", eoNumBytes, [bcf stringFromByteCount:eoNumBytes]);
 			struct HFSPlusExtentDescriptor const *_Nonnull const eoExtDescs = vhPtr->extentsFile.extents;
 			for (NSUInteger i = 0; i < kHFSPlusExtentDensity && eoExtDescs[i].blockCount > 0; ++i) {
 				ImpPrintf(@"Extents overflow extent #%lu: start block #%@, length %@ blocks", i, [fmtr stringFromNumber:@(L(eoExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[0].blockCount))]);
 			}
+
+			ImpPrintf(@"Catalog file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", srcVol.catalogBTree.numberOfLiveNodes, srcVol.catalogBTree.numberOfPotentialNodes, srcVol.catalogBTree.numberOfPotentialNodes > 0 ? (srcVol.catalogBTree.numberOfLiveNodes / (double)srcVol.catalogBTree.numberOfPotentialNodes) * 100.0 : 1.0);
+			ImpPrintf(@"Extents file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", srcVol.extentsOverflowBTree.numberOfLiveNodes, srcVol.extentsOverflowBTree.numberOfPotentialNodes, srcVol.extentsOverflowBTree.numberOfPotentialNodes > 0 ? (srcVol.extentsOverflowBTree.numberOfLiveNodes / (double)srcVol.extentsOverflowBTree.numberOfPotentialNodes) * 100.0 : 1.0);
 		}];
 	} else {
 		[srcVol peekAtHFSVolumeHeader:^(NS_NOESCAPE const struct HFSMasterDirectoryBlock *const mdbPtr) {
@@ -79,10 +88,16 @@
 			fmtr.numberStyle = NSNumberFormatterDecimalStyle;
 			fmtr.hasThousandSeparators = true;
 
+			u_int32_t const catNumBytes = L(mdbPtr->drCTFlSize);
+			ImpPrintf(@"Catalog file logical length: 0x%x bytes (%@)", catNumBytes, [bcf stringFromByteCount:catNumBytes]);
+
 			struct HFSExtentDescriptor const *_Nonnull const catExtDescs = mdbPtr->drCTExtRec;
 			ImpPrintf(@"Catalog extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[0].blockCount))]);
 			ImpPrintf(@"Catalog extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[1].blockCount))]);
 			ImpPrintf(@"Catalog extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[2].blockCount))]);
+
+			u_int32_t const eoNumBytes = L(mdbPtr->drXTFlSize);
+			ImpPrintf(@"Extents overflow file logical length: 0x%x bytes (%@)", eoNumBytes, [bcf stringFromByteCount:eoNumBytes]);
 
 			struct HFSExtentDescriptor const *_Nonnull const eoExtDescs = mdbPtr->drXTExtRec;
 			ImpPrintf(@"Extents overflow extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[0].blockCount))]);
@@ -126,7 +141,6 @@
 
 	ImpPrintf(@"Volume's name is “%@”", srcVol.volumeName);
 	ImpPrintf(@"“%@” contains %lu files and %lu folders", srcVol.volumeName, srcVol.numberOfFiles, srcVol.numberOfFolders);
-	NSByteCountFormatter *_Nonnull const bcf = [NSByteCountFormatter new];
 	ImpPrintf(@"Allocation block size is %lu (%lx) bytes; volume has %lu blocks in use, %lu free", srcVol.numberOfBytesPerBlock, srcVol.numberOfBytesPerBlock, srcVol.numberOfBlocksUsed, srcVol.numberOfBlocksFree);
 	if ([srcVol isKindOfClass:[ImpHFSPlusVolume class]]) {
 		ImpHFSPlusVolume *_Nonnull const srcVolPlus = (ImpHFSPlusVolume *_Nonnull const)srcVol;
