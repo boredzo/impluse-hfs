@@ -67,6 +67,7 @@ typedef void (^ImpConversionProgressUpdateBlock)(double progress, NSString *_Non
 
 - (void) convertHFSVolumeHeader:(struct HFSMasterDirectoryBlock const *_Nonnull const)mdbPtr toHFSPlusVolumeHeader:(struct HFSPlusVolumeHeader *_Nonnull const)vhPtr;
 - (void) copyFromHFSCatalogFile:(ImpBTreeFile *_Nonnull const)sourceTree toHFSPlusCatalogFile:(ImpMutableBTreeFile *_Nonnull const)destTree;
+- (void) copyFromHFSExtentsOverflowFile:(ImpBTreeFile *_Nonnull const)sourceTree toHFSPlusExtentsOverflowFile:(ImpMutableBTreeFile *_Nonnull const)destTree;
 
 ///Open files for reading and writing and do any other preflight checks before conversion begins. The abstract class implements this method. After this method returns, self.hfsVolume and self.hfsPlusVolume are non-nil.
 - (bool) step0_preflight_error:(NSError *_Nullable *_Nullable const)outError;
