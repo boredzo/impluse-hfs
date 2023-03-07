@@ -214,6 +214,16 @@
 
 - (void) buildMockTree {
 	if (! _treeIsBuilt) {
+		/*We can't just convert leaf records straight across in the same order, for three reasons:
+		 *- For files, we probably need to add a thread record (optional in HFS, mandatory in HFS+).
+		 *- File thread records may be at a very different position in the leaf row from the corresponding file record, because the file thread record's key has the file ID as its “parent ID”, whereas the file record's key has the actual parent (directory) of the file. These are two different CNIDs and cannot be assumed to be anywhere near each other in the number sequence.
+		 *- The order of names (and therefore items) may change between HFS's MacRoman-ish 8-bit encoding and HFS+'s Unicode flavor. This not only changes the leaf row, it can also ripple up into the index.
+		 *
+		 *We need to grab the keys, the source file or folder records, and the source thread records, and generate a list of items. Each item has a converted file or folder record with corresponding key, and a converted or generated thread record and corresponding key. From these items, we can extract both records and put those key-value pairs into a sorted array, and then use that array to populate the converted leaf row.
+		 *
+		 *The list of items is built up by calls to the addKey:____Record: methods. By this point, all of those should have already happened.
+		 */
+
 		//Now we have all the items. HFS requires folders to have thread records, so those should all have them, but files having thread records was optional (but is required under HFS+), so we may need to create those.
 		for (ImpCatalogItem *_Nonnull const item in _sourceItemsThatNeedThreadRecords) {
 			if (item.needsThreadRecord) {

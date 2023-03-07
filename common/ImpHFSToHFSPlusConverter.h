@@ -15,6 +15,9 @@ typedef void (^ImpConversionProgressUpdateBlock)(double progress, NSString *_Non
 
 @interface ImpHFSToHFSPlusConverter : NSObject
 
+///The number of bytes per node in the catalog file that will be created as part of conversion. Defaults to BTreeNodeLengthHFSPlusCatalogMinimum.
+- (u_int16_t) destinationCatalogNodeSize;
+
 ///Which encoding to interpret HFS volume, folder, and file names as. Defaults to MacRoman.
 @property TextEncoding hfsTextEncoding;
 
@@ -66,7 +69,7 @@ typedef void (^ImpConversionProgressUpdateBlock)(double progress, NSString *_Non
 - (NSMutableData *_Nonnull) convertHFSCatalogKeyToHFSPlus:(NSData *_Nonnull const)sourceKeyData;
 
 - (void) convertHFSVolumeHeader:(struct HFSMasterDirectoryBlock const *_Nonnull const)mdbPtr toHFSPlusVolumeHeader:(struct HFSPlusVolumeHeader *_Nonnull const)vhPtr;
-- (void) copyFromHFSCatalogFile:(ImpBTreeFile *_Nonnull const)sourceTree toHFSPlusCatalogFile:(ImpMutableBTreeFile *_Nonnull const)destTree;
+- (ImpMutableBTreeFile *_Nonnull) convertHFSCatalogFile:(ImpBTreeFile *_Nonnull const)sourceTree;
 - (void) copyFromHFSExtentsOverflowFile:(ImpBTreeFile *_Nonnull const)sourceTree toHFSPlusExtentsOverflowFile:(ImpMutableBTreeFile *_Nonnull const)destTree;
 
 ///Open files for reading and writing and do any other preflight checks before conversion begins. The abstract class implements this method. After this method returns, self.hfsVolume and self.hfsPlusVolume are non-nil.

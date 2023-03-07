@@ -394,18 +394,14 @@
 	return destRecData;
 }
 
-- (void) copyFromHFSCatalogFile:(ImpBTreeFile *_Nonnull const)sourceTree toHFSPlusCatalogFile:(ImpMutableBTreeFile *_Nonnull const)destTree
-{
-	/*We can't just convert leaf records straight across in the same order, for three reasons:
-	 *- For files, we probably need to add a thread record (optional in HFS, mandatory in HFS+).
-	 *- File thread records may be at a very different position in the leaf row from the corresponding file record, because the file thread record's key has the file ID as its “parent ID”, whereas the file record's key has the actual parent (directory) of the file. These are two different CNIDs and cannot be assumed to be anywhere near each other in the number sequence.
-	 *- The order of names (and therefore items) may change between HFS's MacRoman-ish 8-bit encoding and HFS+'s Unicode flavor. This not only changes the leaf row, it can also ripple up into the index.
-	 *
-	 *We need to grab the keys, the source file or folder records, and the source thread records, and generate a list of items. Each item has a converted file or folder record with corresponding key, and a converted or generated thread record and corresponding key. From these items, we can extract both records and put those key-value pairs into a sorted array, and then use that array to populate the converted leaf row.
-	 */
+- (u_int16_t) destinationCatalogNodeSize {
+	return [ImpBTreeFile nodeSizeForVersion:ImpBTreeVersionHFSPlusCatalog];
+}
+
+- (ImpMutableBTreeFile *_Nonnull) convertHFSCatalogFile:(ImpBTreeFile *_Nonnull const)sourceTree {
 	NSUInteger const numItems = self.sourceVolume.numberOfFiles + self.sourceVolume.numberOfFolders;
 	ImpCatalogBuilder *_Nonnull const catBuilder = [[ImpCatalogBuilder alloc] initWithBTreeVersion:ImpBTreeVersionHFSPlusCatalog
-		bytesPerNode:destTree.bytesPerNode
+		bytesPerNode:self.destinationCatalogNodeSize
 		expectedNumberOfItems:numItems];
 	catBuilder.treeDepthHint = sourceTree.headerNode.treeDepth;
 
@@ -434,6 +430,11 @@
 		return true;
 	}];
 
+	ImpMutableBTreeFile *_Nonnull const destTree = [[ImpMutableBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSPlusCatalog
+		bytesPerNode:self.destinationCatalogNodeSize
+		nodeCount:catBuilder.totalNodeCount
+		convertTree:sourceTree];
+
 	[catBuilder populateTree:destTree];
 
 	struct HFSPlusVolumeHeader *_Nonnull const vhPtr = _destinationVolume.mutableVolumeHeaderPointer;
@@ -450,6 +451,8 @@
 	NSUInteger const numDstPotentialNodes = destTree.numberOfPotentialNodes;
 //	ImpPrintf(@"HFS tree had %lu live nodes out of %lu; HFS+ tree has %lu live nodes out of %lu", numSrcLiveNodes, numSrcPotentialNodes, numDstLiveNodes, numDstPotentialNodes);
 	NSAssert(numDstLiveNodes <= numDstPotentialNodes, @"Conversion failure: Produced more catalog nodes than the catalog file was preallocated for (please file a bug, include this message, and if possible and legal attach the disk image you were trying to convert)");
+
+	return destTree;
 }
 
 ///Map the number of an allocation block from the source volume (e.g., the start block of an extent) to the number of the corresponding block on the destination volume. By default, returns sourceBlock plus the source volume's first block number. You may need to override this method if the destination volume uses a different block size, or if you need to make exceptions for certain blocks (in extents that were relocated due to not fitting in the new volume).
