@@ -29,20 +29,15 @@
 	u_int32_t _nextLeafNodeIndex;
 }
 
-- (instancetype _Nullable)initWithVersion:(ImpBTreeVersion const)version convertTree:(ImpBTreeFile *_Nonnull const)sourceTree
+- (instancetype _Nullable)initWithVersion:(ImpBTreeVersion const)version
+	bytesPerNode:(u_int16_t const)nodeSize
+	nodeCount:(NSUInteger const)numPotentialNodes
+	convertTree:(ImpBTreeFile *_Nonnull const)sourceTree
 {
 	NSParameterAssert(version == (sourceTree.version << 8));
 
-	//The superclass initializer requires data to back the tree, so we need to preallocate space for the nodes we're going to create, which means we need an estimate of the space required.
-	//However, we're working with node counts, not total size of all records. Nodes in HFS+ are eight times the size they are in HFS (0x1000 ÷ 0x200).
-	//As a rough estimate, we divide the old node count by 8, then double it to account for key and record growth. That works out to dividing by 4.
-	//… except that's actually too small for some trees (Doom II for one). So this has been bumped to divide by 2 instead, which is overkill for most trees but is enough for Doom II while still being small enough for Hexen: Deathkings of the Dark Citadel.
-	//Ultimately, this is delicate HAX and needs to be replaced by a better means of anticipating the node count needed, probably in the converter rather than here.
-	NSUInteger const estimatedNumNodes = MAX(sourceTree.numberOfLiveNodes / 2, 2);
-
-	u_int16_t const nodeSize = [[self class] nodeSizeForVersion:version];
 	u_int16_t const maxKeyLength = [[self class] maxKeyLengthForVersion:version];
-	NSMutableData *_Nonnull const fileData = [NSMutableData dataWithLength:nodeSize * estimatedNumNodes];
+	NSMutableData *_Nonnull const fileData = [NSMutableData dataWithLength:nodeSize * numPotentialNodes];
 
 	//Populate the header node of this data.
 	//Do this before super init in case the superclass initializer needs to consult the header node.

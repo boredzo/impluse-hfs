@@ -20,81 +20,10 @@
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
 #import "ImpBTreeHeaderNode.h"
-#import "ImpBTreeIndexNode.h"
 #import "ImpMutableBTreeFile.h"
 #import "ImpExtentSeries.h"
 #import "ImpTextEncodingConverter.h"
-
-///Simple data object for an item in a catalog file being translated.
-@interface ImpCatalogItem: NSObject
-
-- (instancetype _Nonnull) initWithCatalogNodeID:(HFSCatalogNodeID const)cnid;
-
-@property HFSCatalogNodeID cnid;
-@property bool needsThreadRecord;
-
-///The key for the item's file or folder record, containing its parent item CNID and its own name. This version of the key comes from the source volume.
-@property(strong) NSData *sourceKey;
-///The item's file or folder record. This version of the record comes from the source volume.
-@property(strong) NSData *sourceRecord;
-///The key for the item's file or folder record, containing its parent item CNID and its own name. This version of the key has been converted for the destination volume.
-@property(strong) NSMutableData *destinationKey;
-///The item's file or folder record, converted for the destination volume.
-@property(strong) NSMutableData *destinationRecord;
-///The key for the item's thread record, containing its own CNID. This version of the key comes from the source volume.
-@property(strong) NSData *sourceThreadKey;
-///The thread record, containing the item's parent CNID and its own name. This version of the key comes from the source volume.
-@property(strong) NSData *sourceThreadRecord;
-///The key for the item's thread record, containing its own CNID. This version of the key has been converted for the destination volume.
-@property(strong) NSMutableData *destinationThreadKey;
-///The thread record, containing the item's parent CNID and its own name. This version of the key has been converted for the destination volume.
-@property(strong) NSMutableData *destinationThreadRecord;
-
-@end
-
-///Simple data object representing one key-value pair in a B*-tree file's leaf row. Used in converting the catalog file (as thread records may need to be created for files that don't have them, and these thread records will need to be inserted into the list of records in a way that preserves the ordering of keys).
-@interface ImpCatalogKeyValuePair : NSObject
-
-- (instancetype _Nonnull)initWithKey:(NSData *_Nonnull const)keyData value:(NSData *_Nonnull const)valueData;
-
-@property(strong) NSData *key;
-@property(strong) NSData *value;
-
-@end
-
-///Pared-down substitute for ImpBTreeNode, which needs to be backed by a complete tree. This is used in making a new tree.
-@interface ImpMockNode : NSObject
-
-///Create an ImpMockNode that can hold maxNumBytes' worth of records.
-- (instancetype) initWithCapacity:(u_int32_t const)maxNumBytes;
-
-///The index of this node, starting from 0. This node should never be given the index 0 (and, since it defaults to 0, it must be changed) since that's the index of the header node, and ImpMockNodes never represent a header node.
-@property u_int32_t nodeNumber;
-
-///The height of this row in the B*-tree. The header row (header node and map nodes) has no height; nodes in that row have height 0. The leaf row is always at height 1, and index rows are at increasing heights above that.
-@property u_int8_t nodeHeight;
-
-///The first key that has been added to this node, if any. (Used for building index nodes from the first key of each node on the row below.)
-@property(nonatomic, readonly) NSData *_Nullable firstKey;
-
-///Returns the total size of all records in the node (that is, all keys plus all associated payloads).
-@property(readonly) u_int32_t totalSizeOfAllRecords;
-
-///Append a key to the node's list of records.
-- (bool) appendKey:(NSData *_Nonnull const)keyData payload:(NSData *_Nonnull const)payloadData;
-
-- (void) writeIntoNode:(ImpBTreeNode *_Nonnull const)realNode;
-
-@end
-@interface ImpMockIndexNode : ImpMockNode
-
-///Append a key to the node's list of pointer records, linked to the provided node.
-- (bool) appendKey:(NSData *_Nonnull const)keyData fromNode:(ImpMockNode *_Nonnull const)descendantNode;
-
-///Add records to a real index node to match the contents of this mock index node.
-- (void) writeIntoNode:(ImpBTreeNode *_Nonnull const)realNode;
-
-@end
+#import "ImpCatalogBuilder.h"
 
 @implementation ImpHFSToHFSPlusConverter
 {
@@ -465,270 +394,55 @@
 	return destRecData;
 }
 
-- (void) copyFromHFSCatalogFile:(ImpBTreeFile *_Nonnull const)sourceTree toHFSPlusCatalogFile:(ImpMutableBTreeFile *_Nonnull const)destTree
-{
-	/*We can't just convert leaf records straight across in the same order, for three reasons:
-	 *- For files, we probably need to add a thread record (optional in HFS, mandatory in HFS+).
-	 *- File thread records may be at a very different position in the leaf row from the corresponding file record, because the file thread record's key has the file ID as its “parent ID”, whereas the file record's key has the actual parent (directory) of the file. These are two different CNIDs and cannot be assumed to be anywhere near each other in the number sequence.
-	 *- The order of names (and therefore items) may change between HFS's MacRoman-ish 8-bit encoding and HFS+'s Unicode flavor. This not only changes the leaf row, it can also ripple up into the index.
-	 *
-	 *We need to grab the keys, the source file or folder records, and the source thread records, and generate a list of items. Each item has a converted file or folder record with corresponding key, and a converted or generated thread record and corresponding key. From these items, we can extract both records and put those key-value pairs into a sorted array, and then use that array to populate the converted leaf row.
-	 */
-	NSUInteger const numItems = self.sourceVolume.numberOfFiles + self.sourceVolume.numberOfFolders;
-	NSMutableDictionary <NSNumber *, ImpCatalogItem *> *_Nonnull const sourceItemsByCNID = [NSMutableDictionary dictionaryWithCapacity:numItems];
-	NSMutableSet <ImpCatalogItem *> *_Nonnull const sourceItemsThatNeedThreadRecords = [NSMutableSet setWithCapacity:numItems];
-	NSMutableArray <ImpCatalogItem *> *_Nonnull const allSourceItems = [NSMutableArray arrayWithCapacity:numItems];
+- (u_int16_t) destinationCatalogNodeSize {
+	return [ImpBTreeFile nodeSizeForVersion:ImpBTreeVersionHFSPlusCatalog];
+}
 
-	__block HFSCatalogNodeID largestCNIDYet = 0;
-	__block HFSCatalogNodeID firstUnusedCNID = 0;
+- (ImpMutableBTreeFile *_Nonnull) convertHFSCatalogFile:(ImpBTreeFile *_Nonnull const)sourceTree {
+	NSUInteger const numItems = self.sourceVolume.numberOfFiles + self.sourceVolume.numberOfFolders;
+	ImpCatalogBuilder *_Nonnull const catBuilder = [[ImpCatalogBuilder alloc] initWithBTreeVersion:ImpBTreeVersionHFSPlusCatalog
+		bytesPerNode:self.destinationCatalogNodeSize
+		expectedNumberOfItems:numItems];
+	catBuilder.treeDepthHint = sourceTree.headerNode.treeDepth;
 
 	//Gather our list of all items, converting file, folder, and thread records as we go and keeping each item's file/folder record and thread record (if it has one) together.
 	[sourceTree walkLeafNodes:^bool(ImpBTreeNode *const  _Nonnull node) {
 		[node forEachHFSCatalogRecord_file:^(const struct HFSCatalogKey *const  _Nonnull catalogKeyPtr, const struct HFSCatalogFile *const _Nonnull fileRecPtr) {
-			HFSCatalogNodeID const cnid = L(fileRecPtr->fileID);
-			if (cnid > largestCNIDYet) {
-				largestCNIDYet = cnid;
-				if (firstUnusedCNID == 0 && cnid - 1 > largestCNIDYet) {
-					firstUnusedCNID = largestCNIDYet + 1;
-				}
-			}
-
-			ImpCatalogItem *_Nullable item = sourceItemsByCNID[@(cnid)];
-			if (item == nil) {
-				item = [[ImpCatalogItem alloc] initWithCatalogNodeID:cnid];
-				sourceItemsByCNID[@(cnid)] = item;
-				[allSourceItems addObject:item];
-				[sourceItemsThatNeedThreadRecords addObject:item];
-			}
-
 			NSData *_Nonnull const sourceKeyData = [NSData dataWithBytesNoCopy:(void *)catalogKeyPtr length:sizeof(struct HFSCatalogKey) freeWhenDone:false];
 			NSData *_Nonnull const sourceRecData = [NSData dataWithBytesNoCopy:(void *)fileRecPtr length:sizeof(struct HFSCatalogFile) freeWhenDone:false];
-			item.sourceKey = sourceKeyData;
-			item.sourceRecord = sourceRecData;
-			item.destinationKey = [self convertHFSCatalogKeyToHFSPlus:sourceKeyData];
-			item.destinationRecord = [self convertHFSCatalogFileRecordToHFSPlus:sourceRecData];
+			NSMutableData *_Nonnull const destKeyData = [self convertHFSCatalogKeyToHFSPlus:sourceKeyData];
+			NSMutableData *_Nonnull const destRecData = [self convertHFSCatalogFileRecordToHFSPlus:sourceRecData];
+			[catBuilder addKey:destKeyData fileRecord:destRecData];
+
 		} folder:^(const struct HFSCatalogKey *const  _Nonnull catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRecPtr) {
-			HFSCatalogNodeID const cnid = L(folderRecPtr->folderID);
-			if (cnid > largestCNIDYet) {
-				largestCNIDYet = cnid;
-				if (firstUnusedCNID == 0 && cnid - 1 > largestCNIDYet) {
-					firstUnusedCNID = largestCNIDYet + 1;
-				}
-			}
-
-			ImpCatalogItem *_Nullable item = sourceItemsByCNID[@(cnid)];
-			if (item == nil) {
-				item = [[ImpCatalogItem alloc] initWithCatalogNodeID:cnid];
-				sourceItemsByCNID[@(cnid)] = item;
-				[allSourceItems addObject:item];
-				[sourceItemsThatNeedThreadRecords addObject:item];
-			}
-
 			NSData *_Nonnull const sourceKeyData = [NSData dataWithBytesNoCopy:(void *)catalogKeyPtr length:sizeof(struct HFSCatalogKey) freeWhenDone:false];
 			NSData *_Nonnull const sourceRecData = [NSData dataWithBytesNoCopy:(void *)folderRecPtr length:sizeof(struct HFSCatalogFolder) freeWhenDone:false];
-			item.sourceKey = sourceKeyData;
-			item.sourceRecord = sourceRecData;
-			item.destinationKey = [self convertHFSCatalogKeyToHFSPlus:sourceKeyData];
-			item.destinationRecord = [self convertHFSCatalogFolderRecordToHFSPlus:sourceRecData];
+			NSMutableData *_Nonnull const destKeyData = [self convertHFSCatalogKeyToHFSPlus:sourceKeyData];
+			NSMutableData *_Nonnull const destRecData = [self convertHFSCatalogFolderRecordToHFSPlus:sourceRecData];
+			[catBuilder addKey:destKeyData folderRecord:destRecData];
 		} thread:^(const struct HFSCatalogKey *const  _Nonnull catalogKeyPtr, const struct HFSCatalogThread *const _Nonnull threadRecPtr) {
-			HFSCatalogNodeID const cnid = L(catalogKeyPtr->parentID);
-			if (cnid > largestCNIDYet) largestCNIDYet = cnid;
-
-			ImpCatalogItem *_Nullable item = sourceItemsByCNID[@(cnid)];
-			if (item == nil) {
-				item = [[ImpCatalogItem alloc] initWithCatalogNodeID:cnid];
-				sourceItemsByCNID[@(cnid)] = item;
-				[allSourceItems addObject:item];
-			} else {
-				[sourceItemsThatNeedThreadRecords removeObject:item];
-			}
-
 			NSData *_Nonnull const sourceKeyData = [NSData dataWithBytesNoCopy:(void *)catalogKeyPtr length:sizeof(struct HFSCatalogKey) freeWhenDone:false];
 			NSData *_Nonnull const sourceRecData = [NSData dataWithBytesNoCopy:(void *)threadRecPtr length:sizeof(struct HFSCatalogThread) freeWhenDone:false];
-			item.sourceThreadKey = sourceKeyData;
-			item.sourceThreadRecord = sourceRecData;
-			item.destinationThreadKey = [self convertHFSCatalogKeyToHFSPlus:sourceKeyData];
-			item.destinationThreadRecord = [self convertHFSCatalogThreadRecordToHFSPlus:sourceRecData];
-			item.needsThreadRecord = false;
+			NSMutableData *_Nonnull const destKeyData = [self convertHFSCatalogKeyToHFSPlus:sourceKeyData];
+			NSMutableData *_Nonnull const destRecData = [self convertHFSCatalogThreadRecordToHFSPlus:sourceRecData];
+			[catBuilder addKey:destKeyData threadRecord:destRecData];
 		}];
 		return true;
 	}];
 
-	//Now we have all the items. HFS requires folders to have thread records, so those should all have them, but files having thread records was optional (but is required under HFS+), so we may need to create those.
-	for (ImpCatalogItem *_Nonnull const item in sourceItemsThatNeedThreadRecords) {
-		if (item.needsThreadRecord) {
-			NSMutableData *_Nonnull const threadKeyData = [NSMutableData dataWithLength:sizeof(struct HFSPlusCatalogKey)];
-			struct HFSPlusCatalogKey *_Nonnull const threadKeyPtr = threadKeyData.mutableBytes;
-			NSMutableData *_Nonnull const threadRecData = [NSMutableData dataWithLength:sizeof(struct HFSPlusCatalogThread)];
-			struct HFSPlusCatalogThread *_Nonnull const threadRecPtr = threadRecData.mutableBytes;
+	ImpMutableBTreeFile *_Nonnull const destTree = [[ImpMutableBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSPlusCatalog
+		bytesPerNode:self.destinationCatalogNodeSize
+		nodeCount:catBuilder.totalNodeCount
+		convertTree:sourceTree];
 
-			NSData *_Nonnull const keyData = item.destinationKey;
-			struct HFSPlusCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
-			NSMutableData *_Nonnull const recData = item.destinationRecord;
-			void *_Nonnull const recPtr = recData.mutableBytes;
-			int16_t const *_Nonnull const recTypePtr = recPtr;
-			struct HFSPlusCatalogFile *_Nonnull const filePtr = recPtr;
-			struct HFSPlusCatalogFolder *_Nonnull const folderPtr = recPtr;
-
-			//In a thread record, the key holds the item's *own* ID (despite being called “parentID”) and an empty name, while the thread record holds the item's *parent*'s ID and the item's own name.
-			switch (L(*recTypePtr)) {
-				case kHFSPlusFileRecord:
-					threadKeyPtr->parentID = filePtr->fileID;
-					S(threadRecPtr->recordType, kHFSPlusFileThreadRecord);
-					S(filePtr->flags, L(filePtr->flags) | kHFSThreadExistsMask);
-					break;
-				case kHFSPlusFolderRecord:
-					//Technically we shouldn't get here, either, as thread records were required for folders under HFS.
-					threadKeyPtr->parentID = folderPtr->folderID;
-					S(threadRecPtr->recordType, kHFSPlusFolderThreadRecord);
-					S(folderPtr->flags, L(folderPtr->flags) | kHFSThreadExistsMask);
-					break;
-				default:
-					__builtin_unreachable();
-			}
-			threadRecPtr->parentID = keyPtr->parentID;
-			memcpy(&threadRecPtr->nodeName, &keyPtr->nodeName, sizeof(threadRecPtr->nodeName));
-			//DiskWarrior complains about “oversized thread records” if the thread payload contains empty space. Plus, shrinking these down frees up space in the node for more records.
-			u_int32_t const threadRecSize = sizeof(threadRecPtr->recordType) + sizeof(threadRecPtr->reserved) + sizeof(threadRecPtr->parentID) + sizeof(threadRecPtr->nodeName.length) + sizeof(UniChar) * L(threadRecPtr->nodeName.length);
-			[threadRecData setLength:threadRecSize];
-
-			//A thread key has a CNID and an empty node name (so, length 0). keyLength doesn't include itself.
-			u_int16_t const threadKeySize = sizeof(threadKeyPtr->keyLength) + sizeof(threadKeyPtr->parentID) + sizeof(threadKeyPtr->nodeName.length);
-			u_int16_t const threadKeyLength = threadKeySize - sizeof(threadKeyPtr->keyLength);
-			S(threadKeyPtr->keyLength, threadKeyLength);
-			[threadKeyData setLength:threadKeySize];
-
-			item.destinationThreadKey = threadKeyData;
-			item.destinationThreadRecord = threadRecData;
-			item.needsThreadRecord = false;
-		}
-	}
-
-	//Now all of our items have both a file or folder record and a thread record. Each of these is filed under a different key in the catalog file, due to their different purposes. (File and folder records are stored under a key containing their parent item's CNID; thread records are stored under a key containing the item's own CNID, for the purpose of finding the parent ID stored in the thread record.) So turn our list of n items into n * 2 key-value pairs, half of them being file or folder records and half being thread records. These will be the contents of the leaf row.
-	NSMutableArray <ImpCatalogKeyValuePair *> *_Nonnull const keyValuePairs = [NSMutableArray arrayWithCapacity:allSourceItems.count];
-	for (ImpCatalogItem *_Nonnull const item in allSourceItems) {
-		[keyValuePairs addObject:[[ImpCatalogKeyValuePair alloc] initWithKey:item.destinationKey value:item.destinationRecord]];
-		[keyValuePairs addObject:[[ImpCatalogKeyValuePair alloc] initWithKey:item.destinationThreadKey value:item.destinationThreadRecord]];
-	}
-	[keyValuePairs sortUsingSelector:@selector(caseInsensitiveCompare:)];
-
-	/*The algorithm for building the index is built around a loop that processes an entire row and produces a new row above the previous one.
-	 *The initial row is the leaf row; each row produced above it is an index row.
-	 *The first key from each node on the lower row is appended to the upper row, adding new nodes on the upper row as needed.
-	 *Each round of the loop produces a significantly shorter row. (I haven't done the math but my intuitive sense is that it's an exponential curve following the approximate average number of keys per index node.) Every row will contain the first key in the leaf row, fulfilling that requirement.
-	 *The loop ends when the upper row has been fully populated in one node. That node is the root node.
-	 */
-	u_int32_t const nodeBodySize = destTree.bytesPerNode - (sizeof(struct BTNodeDescriptor) + sizeof(BTreeNodeOffset));
-
-	//First, fill out the bottom row with mock leaf nodes. Each “mock node” is an array of NSDatas representing catalog keys; we separately track the total size of the pointer records (each of which is a key + a u_int32_t), so that when adding another key would exceed the capacity of a real node (nodeBodySize), we tear off that node and start the next one.
-	NSMutableArray <ImpMockNode *> *_Nonnull const bottomRow = [NSMutableArray arrayWithCapacity:allSourceItems.count];
-	ImpMockNode *_Nullable thisMockNode = nil;
-
-	u_int32_t numLiveNodes = 1; //1 for the header node
-
-	for (ImpCatalogKeyValuePair *_Nonnull const kvp in keyValuePairs) {
-		if (thisMockNode == nil) {
-			thisMockNode = [[ImpMockNode alloc] initWithCapacity:nodeBodySize];
-			thisMockNode.nodeHeight = 1;
-			[bottomRow addObject:thisMockNode];
-			++numLiveNodes;
-		}
-
-		if (! [thisMockNode appendKey:kvp.key payload:kvp.value]) {
-			thisMockNode = [[ImpMockNode alloc] initWithCapacity:nodeBodySize];
-			thisMockNode.nodeHeight = 1;
-			[bottomRow addObject:thisMockNode];
-			++numLiveNodes;
-
-			NSAssert([thisMockNode appendKey:kvp.key payload:kvp.value], @"Encountered catalog entry too big to fit in a catalog node: Key is %lu bytes, payload is %lu bytes, but maximal node capacity is %u bytes", kvp.key.length, kvp.value.length, nodeBodySize);
-		}
-	}
-
-	NSMutableArray <NSArray <ImpMockNode *> *> *_Nonnull const mockRows = [NSMutableArray arrayWithCapacity:sourceTree.headerNode.treeDepth];
-	NSMutableArray <ImpMockIndexNode *> *_Nonnull const allMockIndexNodes = [NSMutableArray arrayWithCapacity:allSourceItems.count];
-	[mockRows addObject:bottomRow];
-
-	while (mockRows.firstObject.count > 1) {
-		NSMutableArray <ImpMockIndexNode *> *_Nonnull upperRow = [NSMutableArray arrayWithCapacity:keyValuePairs.count];
-		ImpMockIndexNode *_Nullable indexNodeInProgress = nil;
-
-		NSArray <ImpMockNode *> *_Nonnull const lowerRow = mockRows.firstObject;
-		for (ImpMockNode *_Nonnull const node in lowerRow) {
-			if (indexNodeInProgress == nil) {
-				indexNodeInProgress = [[ImpMockIndexNode alloc] initWithCapacity:nodeBodySize];
-				indexNodeInProgress.nodeHeight = (u_int8_t)(mockRows.count + 1);
-				[upperRow addObject:indexNodeInProgress];
-				++numLiveNodes;
-			}
-
-			NSData *_Nonnull const keyData = node.firstKey;
-			if (! [indexNodeInProgress appendKey:keyData fromNode:node]) {
-				indexNodeInProgress = [[ImpMockIndexNode alloc] initWithCapacity:nodeBodySize];
-				indexNodeInProgress.nodeHeight = (u_int8_t)(mockRows.count + 1);
-				[upperRow addObject:indexNodeInProgress];
-				++numLiveNodes;
-
-				NSAssert([indexNodeInProgress appendKey:keyData fromNode:node], @"Encountered catalog entry too big to fit in a catalog index node: Key is %lu bytes, payload is %lu bytes, but maximal node capacity is %u bytes (%u already used)", keyData.length, sizeof(u_int32_t), nodeBodySize, indexNodeInProgress.totalSizeOfAllRecords);
-			}
-		}
-
-		[allMockIndexNodes addObjectsFromArray:upperRow];
-		[mockRows insertObject:upperRow atIndex:0];
-	}
-
-	//Start creating real nodes.
-	NSMutableArray <ImpBTreeNode *> *_Nonnull const allRealIndexNodes = [NSMutableArray arrayWithCapacity:allMockIndexNodes.count];
-	for (ImpMockIndexNode *_Nonnull const mockIndexNode in allMockIndexNodes) {
-		ImpBTreeNode *_Nonnull const realIndexNode = [destTree allocateNewNodeOfKind:kBTIndexNode populate:^(void * _Nonnull bytes, NSUInteger length) {
-			struct BTNodeDescriptor *_Nonnull const nodeDesc = bytes;
-			nodeDesc->height = mockIndexNode.nodeHeight;
-		}];
-		[allRealIndexNodes addObject:realIndexNode];
-		mockIndexNode.nodeNumber = realIndexNode.nodeNumber;
-	}
-	for (ImpMockNode *_Nonnull const mockNode in bottomRow) {
-		ImpBTreeNode *_Nonnull const realLeafNode = [destTree allocateNewNodeOfKind:kBTLeafNode populate:^(void * _Nonnull bytes, NSUInteger length) {
-			struct BTNodeDescriptor *_Nonnull const nodeDesc = bytes;
-			nodeDesc->height = 1;
-		}];
-		mockNode.nodeNumber = realLeafNode.nodeNumber;
-	}
-
-	//Convert the mock index nodes into real nodes.
-	for (NSArray <ImpMockNode *> *_Nonnull const row in mockRows) {
-		ImpBTreeNode *_Nullable lastRealNode = nil;
-		for (ImpMockNode *_Nonnull const mockNode in row) {
-			u_int32_t const nodeNumber = mockNode.nodeNumber;
-			NSAssert(nodeNumber > 0, @"Can't copy a node with no node number. That would overwrite the header node, and that's bad!");
-			ImpBTreeNode *_Nonnull const realNode = [destTree nodeAtIndex:nodeNumber];
-			[mockNode writeIntoNode:realNode];
-			[lastRealNode connectNextNode:realNode];
-			lastRealNode = realNode;
-		}
-	}
-
-	NSArray <ImpMockNode *> *_Nullable const topRow = mockRows.firstObject;
-	NSAssert(topRow != nil, @"No top row? The converted tree is empty!");
-	NSAssert(topRow.count == 1, @"Somehow the top row ended up containing more than one node; it should only contain the root node, but contains %@", topRow);
-	ImpMockNode *_Nonnull const mockRootNode = topRow.firstObject;
-	[destTree.headerNode reviseHeaderRecord:^(struct BTHeaderRec *_Nonnull const headerRecPtr) {
-		S(headerRecPtr->rootNode, mockRootNode.nodeNumber);
-		S(headerRecPtr->treeDepth, (u_int16_t)mockRows.count);
-		S(headerRecPtr->firstLeafNode, bottomRow.firstObject.nodeNumber);
-		S(headerRecPtr->lastLeafNode, bottomRow.lastObject.nodeNumber);
-		S(headerRecPtr->leafRecords, (u_int32_t)keyValuePairs.count);
-		u_int32_t const numPotentialNodes = (u_int32_t)destTree.numberOfPotentialNodes;
-		u_int32_t const numFreeNodes = numPotentialNodes - numLiveNodes;
-		S(headerRecPtr->totalNodes, numPotentialNodes);
-		S(headerRecPtr->freeNodes, numFreeNodes);
-	}];
+	[catBuilder populateTree:destTree];
 
 	struct HFSPlusVolumeHeader *_Nonnull const vhPtr = _destinationVolume.mutableVolumeHeaderPointer;
-	if (largestCNIDYet < UINT32_MAX) {
-		S(vhPtr->nextCatalogID, largestCNIDYet + 1);
-	} else {
-		S(vhPtr->nextCatalogID, firstUnusedCNID);
+	S(vhPtr->nextCatalogID, catBuilder.nextCatalogNodeID);
+	if (catBuilder.hasReusedCatalogNodeIDs) {
 		S(vhPtr->attributes, L(vhPtr->attributes) | kHFSCatalogNodeIDsReusedMask);
+	} else {
+		S(vhPtr->attributes, L(vhPtr->attributes) & ~kHFSCatalogNodeIDsReusedMask);
 	}
 
 //	NSUInteger const numSrcLiveNodes = sourceTree.numberOfLiveNodes;
@@ -737,6 +451,8 @@
 	NSUInteger const numDstPotentialNodes = destTree.numberOfPotentialNodes;
 //	ImpPrintf(@"HFS tree had %lu live nodes out of %lu; HFS+ tree has %lu live nodes out of %lu", numSrcLiveNodes, numSrcPotentialNodes, numDstLiveNodes, numDstPotentialNodes);
 	NSAssert(numDstLiveNodes <= numDstPotentialNodes, @"Conversion failure: Produced more catalog nodes than the catalog file was preallocated for (please file a bug, include this message, and if possible and legal attach the disk image you were trying to convert)");
+
+	return destTree;
 }
 
 ///Map the number of an allocation block from the source volume (e.g., the start block of an extent) to the number of the corresponding block on the destination volume. By default, returns sourceBlock plus the source volume's first block number. You may need to override this method if the destination volume uses a different block size, or if you need to make exceptions for certain blocks (in extents that were relocated due to not fitting in the new volume).
@@ -966,179 +682,6 @@
 		[self deliverProgressUpdateWithOperationDescription:NSLocalizedString(@"Successfully wrote volume", @"Conversion progress message")];
 	}
 	return flushed;
-}
-
-@end
-
-@implementation ImpCatalogItem
-
-- (instancetype _Nonnull) initWithCatalogNodeID:(HFSCatalogNodeID const)cnid {
-	if ((self = [super init])) {
-		_cnid = cnid;
-		_needsThreadRecord = true;
-	}
-	return self;
-}
-
-- (NSUInteger)hash {
-	return self.cnid;
-}
-- (BOOL)isEqual:(id _Nonnull)other {
-	@try {
-		ImpCatalogItem *_Nonnull const fellowCatalogItemHopefully = other;
-		return self.cnid == fellowCatalogItemHopefully.cnid;
-	} @catch (NSException *_Nonnull const exception) {
-		return false;
-	}
-}
-
-@end
-
-@implementation ImpCatalogKeyValuePair
-
-- (instancetype _Nonnull)initWithKey:(NSData *_Nonnull const)keyData value:(NSData *_Nonnull const)valueData {
-	NSParameterAssert(keyData.length >= kHFSPlusCatalogKeyMinimumLength);
-	NSParameterAssert(keyData.length <= kHFSPlusCatalogKeyMaximumLength);
-	if ((self = [super init])) {
-		_key = keyData;
-		_value = valueData;
-	}
-	return self;
-}
-
-- (NSString *_Nonnull) description {
-	NSString *_Nonnull valueDescription = @"(empty)";
-	if (self.value.length > sizeof(u_int16_t)) {
-		u_int16_t const *_Nonnull const recordTypePtr = self.value.bytes;
-		switch (L(*recordTypePtr)) {
-			case kHFSFileRecord:
-			case kHFSPlusFileRecord:
-				valueDescription = @"file";
-				break;
-
-			case kHFSFolderRecord:
-			case kHFSPlusFolderRecord:
-				valueDescription = @"folder";
-				break;
-
-			case kHFSFileThreadRecord:
-			case kHFSPlusFileThreadRecord:
-				valueDescription = @"file thread";
-				break;
-
-			case kHFSFolderThreadRecord:
-			case kHFSPlusFolderThreadRecord:
-				valueDescription = @"folder thread";
-				break;
-
-			default:
-				valueDescription = [NSString stringWithFormat:@"(unknown: 0x%04x)", L(*recordTypePtr)];
-				break;
-		}
-	}
-	return [NSString stringWithFormat:@"<%@ %p with key %@ and value type '%@'>",
-		self.class, self,
-		[ImpBTreeNode describeHFSPlusCatalogKeyWithData:self.key],
-		valueDescription
-	];
-}
-
-- (NSComparisonResult) caseInsensitiveCompare:(id)other {
-	ImpCatalogKeyValuePair *_Nonnull const otherPair = other;
-	return (NSComparisonResult)ImpBTreeCompareHFSPlusCatalogKeys(self.key.bytes, otherPair.key.bytes);
-}
-
-@end
-
-@implementation ImpMockNode
-{
-	NSMutableArray <NSData *> *_Nonnull _allKeys;
-	NSMutableArray <ImpCatalogKeyValuePair *> *_Nonnull _allPairs;
-	u_int32_t _capacity;
-}
-
-- (instancetype) initWithCapacity:(u_int32_t const)maxNumBytes {
-	if ((self = [super init])) {
-		_capacity = maxNumBytes;
-		_allKeys = [NSMutableArray arrayWithCapacity:maxNumBytes / kHFSCatalogKeyMinimumLength];
-		_allPairs = [NSMutableArray arrayWithCapacity:maxNumBytes / kHFSCatalogKeyMinimumLength];
-	}
-	return self;
-}
-
-- (NSData *_Nullable) firstKey {
-	return _allKeys.firstObject;
-}
-
-- (bool) canAppendKey:(NSData *_Nonnull const)keyData payload:(NSData *_Nonnull const)payloadData {
-	return (_capacity - _totalSizeOfAllRecords) >= (keyData.length + payloadData.length + sizeof(BTreeNodeOffset));
-}
-
-- (bool) appendKey:(NSData *_Nonnull const)keyData payload:(NSData *_Nonnull const)payloadData {
-	if ([self canAppendKey:keyData payload:payloadData]) {
-		[_allKeys addObject:keyData];
-		ImpCatalogKeyValuePair *_Nonnull const kvp = [[ImpCatalogKeyValuePair alloc] initWithKey:keyData value:payloadData];
-		[_allPairs addObject:kvp];
-		_totalSizeOfAllRecords += (keyData.length + payloadData.length + sizeof(BTreeNodeOffset));
-		return true;
-	}
-	return false;
-}
-
-- (void) writeIntoNode:(ImpBTreeNode *const)realNode {
-	for (ImpCatalogKeyValuePair *_Nonnull const kvp in _allPairs) {
-		bool const appended = [realNode appendRecordWithKey:kvp.key payload:kvp.value];
-		NSAssert(appended, @"Could not append record to real node %@; it may be out of space (%u bytes remaining; key is %lu bytes and payload is %lu bytes)", realNode, realNode.numberOfBytesAvailable, kvp.key.length, kvp.value.length);
-	}
-}
-
-- (NSArray <NSData *> *_Nonnull const) allKeys {
-	return _allKeys;
-}
-
-@end
-
-@implementation ImpMockIndexNode
-{
-	NSMutableDictionary <NSData *, ImpMockNode *> *_pointerRecords;
-}
-
-- (instancetype)initWithCapacity:(const u_int32_t)maxNumBytes {
-	if ((self = [super initWithCapacity:maxNumBytes])) {
-		_pointerRecords = [NSMutableDictionary dictionaryWithCapacity:maxNumBytes / kHFSCatalogKeyMinimumLength];
-	}
-	return self;
-}
-
-///Append a key to the node's list of pointer records, linked to the provided node.
-- (bool) appendKey:(NSData *_Nonnull const)keyData fromNode:(ImpMockNode *_Nonnull const)descendantNode {
-	NSMutableData *_Nonnull const blankPayloadData = [NSMutableData dataWithLength:sizeof(u_int32_t)];
-	//We don't actually write descendantNode.nodeNumber into blankPayloadData because it hasn't been set yet, so we would just be overwriting the zero with a zero. Our overridden writeIntoNode: will get the real node number at the appropriate time. We're just using this blank NSData to represent the appropriate amount of space.
-
-	if ([self appendKey:keyData payload:blankPayloadData]) {
-		_pointerRecords[keyData] = descendantNode;
-		return true;
-	}
-	return false;
-}
-
-///Add records to a real index node to match the contents of this mock node.
-- (void) writeIntoNode:(ImpBTreeNode *_Nonnull const)realNode {
-	NSParameterAssert([realNode isKindOfClass:[ImpBTreeIndexNode class]]);
-
-	ImpBTreeIndexNode *_Nonnull const realIndexNode = (ImpBTreeIndexNode *_Nonnull const)realNode;
-	for (NSData *_Nonnull const key in self.allKeys) {
-		ImpMockNode *_Nonnull const obj = _pointerRecords[key];
-
-		NSMutableData *_Nonnull const payloadData = [NSMutableData dataWithLength:sizeof(u_int32_t)];
-		u_int32_t *_Nonnull const pointerRecordPtr = payloadData.mutableBytes;
-		S(*pointerRecordPtr, obj.nodeNumber);
-
-//		NSString *_Nonnull const filename = [ImpBTreeNode nodeNameFromHFSPlusCatalogKey:key];
-//		ImpPrintf(@"Node #%u: Wrote index record for file “%@”: %u -(swap)-> %u", realIndexNode.nodeNumber, filename, obj.nodeNumber, *pointerRecordPtr);
-
-		[realIndexNode appendRecordWithKey:key payload:payloadData];
-	}
 }
 
 @end

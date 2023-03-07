@@ -21,7 +21,14 @@
 @interface ImpMutableBTreeFile : ImpBTreeFile
 
 ///Returns nil if the version isn't compatible with the original tree (like if you're trying to convert a catalog file to an extents overflow file).
-- (instancetype _Nullable )initWithVersion:(const ImpBTreeVersion)version convertTree:(ImpBTreeFile *_Nonnull const)sourceTree;
+///Node size must be at least [ImpBTreeFile nodeSizeForVersion:version] and must be a power of two.
+///Node count is the number of nodes to allocate space for. It must be at least enough to hold the header node, plus enough leaf nodes to hold all records, plus the index nodes, plus any map nodes.
+///(It is not yet possible to lengthen a tree after the fact, so you will need to either have an exact number or overestimate.)
+///If you're building a catalog, use ImpCatalogBuilder, which has a property you can access after you have finished adding entries to get the node count you will pass here, and a method to then copy the entries into this tree.
+- (instancetype _Nullable )initWithVersion:(const ImpBTreeVersion)version
+	bytesPerNode:(u_int16_t const)nodeSize
+	nodeCount:(NSUInteger const)numPotentialNodes
+	convertTree:(ImpBTreeFile *_Nonnull const)sourceTree;
 
 ///Allocate one new node of the specified kind, and call the block to populate it with data. If the block is nil, the node will be left blank aside from its node descriptor.
 ///bytes is a pointer to the BTNodeDescriptor at the start of the node, and length is equal to the tree's nodeSize.

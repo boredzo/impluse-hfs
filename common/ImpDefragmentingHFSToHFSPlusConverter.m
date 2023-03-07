@@ -104,14 +104,16 @@
 
 	//We do need to create/have an extents overflow file, even if it's empty.
 	ImpBTreeFile *_Nonnull const srcExtentsOverflow = srcVol.extentsOverflowBTree;
-	ImpMutableBTreeFile *_Nonnull const destExtentsOverflow = [[ImpMutableBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSPlusExtentsOverflow convertTree:srcExtentsOverflow];
+	ImpMutableBTreeFile *_Nonnull const destExtentsOverflow = [[ImpMutableBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSPlusExtentsOverflow
+		bytesPerNode:[ImpBTreeFile nodeSizeForVersion:ImpBTreeVersionHFSPlusExtentsOverflow]
+		nodeCount:2
+		convertTree:srcExtentsOverflow];
 	[self copyFromHFSExtentsOverflowFile:srcExtentsOverflow toHFSPlusExtentsOverflowFile:destExtentsOverflow];
 	//Since we're not copying over anything from the original extents overflow file, deduct it from the amount of data to be copied.
 	[self reportSourceExtentRecordWillNotBeCopied:extentsOverflowFileSourceExtents];
 
 	ImpBTreeFile *_Nonnull const srcCatalog = srcVol.catalogBTree;
-	ImpMutableBTreeFile *_Nonnull const destCatalog = [[ImpMutableBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSPlusCatalog convertTree:srcCatalog];
-	[self copyFromHFSCatalogFile:srcCatalog toHFSPlusCatalogFile:destCatalog];
+	ImpMutableBTreeFile *_Nonnull const destCatalog = [self convertHFSCatalogFile:srcCatalog];
 	[self reportSourceExtentRecordCopied:catalogFileSourceExtents];
 
 	//Allocate the special files before anything else, so they get placed first on the disk.
