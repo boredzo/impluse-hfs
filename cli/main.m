@@ -87,9 +87,22 @@ int main(int argc, const char * argv[]) {
 - (void) list:(NSEnumerator <NSString *> *_Nonnull const)argsEnum {
 	bool printAbsolutePaths = false;
 	NSString *_Nullable srcDevPath = nil;
+	NSNumber *_Nullable defaultEncoding = nil;
+	bool expectsEncoding = false;
 	for (NSString *_Nonnull const arg in argsEnum) {
-		if ((srcDevPath == nil) && [arg isEqualToString:@"--paths"]) {
+		if (expectsEncoding) {
+			defaultEncoding = @([arg integerValue]);
+			expectsEncoding = false;
+		} else if ((srcDevPath == nil) && [arg isEqualToString:@"--paths"]) {
 			printAbsolutePaths = true;
+		} else if ((defaultEncoding == nil) && [arg hasPrefix:@"--encoding"]) {
+			if ([arg hasPrefix:@"--encoding="]) {
+				//--encoding=42
+				defaultEncoding = @([[arg substringFromIndex:@"--encoding=".length] integerValue]);
+			} else {
+				//--encoding 42
+				expectsEncoding = true;
+			}
 		} else {
 			srcDevPath = arg;
 		}
@@ -103,6 +116,9 @@ int main(int argc, const char * argv[]) {
 	ImpHFSLister *_Nonnull const lister = [ImpHFSLister new];
 	lister.sourceDevice = [NSURL fileURLWithPath:srcDevPath isDirectory:false];
 	lister.printAbsolutePaths = printAbsolutePaths;
+	if (defaultEncoding != nil) {
+		lister.hfsTextEncoding = (TextEncoding)defaultEncoding.integerValue;
+	}
 
 	NSError *_Nullable error = nil;
 	bool const converted = [lister performInventoryOrReturnError:&error];
@@ -112,17 +128,44 @@ int main(int argc, const char * argv[]) {
 	}
 }
 - (void) convert:(NSEnumerator <NSString *> *_Nonnull const)argsEnum {
-	NSString *_Nullable const srcDevPath = [argsEnum nextObject];
-	NSString *_Nullable const dstDevPath = [argsEnum nextObject];
-	if (! (srcDevPath != nil && dstDevPath != nil)) {
+	NSNumber *_Nullable defaultEncoding = nil;
+	bool expectsEncoding = false;
+	NSMutableArray *_Nonnull const devicePaths = [NSMutableArray arrayWithCapacity:2];
+	for (NSString *_Nonnull const arg in argsEnum) {
+		if (expectsEncoding) {
+			defaultEncoding = @([arg integerValue]);
+			expectsEncoding = false;
+		} else if ((defaultEncoding == nil) && [arg hasPrefix:@"--encoding"]) {
+			if ([arg hasPrefix:@"--encoding="]) {
+				//--encoding=42
+				defaultEncoding = @([[arg substringFromIndex:@"--encoding=".length] integerValue]);
+			} else {
+				//--encoding 42
+				expectsEncoding = true;
+			}
+		} else if (devicePaths.count < 2) {
+			[devicePaths addObject:arg];
+		} else {
+			[self printUsageToFile:stderr];
+			self.status = EX_USAGE;
+			return;
+		}
+	}
+	if (devicePaths.count != 2) {
 		[self printUsageToFile:stderr];
 		self.status = EX_USAGE;
 		return;
 	}
 
+	NSString *_Nullable const srcDevPath = devicePaths.firstObject;
+	NSString *_Nullable const dstDevPath = devicePaths.lastObject;
+
 	ImpHFSToHFSPlusConverter *_Nonnull const converter = [ImpDefragmentingHFSToHFSPlusConverter new];
 	converter.sourceDevice = [NSURL fileURLWithPath:srcDevPath isDirectory:false];
 	converter.destinationDevice = [NSURL fileURLWithPath:dstDevPath isDirectory:false];
+	if (defaultEncoding != nil) {
+		converter.hfsTextEncoding = (TextEncoding)defaultEncoding.integerValue;
+	}
 	converter.conversionProgressUpdateBlock = ^(double progress, NSString * _Nonnull operationDescription) {
 		ImpPrintf(@"%u%%: %@", (unsigned)round(100.0 * progress), operationDescription);
 	};
@@ -175,13 +218,27 @@ int main(int argc, const char * argv[]) {
 
 - (void) analyze:(NSEnumerator <NSString *> *_Nonnull const)argsEnum {
 	NSString *_Nullable srcDevPath = nil;
+	NSNumber *_Nullable defaultEncoding = nil;
+	bool expectsEncoding = false;
 	for (NSString *_Nonnull const arg in argsEnum) {
-		if (srcDevPath != nil) {
+		if (expectsEncoding) {
+			defaultEncoding = @([arg integerValue]);
+			expectsEncoding = false;
+		} else if ((defaultEncoding == nil) && [arg hasPrefix:@"--encoding"]) {
+			if ([arg hasPrefix:@"--encoding="]) {
+				//--encoding=42
+				defaultEncoding = @([[arg substringFromIndex:@"--encoding=".length] integerValue]);
+			} else {
+				//--encoding 42
+				expectsEncoding = true;
+			}
+		} else if (srcDevPath != nil) {
 			[self printUsageToFile:stderr];
 			self.status = EX_USAGE;
 			return;
+		} else {
+			srcDevPath = arg;
 		}
-		srcDevPath = arg;
 	}
 	if (srcDevPath == nil) {
 		[self printUsageToFile:stderr];
@@ -191,6 +248,9 @@ int main(int argc, const char * argv[]) {
 
 	ImpHFSAnalyzer *_Nonnull const analyzer = [ImpHFSAnalyzer new];
 	analyzer.sourceDevice = [NSURL fileURLWithPath:srcDevPath isDirectory:false];
+	if (defaultEncoding != nil) {
+		analyzer.hfsTextEncoding = (TextEncoding)defaultEncoding.integerValue;
+	}
 
 	NSError *_Nullable error = nil;
 	bool const converted = [analyzer performAnalysisOrReturnError:&error];
