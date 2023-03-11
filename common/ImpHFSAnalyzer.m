@@ -270,14 +270,22 @@
 		if (node.nodeType == kBTLeafNode) {
 			//Each of these will only return HFS or HFS+ catalog entries, so call both. If it's an HFS volume, we'll get HFS entries; if it's HFS+, we'll get HFS+ entries.
 			[node forEachHFSCatalogRecord_file:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFile *const _Nonnull fileRec) {
-				ImpPrintf(@"- 📄 “%@”, ID #%u (0x%x), type %@ creator %@", [srcVol.textEncodingConverter stringForPascalString:catalogKeyPtr->nodeName], L(fileRec->fileID), L(fileRec->fileID),  NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdType)), NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdCreator)));
+				ImpTextEncodingConverter *_Nonnull const tec = [ImpTextEncodingConverter converterForHFSFile:fileRec fallback:srcVol.textEncodingConverter];
+				struct ExtendedFileInfo const *_Nonnull const extFinderInfo = (struct ExtendedFileInfo const *)&(fileRec->finderInfo);
+				UInt16 const extFinderFlags = L(extFinderInfo->extendedFinderFlags);
+				bool const hasEmbeddedScriptCode = [ImpTextEncodingConverter hasTextEncodingInExtendedFinderFlags:extFinderFlags];
+				TextEncoding const embeddedScriptCode = [ImpTextEncodingConverter textEncodingFromExtendedFinderFlags:extFinderFlags];
+				ImpPrintf(@"- 📄 “%@”, ID #%u (0x%x), type %@ creator %@, script code %@", [tec stringForPascalString:catalogKeyPtr->nodeName], L(fileRec->fileID), L(fileRec->fileID),  NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdType)), NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdCreator)), hasEmbeddedScriptCode ? [NSString stringWithFormat:@"%u", embeddedScriptCode] : @"default");
 				ImpPrintf(@"    Parent ID: #%u (0x%x)", L(catalogKeyPtr->parentID), L(catalogKeyPtr->parentID));
 				++numFiles;
 			} folder:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRec) {
-				struct FndrExtendedFileInfo const *_Nonnull const extFinderInfo = (struct FndrExtendedFileInfo const *)&(folderRec->finderInfo);
-				ImpPrintf(@"- 📁 “%@” with ID #%u, %u items", [srcVol.textEncodingConverter stringForPascalString:catalogKeyPtr->nodeName], L(folderRec->folderID), L(folderRec->valence));
+				ImpTextEncodingConverter *_Nonnull const tec = [ImpTextEncodingConverter converterForHFSFolder:folderRec fallback:srcVol.textEncodingConverter];
+				struct ExtendedFolderInfo const *_Nonnull const extFinderInfo = (struct ExtendedFolderInfo const *)&(folderRec->finderInfo);
+				UInt16 const extFinderFlags = L(extFinderInfo->extendedFinderFlags);
+				ImpPrintf(@"- 📁 “%@” with ID #%u, %u items, script code %@", [tec stringForPascalString:catalogKeyPtr->nodeName], L(folderRec->folderID), L(folderRec->valence), [ImpTextEncodingConverter hasTextEncodingInExtendedFinderFlags:extFinderFlags] ? [NSString stringWithFormat:@"%u", [ImpTextEncodingConverter textEncodingFromExtendedFinderFlags:extFinderFlags]] : @"default");
+				ImpPrintf(@"    Script code: 0x%x", ((struct DXInfo const *_Nonnull const)extFinderInfo)->frScript);
 				ImpPrintf(@"    Node flags: 0x%04x", L(folderRec->flags));
-				ImpPrintf(@"    Finder flags: 0x%04x + 0x%04x", L(folderRec->userInfo.frFlags), L(extFinderInfo->extended_flags));
+				ImpPrintf(@"    Finder flags: 0x%04x + 0x%04x", L(folderRec->userInfo.frFlags), L(extFinderInfo->extendedFinderFlags));
 				ImpPrintf(@"    Creation date: %u", L(folderRec->createDate));
 				++numFolders;
 			} thread:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogThread *const _Nonnull threadRec) {
@@ -306,7 +314,9 @@
 			};
 			[node forEachHFSPlusCatalogRecord_file:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSPlusCatalogFile *const _Nonnull fileRec) {
 				struct FndrExtendedFileInfo const *_Nonnull const extFinderInfo = (struct FndrExtendedFileInfo const *)&(fileRec->finderInfo);
-				ImpPrintf(@"- 📄 “%@”, ID #%u (0x%x), type %@ creator %@, flags %@", [[srcVol.textEncodingConverter stringFromHFSUniStr255:&catalogKeyPtr->nodeName] stringByReplacingOccurrencesOfString:@"\x0d" withString:@"\\r"], L(fileRec->fileID), L(fileRec->fileID),  NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdType)), NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdCreator)), flagsString(L(fileRec->flags), L(fileRec->userInfo.fdFlags), L(extFinderInfo->extended_flags)));
+				TextEncoding const enc = L(fileRec->textEncoding);
+				ImpPrintf(@"- 📄 “%@”, ID #%u (0x%x), type %@ creator %@, flags %@, text encoding %u", [[srcVol.textEncodingConverter stringFromHFSUniStr255:&catalogKeyPtr->nodeName] stringByReplacingOccurrencesOfString:@"\x0d" withString:@"\\r"], L(fileRec->fileID), L(fileRec->fileID),  NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdType)), NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdCreator)), flagsString(L(fileRec->flags), L(fileRec->userInfo.fdFlags), L(extFinderInfo->extended_flags)), enc);
+				ImpPrintf(@"    Name encoding: 0x%x “%@”", enc, [ImpTextEncodingConverter nameOfTextEncoding:enc]);
 				ImpPrintf(@"    Node flags: 0x%04x", L(fileRec->flags));
 				ImpPrintf(@"    Finder flags: 0x%04x + 0x%04x", L(fileRec->userInfo.fdFlags), L(extFinderInfo->extended_flags));
 				logFork("    ", "DF", &(fileRec->dataFork));
@@ -314,7 +324,9 @@
 				++numFiles;
 			} folder:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSPlusCatalogFolder *const _Nonnull folderRec) {
 				struct FndrExtendedFileInfo const *_Nonnull const extFinderInfo = (struct FndrExtendedFileInfo const *)&(folderRec->finderInfo);
-				ImpPrintf(@"- 📁 “%@” with ID #%u, %u items", [[srcVol.textEncodingConverter stringFromHFSUniStr255:&catalogKeyPtr->nodeName] stringByReplacingOccurrencesOfString:@"\x0d" withString:@"\\r"], L(folderRec->folderID), L(folderRec->valence));
+				TextEncoding const enc = L(folderRec->textEncoding);
+				ImpPrintf(@"- 📁 “%@” with ID #%u, %u items, text encoding %u", [[srcVol.textEncodingConverter stringFromHFSUniStr255:&catalogKeyPtr->nodeName] stringByReplacingOccurrencesOfString:@"\x0d" withString:@"\\r"], L(folderRec->folderID), L(folderRec->valence), enc);
+				ImpPrintf(@"    Name encoding: 0x%x “%@”", enc, [ImpTextEncodingConverter nameOfTextEncoding:enc]);
 				ImpPrintf(@"    Node flags: 0x%04x", L(folderRec->flags));
 				ImpPrintf(@"    Finder flags: 0x%04x + 0x%04x", L(folderRec->userInfo.frFlags), L(extFinderInfo->extended_flags));
 				ImpPrintf(@"    Creation date: %u", L(folderRec->createDate));

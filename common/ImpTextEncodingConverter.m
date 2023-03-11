@@ -10,14 +10,112 @@
 #import "ImpPrintf.h"
 #import "ImpErrorUtilities.h"
 
+enum {
+	ImpExtFinderFlagsHasEmbeddedScriptCodeMask = 1 << 15,
+	ImpExtFinderFlagsScriptCodeMask = 0x7f << 8,
+};
+
 @implementation ImpTextEncodingConverter
 {
 	TextEncoding _hfsTextEncoding, _hfsPlusTextEncoding;
 	TextToUnicodeInfo _ttui;
 }
 
++ (NSString *_Nullable) nameOfTextEncoding:(TextEncoding const)enc {
+	unsigned char encodingNameBuf[256] = "[no name given]";
+	ByteCount encodingNameLen;
+	TextEncoding const encodingUTF8 = CreateTextEncoding(kTextEncodingUnicodeDefault, kTextEncodingDefaultVariant, kUnicodeUTF8Format);
+	RegionCode actualRegion = -1;
+	TextEncoding actualEncoding = -1;
+	OSStatus const err = GetTextEncodingName(enc, kTextEncodingFullName,
+		//Details of how we want TEC to return this name.
+		kTextRegionDontCare, encodingUTF8,
+		//Info on the buffer for TEC to copy the name into.
+		sizeof(encodingNameBuf) - 1, &encodingNameLen,
+		//Outputs.
+		&actualRegion, &actualEncoding, encodingNameBuf);
+	if (err != noErr) {
+//		ImpPrintf(@"    Couldn't get encoding name: %d/%s", err, GetMacOSStatusCommentString(err));
+		return nil;
+	} else {
+		encodingNameBuf[encodingNameLen] = 0;
+		NSString *_Nonnull const encodingName = [NSString stringWithUTF8String:(char const *_Nonnull)encodingNameBuf];
+		return encodingName;
+	}
+}
+
++ (TextEncoding) textEncodingFromExtendedFinderFlags:(UInt16 const)extFinderFlags defaultEncoding:(TextEncoding const)defaultEncoding {
+	if ([self hasTextEncodingInExtendedFinderFlags:extFinderFlags]) {
+		return [self textEncodingFromExtendedFinderFlags:extFinderFlags];
+	} else {
+		return defaultEncoding;
+	}
+}
++ (bool) hasTextEncodingInExtendedFinderFlags:(UInt16 const)extFinderFlags {
+	UInt16 const hasEmbeddedScriptCodeBit = (extFinderFlags & ImpExtFinderFlagsHasEmbeddedScriptCodeMask);
+	bool const truth = hasEmbeddedScriptCodeBit;
+	NSLog(@"Has embedded script code: 0x%04x %@", hasEmbeddedScriptCodeBit, truth ? @"yes" : @"no");
+	return (extFinderFlags & ImpExtFinderFlagsHasEmbeddedScriptCodeMask);
+}
++ (TextEncoding) textEncodingFromExtendedFinderFlags:(UInt16 const)extFinderFlags {
+	UInt16 const embeddedScriptCodeUnshifted = (extFinderFlags & ImpExtFinderFlagsScriptCodeMask);
+	NSLog(@"Embedded script code before shift: 0x%04x", embeddedScriptCodeUnshifted);
+	return (extFinderFlags & ImpExtFinderFlagsScriptCodeMask) >> 8;
+}
+
++ (instancetype _Nullable) converterForExtendedFileInfo:(struct ExtendedFileInfo const *_Nonnull const)extFilePtr fallback:(ImpTextEncodingConverter *_Nonnull const)fallbackConverter {
+	TextEncoding const fallbackEncoding = fallbackConverter->_hfsTextEncoding;
+	TextEncoding const thisEncoding = [self textEncodingFromExtendedFinderFlags:L(extFilePtr->extendedFinderFlags) defaultEncoding:fallbackEncoding];
+	if (thisEncoding == fallbackEncoding) {
+		return fallbackConverter;
+	} else {
+		return [ImpTextEncodingConverter converterWithHFSTextEncoding:thisEncoding];
+	}
+}
++ (instancetype _Nullable) converterForExtendedFolderInfo:(struct ExtendedFolderInfo const *_Nonnull const)extFolderPtr fallback:(ImpTextEncodingConverter *_Nonnull const)fallbackConverter {
+	TextEncoding const fallbackEncoding = fallbackConverter->_hfsTextEncoding;
+	TextEncoding const thisEncoding = [self textEncodingFromExtendedFinderFlags:L(extFolderPtr->extendedFinderFlags) defaultEncoding:fallbackEncoding];
+	if (thisEncoding == fallbackEncoding) {
+		return fallbackConverter;
+	} else {
+		return [ImpTextEncodingConverter converterWithHFSTextEncoding:thisEncoding];
+	}
+}
+
+///If this file has a script code in its extended Finder flags, creates a converter for that encoding. Otherwise, returns the fallback converter.
++ (instancetype _Nullable) converterForHFSFile:(struct HFSCatalogFile const *_Nonnull const)filePtr fallback:(ImpTextEncodingConverter *_Nonnull const)fallbackConverter {
+	return [self converterForExtendedFileInfo:(struct ExtendedFileInfo const *)&(filePtr->finderInfo) fallback:fallbackConverter];
+}
+///If this folder has a script code in its extended Finder flags, creates a converter for that encoding. Otherwise, returns the fallback converter.
++ (instancetype _Nullable) converterForHFSFolder:(struct HFSCatalogFolder const *_Nonnull const)folderPtr fallback:(ImpTextEncodingConverter *_Nonnull const)fallbackConverter {
+	return [self converterForExtendedFolderInfo:(struct ExtendedFolderInfo const *)&(folderPtr->finderInfo) fallback:fallbackConverter];
+}
+
+///If this file has a script code in its extended Finder flags, creates a converter for that encoding. Otherwise, returns the fallback converter.
++ (instancetype _Nullable) converterForHFSPlusFile:(struct HFSPlusCatalogFile const *_Nonnull const)filePtr fallback:(ImpTextEncodingConverter *_Nonnull const)fallbackConverter {
+	return [self converterForExtendedFileInfo:(struct ExtendedFileInfo const *)&(filePtr->finderInfo) fallback:fallbackConverter];
+}
+///If this folder has a script code in its extended Finder flags, creates a converter for that encoding. Otherwise, returns the fallback converter.
++ (instancetype _Nullable) converterForHFSPlusFolder:(struct HFSPlusCatalogFolder const *_Nonnull const)folderPtr fallback:(ImpTextEncodingConverter *_Nonnull const)fallbackConverter {
+	return [self converterForExtendedFolderInfo:(struct ExtendedFolderInfo const *)&(folderPtr->finderInfo) fallback:fallbackConverter];
+}
+
 + (instancetype _Nullable) converterWithHFSTextEncoding:(TextEncoding const)hfsTextEncoding {
-	return [[self alloc] initWithHFSTextEncoding:hfsTextEncoding];
+	static NSMutableDictionary <NSNumber *, ImpTextEncodingConverter *> *_Nullable converterCache = nil;
+	if (converterCache == nil) {
+		//We're most likely to find MacRoman plus at most one other encoding. More than two encodings should be fairly rare. The NSMutableDictionary initializer will let us go over if we need to.
+		converterCache = [NSMutableDictionary dictionaryWithCapacity:2];
+	}
+
+	NSNumber *_Nonnull const key = @(hfsTextEncoding);
+	ImpTextEncodingConverter *_Nullable thisConverter = converterCache[key];
+	if (thisConverter == nil) {
+		thisConverter = [[self alloc] initWithHFSTextEncoding:hfsTextEncoding];
+		converterCache[key] = thisConverter;
+	}
+
+	return thisConverter;
+
 }
 ///Returns an object that (hopefully) can convert filenames from the given encoding into Unicode.
 - (instancetype _Nullable) initWithHFSTextEncoding:(TextEncoding const)hfsTextEncoding {

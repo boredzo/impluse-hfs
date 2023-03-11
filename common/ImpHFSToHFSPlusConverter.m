@@ -328,7 +328,11 @@
 	memcpy(&destFilePtr->userInfo, &srcFilePtr->userInfo, sizeof(destFilePtr->userInfo));
 	memcpy(&destFilePtr->finderInfo, &srcFilePtr->finderInfo, sizeof(destFilePtr->finderInfo));
 
-	S(destFilePtr->textEncoding, self.hfsTextEncoding);
+	struct ExtendedFileInfo const *_Nonnull const extFinderInfo = (struct ExtendedFileInfo const *)&(srcFilePtr->finderInfo);
+	UInt16 const extFinderFlags = L(extFinderInfo->extendedFinderFlags);
+	TextEncoding const embeddedScriptCode = [ImpTextEncodingConverter textEncodingFromExtendedFinderFlags:extFinderFlags defaultEncoding:self.hfsTextEncoding];
+
+	S(destFilePtr->textEncoding, embeddedScriptCode);
 	ImpZeroField(destFilePtr->reserved2);
 
 	//Don't convert extents (those will be populated when we copy the fork data), but do convert the logical sizes.

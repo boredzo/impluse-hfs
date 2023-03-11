@@ -9,10 +9,42 @@
 
 @interface ImpTextEncodingConverter : NSObject
 
+///Given a text encoding in the type used by the Text Encoding Converter, return its name. Returns nil if TEC does not return a name for this encoding.
++ (NSString *_Nullable) nameOfTextEncoding:(TextEncoding const)hfsTextEncoding;
+
+#pragma mark -
+
+///Given the extended flags from an ExtendedFileInfo or ExtendedFileInfo structure, return the script code embedded there if it has one, or the supplied default if not.
++ (TextEncoding) textEncodingFromExtendedFinderFlags:(UInt16 const)extFinderFlags defaultEncoding:(TextEncoding const)defaultEncoding;
+
+///Returns whether these extended Finder flags contain an embedded script code.
++ (bool) hasTextEncodingInExtendedFinderFlags:(UInt16 const)extFinderFlags;
+///Assuming these extended Finder flags contain an embedded script code, return it. The return value is undefined if the extended Finder flags do not contain an embedded script code.
++ (TextEncoding) textEncodingFromExtendedFinderFlags:(UInt16 const)extFinderFlags;
+
+#pragma mark -
+
+///If this file has a script code in its extended Finder flags, creates a converter for that encoding. Otherwise, returns the fallback converter.
++ (instancetype _Nullable) converterForHFSFile:(struct HFSCatalogFile const *_Nonnull const)filePtr fallback:(ImpTextEncodingConverter *_Nonnull const)fallbackConverter;
+///If this folder has a script code in its extended Finder flags, creates a converter for that encoding. Otherwise, returns the fallback converter.
++ (instancetype _Nullable) converterForHFSFolder:(struct HFSCatalogFolder const *_Nonnull const)folderPtr fallback:(ImpTextEncodingConverter *_Nonnull const)fallbackConverter;
+
+///If this file has a script code in its extended Finder flags, creates a converter for that encoding. Otherwise, returns the fallback converter.
++ (instancetype _Nullable) converterForHFSPlusFile:(struct HFSPlusCatalogFile const *_Nonnull const)filePtr fallback:(ImpTextEncodingConverter *_Nonnull const)fallbackConverter;
+///If this folder has a script code in its extended Finder flags, creates a converter for that encoding. Otherwise, returns the fallback converter.
++ (instancetype _Nullable) converterForHFSPlusFolder:(struct HFSPlusCatalogFolder const *_Nonnull const)folderPtr fallback:(ImpTextEncodingConverter *_Nonnull const)fallbackConverter;
+
+#pragma mark -
+
 ///Returns an object that (hopefully) can convert filenames from the given encoding into Unicode.
 + (instancetype _Nullable) converterWithHFSTextEncoding:(TextEncoding const)hfsTextEncoding;
 ///Returns an object that (hopefully) can convert filenames from the given encoding into Unicode.
 - (instancetype _Nullable) initWithHFSTextEncoding:(TextEncoding const)hfsTextEncoding;
+
+///The encoding this converter was created to convert.
+@property(readonly) TextEncoding hfsTextEncoding;
+
+#pragma mark -
 
 ///Obtain an estimate of how many bytes might be needed to hold the Unicode conversion of this string, including 2 bytes for the length.
 - (ByteCount) estimateSizeOfHFSUniStr255NeededForPascalString:(ConstStr31Param _Nonnull const)pascalString;
