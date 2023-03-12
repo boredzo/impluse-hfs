@@ -56,6 +56,11 @@ typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
 
 ///Convert the item's name from the HFS catalog using its assigned encoding into a modern Unicode name.
 - (NSString *_Nonnull const) name;
+///Convert the item's createDate from the HFS catalog to the modern epoch.
+- (NSDate *_Nonnull const) creationDate;
+///Convert the item's modifyDate from the HFS catalog to the modern epoch.
+- (NSDate *_Nonnull const) modificationDate;
+
 ///Reconstruct the path to the item from the volume's catalog. Returns an array of item names, starting with the volume name, that, if joined by colons, will form an HFS path.
 - (NSArray <NSString *> *_Nonnull const) path;
 

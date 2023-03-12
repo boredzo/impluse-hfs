@@ -147,6 +147,46 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	}
 }
 
+- (NSDate *_Nonnull const) creationDate {
+	if (_isHFSPlus) {
+		if (self.isDirectory) {
+			struct HFSPlusCatalogFolder const *_Nonnull const folderRec = (struct HFSPlusCatalogFolder const *)(self.hfsFolderCatalogRecordData.bytes);
+			return [self dateForHFSDate:L(folderRec->createDate)];
+		} else {
+			struct HFSPlusCatalogFile const *_Nonnull const fileRec = (struct HFSPlusCatalogFile const *)(self.hfsFileCatalogRecordData.bytes);
+			return [self dateForHFSDate:L(fileRec->createDate)];
+		}
+	} else {
+		if (self.isDirectory) {
+			struct HFSCatalogFolder const *_Nonnull const folderRec = (struct HFSCatalogFolder const *)(self.hfsFolderCatalogRecordData.bytes);
+			return [self dateForHFSDate:L(folderRec->createDate)];
+		} else {
+			struct HFSCatalogFile const *_Nonnull const fileRec = (struct HFSCatalogFile const *)(self.hfsFileCatalogRecordData.bytes);
+			return [self dateForHFSDate:L(fileRec->createDate)];
+		}
+	}
+}
+
+- (NSDate *_Nonnull const) modificationDate {
+	if (_isHFSPlus) {
+		if (self.isDirectory) {
+			struct HFSPlusCatalogFolder const *_Nonnull const folderRec = (struct HFSPlusCatalogFolder const *)(self.hfsFolderCatalogRecordData.bytes);
+			return [self dateForHFSDate:L(folderRec->contentModDate)];
+		} else {
+			struct HFSPlusCatalogFile const *_Nonnull const fileRec = (struct HFSPlusCatalogFile const *)(self.hfsFileCatalogRecordData.bytes);
+			return [self dateForHFSDate:L(fileRec->contentModDate)];
+		}
+	} else {
+		if (self.isDirectory) {
+			struct HFSCatalogFolder const *_Nonnull const folderRec = (struct HFSCatalogFolder const *)(self.hfsFolderCatalogRecordData.bytes);
+			return [self dateForHFSDate:L(folderRec->modifyDate)];
+		} else {
+			struct HFSCatalogFile const *_Nonnull const fileRec = (struct HFSCatalogFile const *)(self.hfsFileCatalogRecordData.bytes);
+			return [self dateForHFSDate:L(fileRec->modifyDate)];
+		}
+	}
+}
+
 - (u_int32_t) hfsDateForDate:(NSDate *_Nonnull const)dateToConvert {
 	return (u_int32_t)(dateToConvert.timeIntervalSinceReferenceDate - hfsEpochTISRD);
 }
@@ -781,6 +821,11 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	);
 
 	ImpDehydratedItem *_Nonnull const rootDirectory = self;
+	ImpPrintf(@"Volume name:\t%@", rootDirectory.name);
+	ImpPrintf(@"Created:\t%@", rootDirectory.creationDate);
+	ImpPrintf(@"Last modified:\t%@", rootDirectory.modificationDate);
+	ImpPrintf(@"");
+
 	ImpPrintf(@"%@   \tData size\tRsrc size\tTotal size", printAbsolutePaths ? @"Path" : @"Name");
 	ImpPrintf(@"═══════\t═════════\t═════════\t═════════");
 	NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
