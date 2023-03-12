@@ -40,7 +40,7 @@
 	ImpVolumeProbe *_Nonnull const probe = [[ImpVolumeProbe alloc] initWithFileDescriptor:readFD];
 	[probe findVolumes:^(const u_int64_t startOffsetInBytes, const u_int64_t lengthInBytes, Class  _Nullable const __unsafe_unretained volumeClass) {
 		ImpHFSVolume *_Nonnull const srcVol = [[volumeClass alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
-		analyzed = ([srcVol loadAndReturnError:&volumeLoadError] && [self analyzeVolume:srcVol error:&analysisError]) || analyzed;
+		analyzed = [self analyzeVolume:srcVol error:&analysisError] || analyzed;
 	}];
 
 	if (! analyzed) {
@@ -53,6 +53,14 @@
 }
 - (bool) analyzeVolume:(ImpHFSVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError {
 	NSByteCountFormatter *_Nonnull const bcf = [NSByteCountFormatter new];
+
+	int const readFD = srcVol.fileDescriptor;
+	if (! [srcVol readBootBlocksFromFileDescriptor:readFD error:outError]) {
+		return false;
+	}
+	if (! [srcVol readVolumeHeaderFromFileDescriptor:readFD error:outError]) {
+		return false;
+	}
 
 	if ([srcVol isKindOfClass:[ImpHFSPlusVolume class]]) {
 		ImpHFSPlusVolume *_Nonnull const srcVolPlus = (ImpHFSPlusVolume *_Nonnull const)srcVol;
@@ -76,9 +84,6 @@
 			for (NSUInteger i = 0; i < kHFSPlusExtentDensity && eoExtDescs[i].blockCount > 0; ++i) {
 				ImpPrintf(@"Extents overflow extent #%lu: start block #%@, length %@ blocks", i, [fmtr stringFromNumber:@(L(eoExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[0].blockCount))]);
 			}
-
-			ImpPrintf(@"Catalog file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", srcVol.catalogBTree.numberOfLiveNodes, srcVol.catalogBTree.numberOfPotentialNodes, srcVol.catalogBTree.numberOfPotentialNodes > 0 ? (srcVol.catalogBTree.numberOfLiveNodes / (double)srcVol.catalogBTree.numberOfPotentialNodes) * 100.0 : 1.0);
-			ImpPrintf(@"Extents file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", srcVol.extentsOverflowBTree.numberOfLiveNodes, srcVol.extentsOverflowBTree.numberOfPotentialNodes, srcVol.extentsOverflowBTree.numberOfPotentialNodes > 0 ? (srcVol.extentsOverflowBTree.numberOfLiveNodes / (double)srcVol.extentsOverflowBTree.numberOfPotentialNodes) * 100.0 : 1.0);
 		}];
 	} else {
 		[srcVol peekAtHFSVolumeHeader:^(NS_NOESCAPE const struct HFSMasterDirectoryBlock *const mdbPtr) {
@@ -109,14 +114,18 @@
 		ImpPrintf(@"Failed to read allocation bitmap: %@", (*outError).localizedDescription);
 		return false;
 	}
+
 	if (! [srcVol readExtentsOverflowFileFromFileDescriptor:srcVol.fileDescriptor error:outError]) {
 		ImpPrintf(@"Failed to read extents overflow file: %@", (*outError).localizedDescription);
 		return false;
 	}
+	ImpPrintf(@"Extents file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", srcVol.extentsOverflowBTree.numberOfLiveNodes, srcVol.extentsOverflowBTree.numberOfPotentialNodes, srcVol.extentsOverflowBTree.numberOfPotentialNodes > 0 ? (srcVol.extentsOverflowBTree.numberOfLiveNodes / (double)srcVol.extentsOverflowBTree.numberOfPotentialNodes) * 100.0 : 1.0);
+
 	if (! [srcVol readCatalogFileFromFileDescriptor:srcVol.fileDescriptor error:outError]) {
 		ImpPrintf(@"Failed to read catalog file: %@", (*outError).localizedDescription);
 		return false;
 	}
+	ImpPrintf(@"Catalog file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", srcVol.catalogBTree.numberOfLiveNodes, srcVol.catalogBTree.numberOfPotentialNodes, srcVol.catalogBTree.numberOfPotentialNodes > 0 ? (srcVol.catalogBTree.numberOfLiveNodes / (double)srcVol.catalogBTree.numberOfPotentialNodes) * 100.0 : 1.0);
 
 	u_int32_t const blockSize = (u_int32_t)srcVol.numberOfBytesPerBlock;
 	void (^_Nonnull const logFork)(char const *_Nonnull const indentString, char const *_Nonnull const forkName, HFSPlusForkData const *_Nonnull const forkPtr) = ^(char const *_Nonnull const indentString, char const *_Nonnull const forkName, HFSPlusForkData const *_Nonnull const forkPtr) {
