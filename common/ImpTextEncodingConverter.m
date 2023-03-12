@@ -53,13 +53,9 @@ enum {
 }
 + (bool) hasTextEncodingInExtendedFinderFlags:(UInt16 const)extFinderFlags {
 	UInt16 const hasEmbeddedScriptCodeBit = (extFinderFlags & ImpExtFinderFlagsHasEmbeddedScriptCodeMask);
-	bool const truth = hasEmbeddedScriptCodeBit;
-	NSLog(@"Has embedded script code: 0x%04x %@", hasEmbeddedScriptCodeBit, truth ? @"yes" : @"no");
 	return (extFinderFlags & ImpExtFinderFlagsHasEmbeddedScriptCodeMask);
 }
 + (TextEncoding) textEncodingFromExtendedFinderFlags:(UInt16 const)extFinderFlags {
-	UInt16 const embeddedScriptCodeUnshifted = (extFinderFlags & ImpExtFinderFlagsScriptCodeMask);
-	NSLog(@"Embedded script code before shift: 0x%04x", embeddedScriptCodeUnshifted);
 	return (extFinderFlags & ImpExtFinderFlagsScriptCodeMask) >> 8;
 }
 
