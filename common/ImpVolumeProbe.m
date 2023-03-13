@@ -26,9 +26,9 @@
 
 @end
 
-//IM:D calls this structure “Block0”. All fields are big-endian.
-//We don't really care about trying to parse the driver descriptor block, other than checking the signature. If we find the driver descriptor block, we can expect it to be followed immediately by the partition map.
-//(Note that absence of a DDB does not imply absence of an APM. There can be a PM block with no preceding ER block.)
+///IM:D calls this structure “Block0”. All fields are big-endian.
+///We don't really care about trying to parse the driver descriptor block, other than checking the signature. If we find the driver descriptor block, we can expect it to be followed immediately by the partition map.
+///(Note that absence of a DDB does not imply absence of an APM. There can be a PM block with no preceding ER block.)
 enum {
 	APMDriverDescriptorBlockSignature = 0x4552, //'ER'
 	APMDriverDescriptorBlockSignatureAlternate = 0x0000, //Sometimes there's no Driver Descriptor Record but block 0 is still followed by one or more partition map entries.
