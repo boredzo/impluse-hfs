@@ -51,7 +51,7 @@ struct APMDriverDescriptorBlock {
 		u_int16_t operatingSystemType; //Mac OS == 1
 	} driverRecords[(0x200 - (2+2+4+2+2+4+2)) / 8];
 	u_int32_t pad; //reserved
-};
+} __attribute__((aligned(2), packed));
 struct APMPartition {
 	u_int16_t signature; //'PM'
 	u_int16_t signaturePad;
@@ -72,7 +72,7 @@ struct APMPartition {
 	u_int32_t bootCodeChecksum;
 	Str15 processorType;
 	u_int16_t pad[188];
-};
+} __attribute__((aligned(2), packed));
 
 @implementation ImpVolumeProbe
 {
