@@ -172,13 +172,16 @@ struct APMPartition {
 	switch (L(maybeDDB->signature)) {
 		case APMDriverDescriptorBlockSignature:
 			//It's a DDB. We should definitely have an APM, just after the DDB.
+			if (self.verbose) ImpPrintf(@"Found an Apple Partition Map Driver Descriptor Block");
 		case APMDriverDescriptorBlockSignatureAlternate:
 			//If the space where the DDB should be is empty, the partition map might start in the second block. (It certainly isn't in the *first* block, anyway.)
+			if (self.verbose) ImpPrintf(@"Space where Driver Descriptor Block might've been is empty; could still be an Apple Partition Map");
 			firstPMBlock = 1;
 			break;
 
 		default:
 			//Whatever this is, it doesn't look like a DDB. Reject it.
+			if (self.verbose) ImpPrintf(@"Definitely not an Apple Partition Map");
 			return false;
 	}
 
@@ -193,11 +196,16 @@ struct APMPartition {
 			if (numPartitions == 0) {
 				switch (L(partition->signature)) {
 					case APMPartitionMapEntrySignature:
+						if (self.verbose) ImpPrintf(@"Found an IM5 Apple Partition Map entry");
+						foundPartitionMap = true;
+						break;
 					case APMPartitionMapEntrySignatureOldStyle:
+						if (self.verbose) ImpPrintf(@"Found an IM4 Apple Partition Map");
 						foundPartitionMap = true;
 						break;
 					default:
 						//Signature mismatch—this is not an APM entry. And since it's supposed to be first APM entry, that means there's no APM.
+						if (self.verbose) ImpPrintf(@"Space where partition map entry should be is not an Apple Partition Map entry");
 						foundPartitionMap = false;
 						break;
 				}
@@ -208,8 +216,10 @@ struct APMPartition {
 				numPartitions = L(partition->numMapBlocks);
 			}
 
+			if (self.verbose) ImpPrintf(@"Partition type is %s", partition->partitionType);
 			if (strcmp(partition->partitionType, "Apple_HFS") == 0) {
 				u_int32_t const hfsBootBlocksStartBlockIndex = L(partition->thisPartitionStartBlock);
+				if (self.verbose) ImpPrintf(@"Entry describes an HFS volume. First physical block (location of boot blocks) is #%u", hfsBootBlocksStartBlockIndex);
 				u_int32_t const hfsVolumeHeaderBlockIndex = hfsBootBlocksStartBlockIndex + 2;
 				NSData *_Nonnull const thirdVolumeBlockData = [self readOneISOStandardBlockAtIndex:hfsVolumeHeaderBlockIndex];
 
@@ -217,13 +227,16 @@ struct APMPartition {
 
 				struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr = (struct HFSMasterDirectoryBlock const *_Nonnull)thirdVolumeBlockData.bytes;
 				if (L(mdbPtr->drSigWord) == kHFSSigWord) {
+					if (self.verbose) ImpPrintf(@"Volume is an HFS volume");
 					identifiedClass = [ImpHFSVolume class];
 				} else {
 					struct HFSPlusVolumeHeader const *_Nonnull const vhPtr = (struct HFSPlusVolumeHeader const *_Nonnull)thirdVolumeBlockData.bytes;
 					if (L(vhPtr->signature) == kHFSPlusSigWord) {
+						if (self.verbose) ImpPrintf(@"Volume is an HFS+ volume");
 						identifiedClass = [ImpHFSPlusVolume class];
 					} else {
 						//Signature isn't HFS or HFS+? This may be mapped as an Apple_HFS partition, but it's not a usable HFS or HFS+ volume. Skip it.
+						if (self.verbose) ImpPrintf(@"Volume is not an HFS or HFS+ volume");
 						continue;
 					}
 				}
