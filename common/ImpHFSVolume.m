@@ -172,7 +172,8 @@
 
 	struct HFSExtentDescriptor const *_Nonnull const eoExtDescs = _mdb->drXTExtRec;
 	NSData *_Nullable const extentsFileData = [self readDataFromFileDescriptor:readFD logicalLength:L(_mdb->drXTFlSize) extents:eoExtDescs numExtents:kHFSExtentDensity error:outError];
-//	ImpPrintf(@"Extents file data: 0x%lx bytes (%lu a-blocks)", extentsFileData.length, extentsFileData.length / L(_mdb->drAlBlkSiz));
+//	ImpPrintf(@"Extents file logical length from MDB: 0x%x bytes (must be at least %lu a-blocks)", L(_mdb->drXTFlSize), ImpCeilingDivide(extentsFileData.length, L(_mdb->drAlBlkSiz)));
+//	ImpPrintf(@"Extents file data: 0x%lx bytes (enough to fill %lu a-blocks)", extentsFileData.length, ImpCeilingDivide(extentsFileData.length, L(_mdb->drAlBlkSiz)));
 
 	if (extentsFileData != nil) {
 		self.extentsOverflowBTree = [[ImpBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSExtentsOverflow data:extentsFileData];
