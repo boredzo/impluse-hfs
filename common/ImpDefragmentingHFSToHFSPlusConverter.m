@@ -99,7 +99,7 @@
 	u_int32_t const bytesPerSourceABlock = (u_int32_t)srcVol.numberOfBytesPerBlock;
 
 	u_int32_t const bytesPerABlock = L(vh->blockSize);
-	u_int32_t const numBlocksInVolume = (u_int32_t)(volumeLengthInBytes / bytesPerABlock);
+	u_int32_t const numBlocksInVolume = (u_int32_t)ImpCeilingDivide(volumeLengthInBytes, bytesPerABlock);
 	[dstVol initializeAllocationBitmapWithBlockSize:bytesPerABlock count:numBlocksInVolume];
 
 	//We do need to create/have an extents overflow file, even if it's empty.
