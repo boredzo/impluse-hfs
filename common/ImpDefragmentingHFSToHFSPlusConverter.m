@@ -117,11 +117,11 @@
 	[self reportSourceExtentRecordCopied:catalogFileSourceExtents];
 
 	//Allocate the special files before anything else, so they get placed first on the disk.
-	u_int32_t const catFileLength = (u_int32_t)destCatalog.lengthInBytes;
+	u_int64_t const catFileLength = destCatalog.lengthInBytes;
 	[dstVol allocateBytes:catFileLength forFork:ImpForkTypeSpecialFileContents populateExtentRecord:vh->catalogFile.extents];
 	S(vh->catalogFile.logicalSize, catFileLength);
 	S(vh->catalogFile.totalBlocks, L(vh->catalogFile.extents[0].blockCount));
-	u_int32_t const extFileLength = (u_int32_t)destExtentsOverflow.lengthInBytes;
+	u_int64_t const extFileLength = destExtentsOverflow.lengthInBytes;
 	[dstVol allocateBytes:extFileLength forFork:ImpForkTypeSpecialFileContents populateExtentRecord:vh->extentsFile.extents];
 	S(vh->extentsFile.logicalSize, extFileLength);
 	S(vh->extentsFile.totalBlocks, L(vh->extentsFile.extents[0].blockCount));
