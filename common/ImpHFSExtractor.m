@@ -58,6 +58,7 @@
 					return nil;
 				}
 			}
+			[scanner scanString:@":" intoString:NULL];
 		}
 	}
 
