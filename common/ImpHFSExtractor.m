@@ -71,18 +71,15 @@
 
 ///Return whether a quarry path from parseHFSPath: matches a given path for a catalog item. Returns true for any volume name if the first item in the quarry path is the empty string (indicating a relative path, which we interpret as relative to the volume root).
 - (bool) isQuarryPath:(NSArray <NSString *> *_Nonnull const)quarryPath isEqualToCatalogPath:(NSArray <NSString *> *_Nonnull const)catalogPath {
+	NSParameterAssert(catalogPath.count > 0);
 	if (quarryPath.count != catalogPath.count) {
 		return false;
 	}
 	NSEnumerator <NSString *> *_Nonnull const quarryPathEnum = [quarryPath objectEnumerator];
 	NSEnumerator <NSString *> *_Nonnull const catalogPathEnum = [catalogPath objectEnumerator];
 
-	NSString *_Nonnull const quarryVolumeName = [quarryPathEnum nextObject];
-	NSString *_Nonnull const catalogVolumeName = [catalogPathEnum nextObject];
-	if (quarryVolumeName == catalogVolumeName) {
-		//They're both nil. We're comparing two empty paths. Yup, they're equal!
-		return true;
-	}
+	NSString *_Nullable const quarryVolumeName = [quarryPathEnum nextObject];
+	NSString *_Nullable const catalogVolumeName = [catalogPathEnum nextObject];
 
 	if (quarryVolumeName.length == 0 || [quarryVolumeName isEqualToString:catalogVolumeName]) {
 		//Step through both arrays in parallel, comparing pairs of items as we go. Bail at the first non-equal pair.
