@@ -43,6 +43,9 @@
 		31CD6E8B29CC3BCE0076FEF8 /* ImpBTreeIndexNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 31077AD0293849EE00066789 /* ImpBTreeIndexNode.m */; };
 		31CD6E8E29CC3E2A0076FEF8 /* TestData.r in Rez */ = {isa = PBXBuildFile; fileRef = 31CD6E7629CC36BB0076FEF8 /* TestData.r */; };
 		31CD6E8F29CC40150076FEF8 /* NSData+ImpHexDump.m in Sources */ = {isa = PBXBuildFile; fileRef = 31077AD32939587300066789 /* NSData+ImpHexDump.m */; };
+		31CD6E9229CD76840076FEF8 /* ImpCSVProducer.m in Sources */ = {isa = PBXBuildFile; fileRef = 31CD6E9129CD76840076FEF8 /* ImpCSVProducer.m */; };
+		31CD6E9329CD76840076FEF8 /* ImpCSVProducer.m in Sources */ = {isa = PBXBuildFile; fileRef = 31CD6E9129CD76840076FEF8 /* ImpCSVProducer.m */; };
+		31CD6E9529CD7CBA0076FEF8 /* TestCSVProducer.m in Sources */ = {isa = PBXBuildFile; fileRef = 31CD6E9429CD7CBA0076FEF8 /* TestCSVProducer.m */; };
 		31D46AC529AEA7D7004B04B7 /* ImpVolumeProbe.m in Sources */ = {isa = PBXBuildFile; fileRef = 31D46AC429AEA7D7004B04B7 /* ImpVolumeProbe.m */; };
 		31F719AF293A8F300055EEA3 /* ImpHFSExtractor.m in Sources */ = {isa = PBXBuildFile; fileRef = 31F719AE293A8F300055EEA3 /* ImpHFSExtractor.m */; };
 		31F719B2293A8FD90055EEA3 /* ImpErrorUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 31F719B1293A8FD90055EEA3 /* ImpErrorUtilities.m */; };
@@ -113,6 +116,9 @@
 		31C6E9D72939CF1A000A87D8 /* Prefix.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Prefix.h; sourceTree = "<group>"; };
 		31CD6E7629CC36BB0076FEF8 /* TestData.r */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.rez; path = TestData.r; sourceTree = "<group>"; };
 		31CD6E7729CC36D70076FEF8 /* TestResourceFork.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TestResourceFork.m; sourceTree = "<group>"; };
+		31CD6E9029CD76840076FEF8 /* ImpCSVProducer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpCSVProducer.h; sourceTree = "<group>"; };
+		31CD6E9129CD76840076FEF8 /* ImpCSVProducer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpCSVProducer.m; sourceTree = "<group>"; };
+		31CD6E9429CD7CBA0076FEF8 /* TestCSVProducer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TestCSVProducer.m; sourceTree = "<group>"; };
 		31D46AC329AEA7D7004B04B7 /* ImpVolumeProbe.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpVolumeProbe.h; sourceTree = "<group>"; };
 		31D46AC429AEA7D7004B04B7 /* ImpVolumeProbe.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpVolumeProbe.m; sourceTree = "<group>"; };
 		31F719AD293A8F300055EEA3 /* ImpHFSExtractor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpHFSExtractor.h; sourceTree = "<group>"; };
@@ -217,6 +223,8 @@
 				31F719B4293ABAAB0055EEA3 /* ImpDehydratedItem.m */,
 				313CF74829C8415D00CAA05E /* ImpDehydratedResourceFork.h */,
 				313CF74929C8415D00CAA05E /* ImpDehydratedResourceFork.m */,
+				31CD6E9029CD76840076FEF8 /* ImpCSVProducer.h */,
+				31CD6E9129CD76840076FEF8 /* ImpCSVProducer.m */,
 				314EFFE2293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.h */,
 				314EFFE3293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m */,
 				3105F1C4294574160062C6F8 /* ImpDefragmentingHFSToHFSPlusConverter.h */,
@@ -247,6 +255,7 @@
 				31F719C3293D4C5F0055EEA3 /* TestDangerouslyFastSubdata.m */,
 				31CD6E7629CC36BB0076FEF8 /* TestData.r */,
 				31CD6E7729CC36D70076FEF8 /* TestResourceFork.m */,
+				31CD6E9429CD7CBA0076FEF8 /* TestCSVProducer.m */,
 			);
 			path = UnitTests;
 			sourceTree = "<group>";
@@ -369,6 +378,7 @@
 				314EFFF3293510CE00CE74E9 /* ImpBTreeHeaderNode.m in Sources */,
 				314EFFE72933160800CE74E9 /* ImpHFSVolume.m in Sources */,
 				314EFFF72936D80D00CE74E9 /* ImpExtentSeries.m in Sources */,
+				31CD6E9229CD76840076FEF8 /* ImpCSVProducer.m in Sources */,
 				314EFFE4293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m in Sources */,
 				314EFFDB2932CF3700CE74E9 /* main.m in Sources */,
 				31C6E9D62939CE7D000A87D8 /* ImpPrintf.m in Sources */,
@@ -388,7 +398,9 @@
 				31CD6E8629CC3BB10076FEF8 /* ImpComparisonUtilities.m in Sources */,
 				31CD6E8029CC3B0C0076FEF8 /* ImpErrorUtilities.m in Sources */,
 				31CD6E7F29CC3B070076FEF8 /* ImpSizeUtilities.m in Sources */,
+				31CD6E9529CD7CBA0076FEF8 /* TestCSVProducer.m in Sources */,
 				31F719C8293D4C8E0055EEA3 /* NSData+ImpSubdata.m in Sources */,
+				31CD6E9329CD76840076FEF8 /* ImpCSVProducer.m in Sources */,
 				31CD6E7B29CC3A8E0076FEF8 /* ImpPrintf.m in Sources */,
 				31CD6E7D29CC3AA60076FEF8 /* ImpTextEncodingConverter.m in Sources */,
 				31CD6E8729CC3BCE0076FEF8 /* ImpBTreeFile.m in Sources */,

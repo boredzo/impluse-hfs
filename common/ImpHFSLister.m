@@ -7,6 +7,8 @@
 
 #import "ImpHFSLister.h"
 
+#import "ImpCSVProducer.h"
+
 #import "ImpHFSVolume.h"
 #import "ImpHFSPlusVolume.h"
 #import "ImpVolumeProbe.h"
@@ -51,31 +53,34 @@
 }
 
 - (void) inventoryApplicationsWithinItem:(ImpDehydratedItem *_Nonnull const)rootDirectory {
-	__block bool hasPrintedHeader = false;
-	void (^_Nonnull const printHeaderIfNeeded)(void) = ^(void) {
-		if (! hasPrintedHeader) {
-			ImpPrintf(@"volume_name,application_name,version,creation_date,modification_date,file_type,signature,path");
-			hasPrintedHeader = true;
-		}
-	};
+	NSArray <NSString *> *_Nonnull const columns = @[
+		@"volume_name",
+		@"application_name",
+		@"version",
+		@"creation_date",
+		@"modification_date",
+		@"file_type",
+		@"signature",
+		@"path"
+	];
+	ImpCSVProducer *_Nonnull const csvProducer = [[ImpCSVProducer alloc] initWithFileHandle:[NSFileHandle fileHandleWithStandardOutput] headerRow:columns];
 
 	NSISO8601DateFormatter *_Nonnull const iso8601Fmtr = [NSISO8601DateFormatter new];
 	iso8601Fmtr.formatOptions = NSISO8601DateFormatWithInternetDateTime;
 	[rootDirectory walkBreadthFirst:^(const NSUInteger depth, ImpDehydratedItem *_Nonnull const item) {
 		//TODO: Should we also include 'appe' and 'appc'?
 		if (item.fileTypeCode == 'APPL') {
-			printHeaderIfNeeded();
 			@autoreleasepool {
-				ImpPrintf(@"%@,%@,%@,%@,%@,%@,%@,%@",
+				[csvProducer writeRow:@[
 					rootDirectory.name,
 					item.name,
 					item.versionStringFromVersionNumber ?: @"-",
-					item.creationDate,
-					item.modificationDate,
+					[iso8601Fmtr stringFromDate:item.creationDate],
+					[iso8601Fmtr stringFromDate:item.modificationDate],
 					NSFileTypeForHFSTypeCode(item.fileTypeCode),
 					NSFileTypeForHFSTypeCode(item.creatorCode),
 					[item.path componentsJoinedByString:@":"]
-				);
+				]];
 			}
 		}
 	}];
