@@ -7,6 +7,8 @@
 
 #import <Foundation/Foundation.h>
 
+#import "ImpForkUtilities.h"
+
 @class ImpHFSVolume;
 @class ImpHFSPlusVolume;
 
@@ -60,9 +62,26 @@ typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
 - (NSDate *_Nonnull const) creationDate;
 ///Convert the item's modifyDate from the HFS catalog to the modern epoch.
 - (NSDate *_Nonnull const) modificationDate;
+///The item's four-byte type code. Only valid for files; returns 0 for folders.
+@property(nonatomic, readonly) OSType fileTypeCode;
+///The item's four-byte creator code (also called its signature when the item is an application). Only valid for files; returns 0 for folders.
+@property(nonatomic, readonly) OSType creatorCode;
+
+///The logical length of the file's data fork as a number of bytes. Returns 0 for folders.
+@property(nonatomic, readonly) u_int64_t dataForkLogicalLength;
+///The logical length of the file's resource fork as a number of bytes. Returns 0 for folders.
+@property(nonatomic, readonly) u_int64_t resourceForkLogicalLength;
+
+///The short version string from the item's 'vers' resource ID 1, if such a resource exists. Returns nil if there is no such resource or if the item is a folder. The string may be empty.
+- (NSString *_Nullable const) shortVersionString;
+///The short version string from the item's 'vers' resource ID 1, if such a resource exists. Returns nil if there is no such resource or if the item is a folder. The string may be empty.
+- (NSString *_Nullable const) versionStringFromVersionNumber;
 
 ///Reconstruct the path to the item from the volume's catalog. Returns an array of item names, starting with the volume name, that, if joined by colons, will form an HFS path.
 - (NSArray <NSString *> *_Nonnull const) path;
+
+///Returns an NSData containing the data from either the data fork or the resource fork. Returns nil if whichFork is invalid or the item is not a file.
+- (NSData *_Nullable const) rehydrateForkContents:(ImpForkType)whichFork;
 
 ///Create a real file or folder with the same contents and (as much as possible) metadata as the dehydrated item. Folders get rehydrated recursively, with all of their sub-items. Note that this must be the URL of the item to be created (i.e., parent directory + nameFromEncoding:).
 - (bool) rehydrateAtRealWorldURL:(NSURL *_Nonnull const)realWorldURL error:(NSError *_Nullable *_Nonnull const)outError;

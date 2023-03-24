@@ -7,6 +7,8 @@
 
 #import "ImpComparisonUtilities.h"
 
+#import "ImpByteOrder.h"
+
 ///Historically declared in TextUtils.h, but now so deprecated that it's not even in the headers anymore. Could go away at any time, in which case this will need to be replaced with either a clean original implementation or Apple's open-source FastRelString from diskdev_cmds-491.3/fsck_hfs.tproj.
 //NOTE: Must be declared as int32_t, not NSComparisonResult, as the latter is long, which is 64-bit on LP64 systems, and this does not return a 64-bit value. If you declare this as NSComparisonResult, you get INT_MAX rather than -1.
 extern int32_t RelString(ConstStr255Param a, ConstStr255Param b, bool const caseSensitive, bool const diacriticSensitive);

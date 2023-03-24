@@ -8,11 +8,14 @@
 #import "ImpDehydratedItem.h"
 
 #import "ImpTextEncodingConverter.h"
+#import "ImpByteOrder.h"
+#import "ImpPrintf.h"
 
 #import "ImpHFSVolume.h"
 #import "ImpHFSPlusVolume.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
+#import "ImpDehydratedResourceFork.h"
 
 typedef NS_ENUM(u_int64_t, ImpVolumeSizeThreshold) {
 	//Rough estimates just for icon selection purposes.
@@ -37,6 +40,9 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	NSArray <NSString *> *_cachedPath;
 	NSMutableArray <ImpDehydratedItem *> *_children;
 	ImpTextEncodingConverter *_tec;
+	ImpDehydratedResourceFork *_resourceFork;
+	NSData *_vers1ResourceData;
+	bool _hasCheckedForVers1Resource;
 	bool _isHFSPlus;
 }
 
@@ -187,6 +193,123 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	}
 }
 
+- (OSType) fileTypeCode {
+	if (_isHFSPlus) {
+		if (self.isDirectory) {
+			return 0;
+		} else {
+			struct HFSPlusCatalogFile const *_Nonnull const fileRec = (struct HFSPlusCatalogFile const *)(self.hfsFileCatalogRecordData.bytes);
+			return L(fileRec->userInfo.fdType);
+		}
+	} else {
+		if (self.isDirectory) {
+			return 0;
+		} else {
+			struct HFSCatalogFile const *_Nonnull const fileRec = (struct HFSCatalogFile const *)(self.hfsFileCatalogRecordData.bytes);
+			return L(fileRec->userInfo.fdType);
+		}
+	}
+}
+- (OSType) creatorCode {
+	if (_isHFSPlus) {
+		if (self.isDirectory) {
+			return 0;
+		} else {
+			struct HFSPlusCatalogFile const *_Nonnull const fileRec = (struct HFSPlusCatalogFile const *)(self.hfsFileCatalogRecordData.bytes);
+			return L(fileRec->userInfo.fdCreator);
+		}
+	} else {
+		if (self.isDirectory) {
+			return 0;
+		} else {
+			struct HFSCatalogFile const *_Nonnull const fileRec = (struct HFSCatalogFile const *)(self.hfsFileCatalogRecordData.bytes);
+			return L(fileRec->userInfo.fdCreator);
+		}
+	}
+}
+
+///Returns the contents of 'vers' resource ID 1, if it exists, or else nil.
+- (NSData *_Nullable const) applicationVersionResource {
+	if (! _hasCheckedForVers1Resource) {
+		ImpDehydratedResourceFork *_Nullable const resourceFork = [[ImpDehydratedResourceFork alloc] initWithItem:self];
+		NSData *_Nullable const resourceData = [resourceFork resourceOfType:'vers' ID:1];
+
+		enum {
+			///We can't use sizeof(VersRec) because MacTypes.h defines the VersRec structure as ending with two Str255s. The problem with that is that they aren't unconditionally stored in 256 bytes each; the strings are packed, allocated only as much space as needed to hold the string.
+			///So the *minimum* size of the structure is its numeric components plus two empty Pascal strings (length bytes of value zero). That's the size to use to validate that this might be a VersRec.
+			///Further validation can be done by checking that the length byte of the shortVersion string does not indicate more string than is actually present in the stored resource. (This could reject 'vers' resources that were correctly read, but hold corrupted VersRec data, either because it was corrupted before addition to the resource fork or because the resource map is itself corrupted. That is to say, it could be that either the string's length or the resource's length is genuinely wrong.)
+			ImpMinimumVersRecSize = sizeof(NumVersion) + sizeof(SInt16) + sizeof(unsigned char) + sizeof(unsigned char),
+			///The size of the portion of the VersRec structure that precedes the two strings. This can be added to the shortVersion length byte to validate that that length fits within the resource data we have retrieved.
+			ImpVersRecPreStringsSize = sizeof(NumVersion) + sizeof(SInt16),
+		};
+
+		if (resourceData != nil && resourceData.length >= ImpMinimumVersRecSize) {
+			_vers1ResourceData = resourceData;
+		}
+
+		_hasCheckedForVers1Resource = true;
+	}
+	return _vers1ResourceData;
+}
+
+- (NSString *_Nullable const) shortVersionString {
+	NSData *_Nullable const versionResourceData = self.applicationVersionResource;
+	enum {
+		///We can't use sizeof(VersRec) because MacTypes.h defines the VersRec structure as ending with two Str255s. The problem with that is that they aren't unconditionally stored in 256 bytes each; the strings are packed, allocated only as much space as needed to hold the string.
+		///So the *minimum* size of the structure is its numeric components plus two empty Pascal strings (length bytes of value zero). That's the size to use to validate that this might be a VersRec.
+		///Further validation can be done by checking that the length byte of the shortVersion string does not indicate more string than is actually present in the stored resource. (This could reject 'vers' resources that were correctly read, but hold corrupted VersRec data, either because it was corrupted before addition to the resource fork or because the resource map is itself corrupted. That is to say, it could be that either the string's length or the resource's length is genuinely wrong.)
+		ImpMinimumVersRecSize = sizeof(NumVersion) + sizeof(SInt16) + sizeof(unsigned char) + sizeof(unsigned char),
+		///The size of the portion of the VersRec structure that precedes the two strings. This can be added to the shortVersion length byte to validate that that length fits within the resource data we have retrieved.
+		ImpVersRecPreStringsSize = sizeof(NumVersion) + sizeof(SInt16),
+	};
+	if (versionResourceData != nil && versionResourceData.length >= ImpMinimumVersRecSize) {
+		VersRec const *_Nonnull const vers = versionResourceData.bytes;
+
+		if (vers->shortVersion[0] > 0) {
+			if (versionResourceData.length >= (ImpVersRecPreStringsSize + vers->shortVersion[0])) {
+				return [_tec stringForPascalString:vers->shortVersion];
+			} else {
+				//We have a Pascal string that says it's X bytes, but there are only Y (< X) bytes left in the stored resource.
+				//Copy out the Y bytes we've got, then append an ellipsis after it, and update the length in our copy.
+				//The truncated string = what we've got from the resource.
+				NSUInteger const truncatedPascalStringSize = versionResourceData.length - ImpVersRecPreStringsSize;
+				//The abbreviated string = what we're going to produce by appending an ellipsis.
+				NSUInteger const abbreviatedPascalStringSize = truncatedPascalStringSize + 1;
+				NSUInteger const abbreviatedPascalStringLength = abbreviatedPascalStringSize - 1;
+
+				NSMutableData *_Nonnull const abbreviatedSVSData = [NSMutableData dataWithCapacity:abbreviatedPascalStringSize];
+				[abbreviatedSVSData appendBytes:vers->shortVersion length:truncatedPascalStringSize];
+				unsigned char const ellipsisMacRoman = 0xc9;
+				[abbreviatedSVSData appendBytes:&ellipsisMacRoman length:1];
+				UInt8 *_Nonnull const lengthBytePtr = abbreviatedSVSData.mutableBytes;
+				*lengthBytePtr = (UInt8)abbreviatedPascalStringLength;
+				return [_tec stringForPascalString:abbreviatedSVSData.bytes];
+			}
+		} else {
+			return @"";
+		}
+	}
+	return nil;
+}
+- (NSString *_Nullable const) versionStringFromVersionNumber {
+	NSData *_Nullable const versionResourceData = self.applicationVersionResource;
+	enum {
+		///We can't use sizeof(VersRec) because MacTypes.h defines the VersRec structure as ending with two Str255s. The problem with that is that they aren't unconditionally stored in 256 bytes each; the strings are packed, allocated only as much space as needed to hold the string.
+		///So the *minimum* size of the structure is its numeric components plus two empty Pascal strings (length bytes of value zero). That's the size to use to validate that this might be a VersRec.
+		///Further validation can be done by checking that the length byte of the shortVersion string does not indicate more string than is actually present in the stored resource. (This could reject 'vers' resources that were correctly read, but hold corrupted VersRec data, either because it was corrupted before addition to the resource fork or because the resource map is itself corrupted. That is to say, it could be that either the string's length or the resource's length is genuinely wrong.)
+		ImpMinimumVersRecSize = sizeof(NumVersion) + sizeof(SInt16) + sizeof(unsigned char) + sizeof(unsigned char),
+		///The size of the portion of the VersRec structure that precedes the two strings. This can be added to the shortVersion length byte to validate that that length fits within the resource data we have retrieved.
+		ImpVersRecPreStringsSize = sizeof(NumVersion) + sizeof(SInt16),
+	};
+
+	if (versionResourceData != nil && versionResourceData.length >= ImpMinimumVersRecSize) {
+		struct ImpFixed_VersRec const *_Nonnull const vers = versionResourceData.bytes;
+
+		NSString *_Nonnull const versionString = [ImpDehydratedResourceFork versionStringForNumericVersion:&(vers->numericVersion)];
+		return versionString;
+	}
+	return nil;
+}
 - (u_int32_t) hfsDateForDate:(NSDate *_Nonnull const)dateToConvert {
 	return (u_int32_t)(dateToConvert.timeIntervalSinceReferenceDate - hfsEpochTISRD);
 }
@@ -194,7 +317,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	return [NSDate dateWithTimeIntervalSinceReferenceDate:hfsDate + hfsEpochTISRD];
 }
 
-- (u_int64_t) logicalDataForkBytes {
+- (u_int64_t) dataForkLogicalLength {
 	if (_isHFSPlus) {
 		struct HFSPlusCatalogFile const *_Nonnull const fileRec = self.hfsFileCatalogRecordData.bytes;
 		return L(fileRec->dataFork.logicalSize);
@@ -203,7 +326,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		return L(fileRec->dataLogicalSize);
 	}
 }
-- (u_int64_t) logicalResourceForkBytes {
+- (u_int64_t) resourceForkLogicalLength {
 	if (_isHFSPlus) {
 		struct HFSPlusCatalogFile const *_Nonnull const fileRec = self.hfsFileCatalogRecordData.bytes;
 		return L(fileRec->resourceFork.logicalSize);
@@ -246,6 +369,80 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	}
 
 	return _cachedPath;
+}
+
+- (NSData *_Nullable const) rehydrateForkContents:(ImpForkType)whichFork {
+	if (self.isDirectory) {
+		return nil;
+	}
+
+	ImpHFSVolume *_Nonnull const hfsVolume = self.hfsVolume;
+	ImpHFSPlusVolume *_Nullable const hfsPlusVolume = _isHFSPlus ? (ImpHFSPlusVolume *)hfsVolume : nil;
+
+	NSData *_Nonnull const fileRecData = self.hfsFileCatalogRecordData;
+	struct HFSCatalogFile const *_Nullable const hfsFileRec = _isHFSPlus ? NULL : fileRecData.bytes;
+	struct HFSPlusCatalogFile const *_Nullable const hfsPlusFileRec = _isHFSPlus ? fileRecData.bytes : NULL;
+
+	u_int64_t logicalLength = 0;
+	struct HFSExtentDescriptor const *_Nullable extents = NULL;
+	struct HFSPlusExtentDescriptor const *_Nullable extentsPlus = NULL;
+	switch (whichFork) {
+		case ImpForkTypeData:
+			if (_isHFSPlus) {
+				logicalLength = L(hfsPlusFileRec->dataFork.logicalSize);
+				extents = hfsPlusFileRec->dataFork.extents;
+			} else {
+				logicalLength = L(hfsFileRec->dataLogicalSize);
+				extents = hfsFileRec->dataExtents;
+			}
+			break;
+
+		case ImpForkTypeResource:
+			if (_isHFSPlus) {
+				logicalLength = L(hfsPlusFileRec->resourceFork.logicalSize);
+				extents = hfsPlusFileRec->resourceFork.extents;
+			} else {
+				logicalLength = L(hfsFileRec->rsrcLogicalSize);
+				extents = hfsFileRec->rsrcExtents;
+			}
+			break;
+
+		default:
+			return nil;
+	}
+
+	NSMutableData *_Nonnull const forkContents = [NSMutableData dataWithCapacity:logicalLength];
+	bool (^_Nonnull const appendBlock)(NSData *_Nonnull const fileData, u_int64_t const logicalLengthRemaining) = ^bool(NSData *_Nonnull const fileData, u_int64_t const logicalLengthRemaining) {
+		[forkContents appendData:fileData];
+		return true;
+	};
+
+	//TODO: This still swallows the error on GUI clients.
+	NSError *_Nullable readError = nil;
+
+	u_int64_t totalLengthRead = 0;
+	if (_isHFSPlus) {
+		totalLengthRead = [hfsPlusVolume forEachExtentInFileWithID:self.catalogNodeID
+			fork:whichFork
+			forkLogicalLength:logicalLength
+			startingWithBigExtentsRecord:extentsPlus
+			readDataOrReturnError:&readError
+			block:appendBlock];
+	} else {
+		totalLengthRead = [hfsVolume forEachExtentInFileWithID:self.catalogNodeID
+			fork:whichFork
+			forkLogicalLength:logicalLength
+			startingWithExtentsRecord:extents
+			readDataOrReturnError:&readError
+			block:appendBlock];
+	}
+
+	if (totalLengthRead == logicalLength) {
+		return forkContents;
+	} else {
+		ImpPrintf(@"Failed to read %llu bytes; got %llu bytes instead", logicalLength, totalLengthRead);
+		return nil;
+	}
 }
 
 - (bool) rehydrateIntoRealWorldDirectoryAtURL:(NSURL *_Nonnull const)realWorldParentURL error:(NSError *_Nullable *_Nonnull const)outError {
@@ -710,7 +907,6 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 }
 
 + (instancetype _Nonnull) rootDirectoryOfHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol {
-
 	ImpBTreeFile *_Nonnull const catalog = hfsVol.catalogBTree;
 
 	NSUInteger const totalNumItems = hfsVol.numberOfFiles + hfsVol.numberOfFolders;
@@ -844,7 +1040,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		lastKnownDepth = depth;
 		switch (item.type) {
 			case ImpDehydratedItemTypeFile: {
-				u_int64_t const sizeDF = item.logicalDataForkBytes, sizeRF = item.logicalResourceForkBytes, sizeTotal = sizeDF + sizeRF;
+				u_int64_t const sizeDF = item.dataForkLogicalLength, sizeRF = item.resourceForkLogicalLength, sizeTotal = sizeDF + sizeRF;
 				totalDF += sizeDF;
 				totalRF += sizeRF;
 				totalTotal += sizeTotal;

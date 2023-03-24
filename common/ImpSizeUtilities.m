@@ -10,6 +10,8 @@
 #import <Foundation/Foundation.h>
 #import <hfs/hfs_format.h>
 
+#import "ImpByteOrder.h"
+
 u_int32_t ImpNumberOfBlocksInHFSExtentRecord(struct HFSExtentDescriptor const *_Nonnull const extRec) {
 	u_int32_t total = 0;
 	for (NSUInteger i = 0; i < kHFSExtentDensity; ++i) {

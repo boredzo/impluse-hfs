@@ -8,6 +8,7 @@
 #import "ImpBTreeNode.h"
 
 #import "ImpByteOrder.h"
+#import "ImpPrintf.h"
 #import "ImpSizeUtilities.h"
 #import "NSData+ImpSubdata.h"
 #import "ImpBTreeFile.h"

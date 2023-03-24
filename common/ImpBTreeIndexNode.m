@@ -8,6 +8,7 @@
 #import "ImpBTreeIndexNode.h"
 
 #import "ImpByteOrder.h"
+#import "ImpPrintf.h"
 #import "ImpBTreeFile.h"
 
 @implementation ImpBTreeIndexNode

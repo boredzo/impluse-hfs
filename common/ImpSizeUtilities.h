@@ -8,6 +8,11 @@
 #ifndef ImpSizeUtilities_h
 #define ImpSizeUtilities_h
 
+#import <sys/types.h>
+#import <hfs/hfs_format.h>
+
+@class NSString;
+
 ///Returns the next number that is less than or equal to size, and is a multiple of factor.
 #define macro_ImpNextMultipleOfSize(size, factor) \
 	( \
