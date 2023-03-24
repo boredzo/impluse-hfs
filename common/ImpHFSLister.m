@@ -32,7 +32,11 @@
 
 		if (loaded) {
 			ImpDehydratedItem *_Nonnull const rootDirectory = [ImpDehydratedItem rootDirectoryOfHFSVolume:srcVol];
-			[rootDirectory printDirectoryHierarchy_asPaths:self.printAbsolutePaths];
+			if (self.inventoryApplications) {
+				[self inventoryApplicationsWithinItem:rootDirectory];
+			} else {
+				[rootDirectory printDirectoryHierarchy_asPaths:self.printAbsolutePaths];
+			}
 			listed = true;
 		}
 	}];
@@ -44,6 +48,37 @@
 	}
 
 	return listed;
+}
+
+- (void) inventoryApplicationsWithinItem:(ImpDehydratedItem *_Nonnull const)rootDirectory {
+	__block bool hasPrintedHeader = false;
+	void (^_Nonnull const printHeaderIfNeeded)(void) = ^(void) {
+		if (! hasPrintedHeader) {
+			ImpPrintf(@"volume_name,application_name,version,creation_date,modification_date,file_type,signature,path");
+			hasPrintedHeader = true;
+		}
+	};
+
+	NSISO8601DateFormatter *_Nonnull const iso8601Fmtr = [NSISO8601DateFormatter new];
+	iso8601Fmtr.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+	[rootDirectory walkBreadthFirst:^(const NSUInteger depth, ImpDehydratedItem *_Nonnull const item) {
+		//TODO: Should we also include 'appe' and 'appc'?
+		if (item.fileTypeCode == 'APPL') {
+			printHeaderIfNeeded();
+			@autoreleasepool {
+				ImpPrintf(@"%@,%@,%@,%@,%@,%@,%@,%@",
+					rootDirectory.name,
+					item.name,
+					item.versionStringFromVersionNumber ?: @"-",
+					item.creationDate,
+					item.modificationDate,
+					NSFileTypeForHFSTypeCode(item.fileTypeCode),
+					NSFileTypeForHFSTypeCode(item.creatorCode),
+					[item.path componentsJoinedByString:@":"]
+				);
+			}
+		}
+	}];
 }
 
 @end

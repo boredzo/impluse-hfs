@@ -14,6 +14,7 @@
 		31077AD1293849EE00066789 /* ImpBTreeIndexNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 31077AD0293849EE00066789 /* ImpBTreeIndexNode.m */; };
 		31077AD42939587400066789 /* NSData+ImpHexDump.m in Sources */ = {isa = PBXBuildFile; fileRef = 31077AD32939587300066789 /* NSData+ImpHexDump.m */; };
 		3135D7782960FFDC001E4890 /* ImpComparisonUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 3135D7772960FFDC001E4890 /* ImpComparisonUtilities.m */; };
+		313CF74A29C8415D00CAA05E /* ImpDehydratedResourceFork.m in Sources */ = {isa = PBXBuildFile; fileRef = 313CF74929C8415D00CAA05E /* ImpDehydratedResourceFork.m */; };
 		314EFFDB2932CF3700CE74E9 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFDA2932CF3700CE74E9 /* main.m */; };
 		314EFFE4293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFE3293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m */; };
 		314EFFE72933160800CE74E9 /* ImpHFSVolume.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFE62933160800CE74E9 /* ImpHFSVolume.m */; };
@@ -25,6 +26,23 @@
 		31A1B58A29B64FB000127C69 /* ImpCatalogBuilder.m in Sources */ = {isa = PBXBuildFile; fileRef = 31A1B58929B64FB000127C69 /* ImpCatalogBuilder.m */; };
 		31A5B1C2296127CB00D8A731 /* ImpHFSAnalyzer.m in Sources */ = {isa = PBXBuildFile; fileRef = 31A5B1C1296127CB00D8A731 /* ImpHFSAnalyzer.m */; };
 		31C6E9D62939CE7D000A87D8 /* ImpPrintf.m in Sources */ = {isa = PBXBuildFile; fileRef = 31C6E9D52939CE7D000A87D8 /* ImpPrintf.m */; };
+		31CD6E7829CC36D70076FEF8 /* TestResourceFork.m in Sources */ = {isa = PBXBuildFile; fileRef = 31CD6E7729CC36D70076FEF8 /* TestResourceFork.m */; };
+		31CD6E7929CC36FF0076FEF8 /* ImpDehydratedItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 31F719B4293ABAAB0055EEA3 /* ImpDehydratedItem.m */; };
+		31CD6E7A29CC36FF0076FEF8 /* ImpDehydratedResourceFork.m in Sources */ = {isa = PBXBuildFile; fileRef = 313CF74929C8415D00CAA05E /* ImpDehydratedResourceFork.m */; };
+		31CD6E7B29CC3A8E0076FEF8 /* ImpPrintf.m in Sources */ = {isa = PBXBuildFile; fileRef = 31C6E9D52939CE7D000A87D8 /* ImpPrintf.m */; };
+		31CD6E7C29CC3AA00076FEF8 /* ImpHFSPlusVolume.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFE929332FEA00CE74E9 /* ImpHFSPlusVolume.m */; };
+		31CD6E7D29CC3AA60076FEF8 /* ImpTextEncodingConverter.m in Sources */ = {isa = PBXBuildFile; fileRef = 31F719B7293AC4230055EEA3 /* ImpTextEncodingConverter.m */; };
+		31CD6E7E29CC3ABB0076FEF8 /* ImpHFSVolume.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFE62933160800CE74E9 /* ImpHFSVolume.m */; };
+		31CD6E7F29CC3B070076FEF8 /* ImpSizeUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 31FD38C32978E29D00B44404 /* ImpSizeUtilities.m */; };
+		31CD6E8029CC3B0C0076FEF8 /* ImpErrorUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 31F719B1293A8FD90055EEA3 /* ImpErrorUtilities.m */; };
+		31CD6E8629CC3BB10076FEF8 /* ImpComparisonUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 3135D7772960FFDC001E4890 /* ImpComparisonUtilities.m */; };
+		31CD6E8729CC3BCE0076FEF8 /* ImpBTreeFile.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFEC29346AB300CE74E9 /* ImpBTreeFile.m */; };
+		31CD6E8829CC3BCE0076FEF8 /* ImpBTreeNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFEF293486BB00CE74E9 /* ImpBTreeNode.m */; };
+		31CD6E8929CC3BCE0076FEF8 /* ImpBTreeHeaderNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFF2293510CE00CE74E9 /* ImpBTreeHeaderNode.m */; };
+		31CD6E8A29CC3BCE0076FEF8 /* ImpBTreeMapNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 3105F1CC29501F5E0062C6F8 /* ImpBTreeMapNode.m */; };
+		31CD6E8B29CC3BCE0076FEF8 /* ImpBTreeIndexNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 31077AD0293849EE00066789 /* ImpBTreeIndexNode.m */; };
+		31CD6E8E29CC3E2A0076FEF8 /* TestData.r in Rez */ = {isa = PBXBuildFile; fileRef = 31CD6E7629CC36BB0076FEF8 /* TestData.r */; };
+		31CD6E8F29CC40150076FEF8 /* NSData+ImpHexDump.m in Sources */ = {isa = PBXBuildFile; fileRef = 31077AD32939587300066789 /* NSData+ImpHexDump.m */; };
 		31D46AC529AEA7D7004B04B7 /* ImpVolumeProbe.m in Sources */ = {isa = PBXBuildFile; fileRef = 31D46AC429AEA7D7004B04B7 /* ImpVolumeProbe.m */; };
 		31F719AF293A8F300055EEA3 /* ImpHFSExtractor.m in Sources */ = {isa = PBXBuildFile; fileRef = 31F719AE293A8F300055EEA3 /* ImpHFSExtractor.m */; };
 		31F719B2293A8FD90055EEA3 /* ImpErrorUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 31F719B1293A8FD90055EEA3 /* ImpErrorUtilities.m */; };
@@ -64,6 +82,8 @@
 		31077AD32939587300066789 /* NSData+ImpHexDump.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSData+ImpHexDump.m"; sourceTree = "<group>"; };
 		3135D7762960FFDC001E4890 /* ImpComparisonUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpComparisonUtilities.h; sourceTree = "<group>"; };
 		3135D7772960FFDC001E4890 /* ImpComparisonUtilities.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpComparisonUtilities.m; sourceTree = "<group>"; };
+		313CF74829C8415D00CAA05E /* ImpDehydratedResourceFork.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpDehydratedResourceFork.h; sourceTree = "<group>"; };
+		313CF74929C8415D00CAA05E /* ImpDehydratedResourceFork.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpDehydratedResourceFork.m; sourceTree = "<group>"; };
 		314EFFD72932CF3700CE74E9 /* impluse-hfs */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "impluse-hfs"; sourceTree = BUILT_PRODUCTS_DIR; };
 		314EFFDA2932CF3700CE74E9 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		314EFFE12932CF5B00CE74E9 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
@@ -91,6 +111,8 @@
 		31C6E9D42939CE7D000A87D8 /* ImpPrintf.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpPrintf.h; sourceTree = "<group>"; };
 		31C6E9D52939CE7D000A87D8 /* ImpPrintf.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpPrintf.m; sourceTree = "<group>"; };
 		31C6E9D72939CF1A000A87D8 /* Prefix.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Prefix.h; sourceTree = "<group>"; };
+		31CD6E7629CC36BB0076FEF8 /* TestData.r */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.rez; path = TestData.r; sourceTree = "<group>"; };
+		31CD6E7729CC36D70076FEF8 /* TestResourceFork.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TestResourceFork.m; sourceTree = "<group>"; };
 		31D46AC329AEA7D7004B04B7 /* ImpVolumeProbe.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpVolumeProbe.h; sourceTree = "<group>"; };
 		31D46AC429AEA7D7004B04B7 /* ImpVolumeProbe.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpVolumeProbe.m; sourceTree = "<group>"; };
 		31F719AD293A8F300055EEA3 /* ImpHFSExtractor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpHFSExtractor.h; sourceTree = "<group>"; };
@@ -193,6 +215,8 @@
 				314EFFF62936D80D00CE74E9 /* ImpExtentSeries.m */,
 				31F719B3293ABAAB0055EEA3 /* ImpDehydratedItem.h */,
 				31F719B4293ABAAB0055EEA3 /* ImpDehydratedItem.m */,
+				313CF74829C8415D00CAA05E /* ImpDehydratedResourceFork.h */,
+				313CF74929C8415D00CAA05E /* ImpDehydratedResourceFork.m */,
 				314EFFE2293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.h */,
 				314EFFE3293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m */,
 				3105F1C4294574160062C6F8 /* ImpDefragmentingHFSToHFSPlusConverter.h */,
@@ -221,6 +245,8 @@
 			isa = PBXGroup;
 			children = (
 				31F719C3293D4C5F0055EEA3 /* TestDangerouslyFastSubdata.m */,
+				31CD6E7629CC36BB0076FEF8 /* TestData.r */,
+				31CD6E7729CC36D70076FEF8 /* TestResourceFork.m */,
 			);
 			path = UnitTests;
 			sourceTree = "<group>";
@@ -251,6 +277,7 @@
 			buildPhases = (
 				31F719BD293D4C5F0055EEA3 /* Sources */,
 				31F719BE293D4C5F0055EEA3 /* Frameworks */,
+				31CD6E8D29CC3E220076FEF8 /* Rez */,
 				31F719BF293D4C5F0055EEA3 /* Resources */,
 			);
 			buildRules = (
@@ -308,6 +335,17 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXRezBuildPhase section */
+		31CD6E8D29CC3E220076FEF8 /* Rez */ = {
+			isa = PBXRezBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				31CD6E8E29CC3E2A0076FEF8 /* TestData.r in Rez */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXRezBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		314EFFD32932CF3700CE74E9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -335,6 +373,7 @@
 				314EFFDB2932CF3700CE74E9 /* main.m in Sources */,
 				31C6E9D62939CE7D000A87D8 /* ImpPrintf.m in Sources */,
 				3105F1CD29501F5E0062C6F8 /* ImpBTreeMapNode.m in Sources */,
+				313CF74A29C8415D00CAA05E /* ImpDehydratedResourceFork.m in Sources */,
 				31F719BC293D1FC40055EEA3 /* NSData+ImpSubdata.m in Sources */,
 				31F719AF293A8F300055EEA3 /* ImpHFSExtractor.m in Sources */,
 				3105F1CA294EE34B0062C6F8 /* ImpMutableBTreeFile.m in Sources */,
@@ -345,8 +384,24 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				31CD6E8F29CC40150076FEF8 /* NSData+ImpHexDump.m in Sources */,
+				31CD6E8629CC3BB10076FEF8 /* ImpComparisonUtilities.m in Sources */,
+				31CD6E8029CC3B0C0076FEF8 /* ImpErrorUtilities.m in Sources */,
+				31CD6E7F29CC3B070076FEF8 /* ImpSizeUtilities.m in Sources */,
 				31F719C8293D4C8E0055EEA3 /* NSData+ImpSubdata.m in Sources */,
+				31CD6E7B29CC3A8E0076FEF8 /* ImpPrintf.m in Sources */,
+				31CD6E7D29CC3AA60076FEF8 /* ImpTextEncodingConverter.m in Sources */,
+				31CD6E8729CC3BCE0076FEF8 /* ImpBTreeFile.m in Sources */,
+				31CD6E8829CC3BCE0076FEF8 /* ImpBTreeNode.m in Sources */,
+				31CD6E8929CC3BCE0076FEF8 /* ImpBTreeHeaderNode.m in Sources */,
+				31CD6E8A29CC3BCE0076FEF8 /* ImpBTreeMapNode.m in Sources */,
+				31CD6E8B29CC3BCE0076FEF8 /* ImpBTreeIndexNode.m in Sources */,
+				31CD6E7E29CC3ABB0076FEF8 /* ImpHFSVolume.m in Sources */,
+				31CD6E7C29CC3AA00076FEF8 /* ImpHFSPlusVolume.m in Sources */,
+				31CD6E7929CC36FF0076FEF8 /* ImpDehydratedItem.m in Sources */,
+				31CD6E7A29CC36FF0076FEF8 /* ImpDehydratedResourceFork.m in Sources */,
 				31F719C4293D4C5F0055EEA3 /* TestDangerouslyFastSubdata.m in Sources */,
+				31CD6E7829CC36D70076FEF8 /* TestResourceFork.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

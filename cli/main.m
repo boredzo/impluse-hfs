@@ -86,6 +86,7 @@ int main(int argc, const char * argv[]) {
 
 - (void) list:(NSEnumerator <NSString *> *_Nonnull const)argsEnum {
 	bool printAbsolutePaths = false;
+	bool inventoryApplications = false;
 	NSString *_Nullable srcDevPath = nil;
 	NSNumber *_Nullable defaultEncoding = nil;
 	bool expectsEncoding = false;
@@ -95,6 +96,8 @@ int main(int argc, const char * argv[]) {
 			expectsEncoding = false;
 		} else if ((srcDevPath == nil) && [arg isEqualToString:@"--paths"]) {
 			printAbsolutePaths = true;
+		} else if ([arg isEqualToString:@"--application-inventory"] || [arg isEqualToString:@"--app-inventory"]) {
+			inventoryApplications = true;
 		} else if ((defaultEncoding == nil) && [arg hasPrefix:@"--encoding"]) {
 			if ([arg hasPrefix:@"--encoding="]) {
 				//--encoding=42
@@ -116,6 +119,7 @@ int main(int argc, const char * argv[]) {
 	ImpHFSLister *_Nonnull const lister = [ImpHFSLister new];
 	lister.sourceDevice = [NSURL fileURLWithPath:srcDevPath isDirectory:false];
 	lister.printAbsolutePaths = printAbsolutePaths;
+	lister.inventoryApplications = inventoryApplications;
 	if (defaultEncoding != nil) {
 		lister.hfsTextEncoding = (TextEncoding)defaultEncoding.integerValue;
 	}
