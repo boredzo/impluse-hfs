@@ -7,6 +7,8 @@
 
 #import <Foundation/Foundation.h>
 
+#import "ImpForkUtilities.h"
+
 @class ImpHFSVolume;
 @class ImpHFSPlusVolume;
 

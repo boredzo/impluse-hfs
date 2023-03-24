@@ -8,6 +8,8 @@
 #import "ImpHFSPlusVolume.h"
 
 #import "NSData+ImpSubdata.h"
+#import "ImpByteOrder.h"
+#import "ImpPrintf.h"
 #import "ImpSizeUtilities.h"
 
 #import <sys/stat.h>

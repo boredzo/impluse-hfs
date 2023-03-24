@@ -8,6 +8,7 @@
 #import "ImpHFSVolume.h"
 
 #import "ImpByteOrder.h"
+#import "ImpPrintf.h"
 #import "ImpSizeUtilities.h"
 #import "ImpForkUtilities.h"
 #import "NSData+ImpSubdata.h"

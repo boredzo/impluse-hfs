@@ -8,6 +8,7 @@
 #import "ImpTextEncodingConverter.h"
 
 #import "ImpPrintf.h"
+#import "ImpByteOrder.h"
 #import "ImpErrorUtilities.h"
 
 enum {

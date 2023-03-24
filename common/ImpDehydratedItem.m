@@ -8,6 +8,8 @@
 #import "ImpDehydratedItem.h"
 
 #import "ImpTextEncodingConverter.h"
+#import "ImpByteOrder.h"
+#import "ImpPrintf.h"
 
 #import "ImpHFSVolume.h"
 #import "ImpHFSPlusVolume.h"
