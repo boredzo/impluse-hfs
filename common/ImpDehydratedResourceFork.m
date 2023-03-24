@@ -204,9 +204,6 @@ enum {
 	return nil;
 }
 - (NSData *_Nullable) resourceOfType:(ResType const)type ID:(ResID const)resID {
-	if (_forkData.length == 12288) {
-		NSLog(@"WARNING: Resource fork contains no resources!!!"); //TEMP
-	}
 	struct ResReferenceListEntry const *_Nullable refList = NULL;
 	NSUInteger const numResourcesOfThisType = [self findResourcesOfType:type getReferenceList:&refList];
 	if (refList == NULL) {
