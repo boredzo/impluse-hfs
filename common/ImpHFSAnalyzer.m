@@ -11,6 +11,7 @@
 #import "ImpTextEncodingConverter.h"
 
 #import "ImpHFSVolume.h"
+#import "ImpHFSVolume+ConsistencyChecking.h"
 #import "ImpHFSPlusVolume.h"
 #import "ImpVolumeProbe.h"
 #import "ImpBTreeFile.h"
@@ -124,6 +125,10 @@
 
 	if (! [srcVol readCatalogFileFromFileDescriptor:srcVol.fileDescriptor error:outError]) {
 		ImpPrintf(@"Failed to read catalog file: %@", (*outError).localizedDescription);
+		return false;
+	}
+	if ( ! [srcVol checkCatalogFile:outError]) {
+		ImpPrintf(@"Faults detected in catalog file: %@", (*outError).localizedDescription);
 		return false;
 	}
 	ImpPrintf(@"Catalog file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", srcVol.catalogBTree.numberOfLiveNodes, srcVol.catalogBTree.numberOfPotentialNodes, srcVol.catalogBTree.numberOfPotentialNodes > 0 ? (srcVol.catalogBTree.numberOfLiveNodes / (double)srcVol.catalogBTree.numberOfPotentialNodes) * 100.0 : 1.0);

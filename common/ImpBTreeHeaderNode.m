@@ -13,6 +13,9 @@
 @interface ImpBTreeHeaderNode ()
 
 @property(readwrite) u_int16_t treeDepth;
+@property(readwrite) u_int32_t rootNodeIndex;
+@property(readwrite) u_int32_t firstLeafNodeIndex;
+@property(readwrite) u_int32_t lastLeafNodeIndex;
 @property(readwrite) u_int32_t numberOfLeafRecords;
 @property(readwrite) u_int16_t bytesPerNode;
 @property(readwrite) u_int16_t maxKeyLength;
@@ -33,11 +36,6 @@
 @end
 
 @implementation ImpBTreeHeaderNode
-{
-	u_int32_t _rootNodeIndex;
-	u_int32_t _firstLeafNodeIndex;
-	u_int32_t _lastLeafNodeIndex;
-}
 
 - (instancetype _Nullable) initWithTree:(ImpBTreeFile *_Nonnull const)tree data:(NSData *_Nonnull const)nodeData copy:(bool const)shouldCopyData mutable:(bool const)dataShouldBeMutable {
 	if ((self = [super initWithTree:tree data:nodeData copy:shouldCopyData mutable:dataShouldBeMutable])) {
@@ -58,10 +56,10 @@
 
 	self.treeDepth = L(headerRec->treeDepth);
 
-	_rootNodeIndex = L(headerRec->rootNode);
+	self.rootNodeIndex = L(headerRec->rootNode);
 	self.numberOfLeafRecords = L(headerRec->leafRecords);
-	_firstLeafNodeIndex = L(headerRec->firstLeafNode);
-	_lastLeafNodeIndex = L(headerRec->lastLeafNode);
+	self.firstLeafNodeIndex = L(headerRec->firstLeafNode);
+	self.lastLeafNodeIndex = L(headerRec->lastLeafNode);
 
 	self.bytesPerNode = L(headerRec->nodeSize);
 	self.maxKeyLength = L(headerRec->maxKeyLength);
@@ -352,14 +350,14 @@
 }
 
 - (ImpBTreeNode *_Nonnull const) rootNode {
-	return [self.tree nodeAtIndex:_rootNodeIndex];
+	return [self.tree nodeAtIndex:self.rootNodeIndex];
 }
 
 - (ImpBTreeNode *_Nonnull const) firstLeafNode {
-	return [self.tree nodeAtIndex:_firstLeafNodeIndex];
+	return [self.tree nodeAtIndex:self.firstLeafNodeIndex];
 }
 - (ImpBTreeNode *_Nonnull const) lastLeafNode {
-	return [self.tree nodeAtIndex:_lastLeafNodeIndex];
+	return [self.tree nodeAtIndex:self.lastLeafNodeIndex];
 }
 
 - (void) reviseHeaderRecord:(void (^_Nonnull const)(struct BTHeaderRec *_Nonnull const))block {
@@ -382,4 +380,5 @@
 	NSAssert(self.numberOfRecords <= 3, @"Attempt to append records to a header node beyond the requisite three. Something is deeply wrong!");
 	return [super appendRecordWithData:data];
 }
+
 @end

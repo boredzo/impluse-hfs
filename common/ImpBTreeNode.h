@@ -45,6 +45,11 @@
 @property(readonly) u_int8_t nodeHeight;
 @property(readonly) u_int16_t numberOfRecords;
 
+///Returns true if the node's backward link is 0 (non-reference) or an index that is within the bounds of the tree. Returns false if it is an index out of bounds.
+- (bool) validateLinkToPreviousNode;
+///Returns true if the node's forward link is 0 (non-reference) or an index that is within the bounds of the tree. Returns false if it is an index out of bounds.
+- (bool) validateLinkToNextNode;
+
 @property(nonatomic, readonly) ImpBTreeNode *_Nullable previousNode;
 @property(nonatomic, readonly) ImpBTreeNode *_Nullable nextNode;
 

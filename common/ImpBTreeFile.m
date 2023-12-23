@@ -235,6 +235,10 @@
 	return false;
 }
 
+- (bool) isValidIndex:(u_int32_t const)nodeIndex {
+	return nodeIndex == 0 || nodeIndex < self.numberOfPotentialNodes;
+}
+
 - (ImpBTreeNode *_Nonnull const) nodeAtIndex:(u_int32_t const)idx {
 	if (idx >= _numPotentialNodes) {
 		//This will throw a range exception.

@@ -114,12 +114,21 @@
 
 #pragma mark Node connections
 
+- (bool) validateLink:(u_int32_t const)nodeIndex {
+	return [self.tree isValidIndex:nodeIndex];
+}
+- (bool) validateLinkToPreviousNode {
+	return [self validateLink:self.backwardLink];
+}
 - (ImpBTreeNode *_Nullable) previousNode {
 	u_int32_t const bLink = self.backwardLink;
 	if (bLink > 0) {
 		return [self.tree nodeAtIndex:bLink];
 	}
 	return nil;
+}
+- (bool) validateLinkToNextNode {
+	return [self validateLink:self.forwardLink];
 }
 - (ImpBTreeNode *_Nullable) nextNode {
 	u_int32_t const fLink = self.forwardLink;

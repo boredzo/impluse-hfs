@@ -52,6 +52,9 @@
 ///Returns the first node in the file if there is one and it is a header node. Otherwise, returns nil.
 - (ImpBTreeHeaderNode *_Nullable const) headerNode;
 
+///Returns true if the index is 0 (non-reference) or an index that is within the bounds of the tree. Returns false if it is an index out of bounds.
+- (bool) isValidIndex:(u_int32_t const)nodeIndex;
+
 - (ImpBTreeNode *_Nonnull const) nodeAtIndex:(u_int32_t const)idx;
 
 ///This is meant for the mutable subclass's use.

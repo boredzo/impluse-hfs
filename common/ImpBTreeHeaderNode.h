@@ -13,6 +13,14 @@
 @interface ImpBTreeHeaderNode : ImpBTreeMapNode
 
 @property(readonly) u_int16_t treeDepth;
+
+///Most clients should use the node properties. This is mainly here for consistency-checking.
+@property(readonly) u_int32_t rootNodeIndex;
+///Most clients should use the node properties. This is mainly here for consistency-checking.
+@property(readonly) u_int32_t firstLeafNodeIndex;
+///Most clients should use the node properties. This is mainly here for consistency-checking.
+@property(readonly) u_int32_t lastLeafNodeIndex;
+
 @property(nonatomic, readonly) ImpBTreeNode *_Nonnull const rootNode;
 @property(readonly) u_int32_t numberOfLeafRecords;
 @property(nonatomic, readonly) ImpBTreeNode *_Nonnull const firstLeafNode;
