@@ -147,12 +147,24 @@
 	//>All the areas on a volume are of fixed size and location, except for the catalog file and the extents overflow file. These two files can appear anywhere between the volume bitmap and the alternate master directory block (MDB). They can appear in any order and are not necessarily contiguous.
 	//So we essentially have to treat the cat file as a file.
 	//TODO: We may also need to load further extents from the extents overflow file, if the catalog is particularly fragmented. Only using the extent record in the volume header may lead to only having part of the catalog.
-
 	struct HFSExtentDescriptor const *_Nonnull const catExtDescs = _mdb->drCTExtRec;
-	NSData *_Nullable const catalogFileData = [self readDataFromFileDescriptor:readFD logicalLength:L(_mdb->drCTFlSize) extents:catExtDescs numExtents:kHFSExtentDensity error:outError];
-//	ImpPrintf(@"Catalog file data: logical length 0x%x bytes (%lu a-blocks); read 0x%lx bytes", L(_mdb->drCTFlSize), catalogFileData.length / L(_mdb->drAlBlkSiz), catalogFileData.length);
+	u_int64_t const catFileLen = L(_mdb->drCTFlSize);
+	NSMutableData *_Nonnull const catalogFileData = [NSMutableData dataWithCapacity:ImpNumberOfBlocksInHFSExtentRecord(catExtDescs) * L(_mdb->drAlBlkSiz)];
+	__block u_int32_t numExtents = 0;
+	[self forEachExtentInFileWithID:kHFSCatalogFileID
+							   fork:ImpForkTypeData
+				  forkLogicalLength:catFileLen
+		  startingWithExtentsRecord:catExtDescs
+			  readDataOrReturnError:outError
+							  block:^bool(NSData *const  _Nonnull fileData, const u_int64_t logicalLength) {
+		[catalogFileData appendData:fileData];
+		++numExtents;
+		return true;
+	}];
+	ImpPrintf(@"Catalog file spanned %u extents", numExtents);
 
-	if (catalogFileData != nil) {
+	bool const successfullyReadCatalog = catalogFileData != nil && catalogFileData.length > 0;
+	if (successfullyReadCatalog) {
 		self.catalogBTree = [[ImpBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSCatalog data:catalogFileData];
 		if (self.catalogBTree == nil) {
 			NSError *_Nonnull const noCatalogFileError = [NSError errorWithDomain:NSOSStatusErrorDomain code:badMDBErr userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Catalog file was invalid, corrupt, or not where the volume header said it would be", @"") }];
@@ -163,7 +175,7 @@
 	}
 //	ImpPrintf(@"Catalog file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", self.catalogBTree.numberOfLiveNodes, self.catalogBTree.numberOfPotentialNodes, self.catalogBTree.numberOfPotentialNodes > 0 ? (self.catalogBTree.numberOfLiveNodes / (double)self.catalogBTree.numberOfPotentialNodes) * 100.0 : 1.0);
 
-	return (self.catalogBTree != nil);
+	return successfullyReadCatalog;
 }
 
 - (bool)readExtentsOverflowFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
