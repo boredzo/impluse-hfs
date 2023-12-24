@@ -492,6 +492,7 @@
 	u_int32_t const numAllBlocks = L(_vh->totalBlocks);
 
 	bool fulfilled = false;
+	bool const verboseAllocation = false;
 
 	struct HFSPlusExtentDescriptor backupExtent = *outExt;
 	u_int32_t const existingSizeOfExtent = L(outExt->blockCount);
@@ -505,19 +506,19 @@
 		//First search for a big enough opening to satisfy the request. If there isn't one, take any opening we can find. (If the volume is fragmented, we may be able to cobble together multiple openings. If not, taking the last remaining available blocks but still needing more only delays inevitable failure.)
 		fulfilled = [self findBlocksForward:requestedBlocks inRange:firstSearchRange acceptPartial:false getExtent:outExt];
 		if (fulfilled) {
-			ImpPrintf(@"Successfully allocated { %u, %u } from a sufficient opening in the latter half", L(outExt->startBlock), L(outExt->blockCount));
+			if (verboseAllocation) ImpPrintf(@"Successfully allocated { %u, %u } from a sufficient opening in the latter half", L(outExt->startBlock), L(outExt->blockCount));
 		} else {
 			fulfilled = [self findBlocksForward:requestedBlocks inRange:secondSearchRange acceptPartial:false getExtent:outExt];
 			if (fulfilled) {
-				ImpPrintf(@"Successfully allocated { %u, %u } from a sufficient opening in the former half", L(outExt->startBlock), L(outExt->blockCount));
+				if (verboseAllocation) ImpPrintf(@"Successfully allocated { %u, %u } from a sufficient opening in the former half", L(outExt->startBlock), L(outExt->blockCount));
 			} else {
 				fulfilled = [self findBlocksForward:requestedBlocks inRange:firstSearchRange acceptPartial:true getExtent:outExt];
 				if (fulfilled) {
-					ImpPrintf(@"Successfully allocated { %u, %u } from a partial opening in the latter half", L(outExt->startBlock), L(outExt->blockCount));
+					if (verboseAllocation) ImpPrintf(@"Successfully allocated { %u, %u } from a partial opening in the latter half", L(outExt->startBlock), L(outExt->blockCount));
 				} else {
 					fulfilled = [self findBlocksForward:requestedBlocks inRange:secondSearchRange acceptPartial:true getExtent:outExt];
 					if (fulfilled) {
-						ImpPrintf(@"Successfully allocated { %u, %u } from a partial opening in the former half", L(outExt->startBlock), L(outExt->blockCount));
+						if (verboseAllocation) ImpPrintf(@"Successfully allocated { %u, %u } from a partial opening in the former half", L(outExt->startBlock), L(outExt->blockCount));
 					} else {
 						ImpPrintf(@"Failed to allocate %u blocks", requestedBlocks);
 					}
