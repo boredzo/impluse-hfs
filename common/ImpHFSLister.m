@@ -55,8 +55,23 @@
 }
 
 - (bool) shouldIncludeItemInInventory:(ImpDehydratedItem *_Nonnull const)item {
-	//TODO: Should we also include 'appe' and 'appc'?
-	return (item.fileTypeCode == 'APPL');
+	OSType const type = item.fileTypeCode;
+	bool const includeApps = self.inventoryApplications;
+	bool const includeInits = self.inventoryExtensions;
+	bool const includeCdevs = self.inventoryControlPanels;
+	bool const includeShLibs = self.inventorySharedLibraries;
+	return (false
+		|| (includeApps && (type == 'APPL'))
+
+		|| (includeInits && (type == 'INIT'))
+		|| (includeInits && (type == 'appe'))
+
+		|| (includeCdevs && (type == 'cdev'))
+		|| (includeCdevs && (type == 'appc'))
+
+		|| (includeShLibs && (type == 'shlb'))
+		|| (includeShLibs && (type == 'libr'))
+	);
 }
 
 - (void) inventoryInterestingItemsWithinItem:(ImpDehydratedItem *_Nonnull const)rootDirectory {

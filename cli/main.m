@@ -87,6 +87,9 @@ int main(int argc, const char * argv[]) {
 - (void) list:(NSEnumerator <NSString *> *_Nonnull const)argsEnum {
 	bool printAbsolutePaths = false;
 	bool inventoryApplications = false;
+	bool inventoryExtensions = false;
+	bool inventoryControlPanels = false;
+	bool inventorySharedLibraries = false;
 	NSString *_Nullable srcDevPath = nil;
 	NSNumber *_Nullable defaultEncoding = nil;
 	bool expectsEncoding = false;
@@ -98,6 +101,13 @@ int main(int argc, const char * argv[]) {
 			printAbsolutePaths = true;
 		} else if ([arg isEqualToString:@"--application-inventory"] || [arg isEqualToString:@"--app-inventory"]) {
 			inventoryApplications = true;
+		} else if ([arg isEqualToString:@"--inventory"]) {
+			//TODO: Support --inventory=applications,extensions or some such.
+		} else if ([arg isEqualToString:@"--full-inventory"]) {
+			inventoryApplications = true;
+			inventoryExtensions = true;
+			inventoryControlPanels = true;
+			inventorySharedLibraries = true;
 		} else if ((defaultEncoding == nil) && [arg hasPrefix:@"--encoding"]) {
 			if ([arg hasPrefix:@"--encoding="]) {
 				//--encoding=42
@@ -120,6 +130,9 @@ int main(int argc, const char * argv[]) {
 	lister.sourceDevice = [NSURL fileURLWithPath:srcDevPath isDirectory:false];
 	lister.printAbsolutePaths = printAbsolutePaths;
 	lister.inventoryApplications = inventoryApplications;
+	lister.inventoryExtensions = inventoryExtensions;
+	lister.inventoryControlPanels = inventoryControlPanels;
+	lister.inventorySharedLibraries = inventorySharedLibraries;
 	if (defaultEncoding != nil) {
 		lister.hfsTextEncoding = (TextEncoding)defaultEncoding.integerValue;
 	}
