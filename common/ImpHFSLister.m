@@ -24,6 +24,8 @@
 		return false;
 	}
 
+	bool const userWantsCSVInventory = self.inventoryApplications;
+
 	__block bool listed = false;
 	__block NSError *_Nullable volumeLoadError = nil;
 
@@ -34,8 +36,8 @@
 
 		if (loaded) {
 			ImpDehydratedItem *_Nonnull const rootDirectory = [ImpDehydratedItem rootDirectoryOfHFSVolume:srcVol];
-			if (self.inventoryApplications) {
-				[self inventoryApplicationsWithinItem:rootDirectory];
+			if (userWantsCSVInventory) {
+				[self inventoryInterestingItemsWithinItem:rootDirectory];
 			} else {
 				[rootDirectory printDirectoryHierarchy_asPaths:self.printAbsolutePaths];
 			}
@@ -52,7 +54,12 @@
 	return listed;
 }
 
-- (void) inventoryApplicationsWithinItem:(ImpDehydratedItem *_Nonnull const)rootDirectory {
+- (bool) shouldIncludeItemInInventory:(ImpDehydratedItem *_Nonnull const)item {
+	//TODO: Should we also include 'appe' and 'appc'?
+	return (item.fileTypeCode == 'APPL');
+}
+
+- (void) inventoryInterestingItemsWithinItem:(ImpDehydratedItem *_Nonnull const)rootDirectory {
 	NSArray <NSString *> *_Nonnull const columns = @[
 		@"volume_name",
 		@"application_name",
@@ -67,9 +74,10 @@
 
 	NSISO8601DateFormatter *_Nonnull const iso8601Fmtr = [NSISO8601DateFormatter new];
 	iso8601Fmtr.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+	__weak __typeof(self) weakSelf = self;
 	[rootDirectory walkBreadthFirst:^(const NSUInteger depth, ImpDehydratedItem *_Nonnull const item) {
-		//TODO: Should we also include 'appe' and 'appc'?
-		if (item.fileTypeCode == 'APPL') {
+		__strong __typeof(weakSelf) strongSelf = weakSelf;
+		if ([strongSelf shouldIncludeItemInInventory:item]) {
 			@autoreleasepool {
 				[csvProducer writeRow:@[
 					rootDirectory.name,
