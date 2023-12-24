@@ -161,7 +161,6 @@
 		++numExtents;
 		return true;
 	}];
-	ImpPrintf(@"Catalog file spanned %u extents", numExtents);
 
 	bool const successfullyReadCatalog = catalogFileData != nil && catalogFileData.length > 0;
 	if (successfullyReadCatalog) {
