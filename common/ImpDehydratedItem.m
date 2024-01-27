@@ -19,7 +19,7 @@
 
 typedef NS_ENUM(u_int64_t, ImpVolumeSizeThreshold) {
 	//Rough estimates just for icon selection purposes.
-	floppyMaxSize = 2 * 1024,
+	floppyMaxSize = 2 * 1048576,
 	cdMaxSize = 700 * 1048576,
 	dvdMaxSize = 10ULL * 1048576ULL * 1024ULL,
 };
