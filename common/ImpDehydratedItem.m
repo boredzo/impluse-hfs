@@ -797,7 +797,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 				ImpPrintf(@"Rehydrating descendant 📁 “%@”", subfolderName);
 				bool const rehydrated = [dehydratedSubfolder rehydrateFolderAtRealWorldURL:subfolderURL error:&rehydrationError];
 				if (! rehydrated) {
-					ImpPrintf(@"%@ in rehydrating descendant 📄 “%@”", rehydrated ? @"Success" : @"Failure", subfolderName);
+					ImpPrintf(@"%@ in rehydrating descendant 📁 “%@”", rehydrated ? @"Success" : @"Failure", subfolderName);
 					anyRehydrationFailed = true;
 				}
 				return rehydrated;
