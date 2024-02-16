@@ -14,6 +14,7 @@
 #import "ImpByteOrder.h"
 #import "ImpSizeUtilities.h"
 #import "ImpErrorUtilities.h"
+#import "NSData+ImpMultiplication.h"
 #import "ImpHFSVolume.h"
 #import "ImpHFSPlusVolume.h"
 #import "ImpVolumeProbe.h"
@@ -27,10 +28,43 @@
 
 @implementation ImpHFSToHFSPlusConverter
 {
+	NSData *_placeholderForkData;
 	TextEncoding _hfsTextEncoding, _hfsPlusTextEncoding;
 	TextToUnicodeInfo _ttui;
 	int _readFD, _writeFD;
 	bool _hasReportedPostVolumeLength;
+}
+
++ (NSData *_Nonnull const) placeholderForkData {
+	static NSData *_Nullable placeholderForkData = nil;
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+		static char bytes[513] =
+			"This block is in a file that was copied from an HFS volume using impluse. impluse was told to not copy fork data, so it wrote this message instead. You should see it repeated throughout each and every occupied block in every copied file.\x0d"
+			"\x0d"
+			"Any files not containing this message were not copied, but were created directly on this volume after conversion.\x0d"
+			"\x0d"
+			"Resource forks will not work. Applications will not launch, custom icons will be missing, and the desktop database may need to be rebuilt.\x0d"
+			"\x0d"
+			"Message repeats\xc9\x0d" /*Note: \xc9 is the ellipsis character, …, in MacRoman*/
+			"\x0d";
+		size_t const stringLength = strlen(bytes);
+		NSAssert(stringLength == 512, @"Incorrect placeholder text length: %zu", stringLength);
+		placeholderForkData = [NSData dataWithBytesNoCopy:bytes length:stringLength freeWhenDone:false];
+	});
+	return placeholderForkData;
+}
+
+- (NSData *_Nonnull const) placeholderForkData {
+	if (_placeholderForkData == nil) {
+		NSData *_Nonnull const oneBlockPlaceholder = [[self class] placeholderForkData];
+		NSUInteger const srcBlockSize = self.sourceVolume.numberOfBytesPerBlock;
+		NSAssert(srcBlockSize > 0, @"Can't build placeholder fork data until source volume's block size is known");
+		NSUInteger const multiplier = srcBlockSize / oneBlockPlaceholder.length;
+		_placeholderForkData = [oneBlockPlaceholder times_Imp:multiplier];
+		NSLog(@"Placeholder size: %lu bytes", _placeholderForkData.length);
+	}
+	return _placeholderForkData;
 }
 
 - (instancetype _Nonnull)init {

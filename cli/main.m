@@ -146,6 +146,7 @@ int main(int argc, const char * argv[]) {
 }
 - (void) convert:(NSEnumerator <NSString *> *_Nonnull const)argsEnum {
 	NSNumber *_Nullable defaultEncoding = nil;
+	bool copyForkData = true;
 	bool expectsEncoding = false;
 	NSMutableArray *_Nonnull const devicePaths = [NSMutableArray arrayWithCapacity:2];
 	for (NSString *_Nonnull const arg in argsEnum) {
@@ -160,6 +161,10 @@ int main(int argc, const char * argv[]) {
 				//--encoding 42
 				expectsEncoding = true;
 			}
+		} else if ([arg isEqualToString:@"--no-copy-fork-data"]) {
+			copyForkData = false;
+		} else if ([arg isEqualToString:@"--copy-fork-data"]) {
+			copyForkData = true;
 		} else if (devicePaths.count < 2) {
 			[devicePaths addObject:arg];
 		} else {
@@ -183,6 +188,7 @@ int main(int argc, const char * argv[]) {
 	if (defaultEncoding != nil) {
 		converter.hfsTextEncoding = (TextEncoding)defaultEncoding.integerValue;
 	}
+	converter.copyForkData = copyForkData;
 	converter.conversionProgressUpdateBlock = ^(double progress, NSString * _Nonnull operationDescription) {
 		ImpPrintf(@"%u%%: %@", (unsigned)round(100.0 * progress), operationDescription);
 	};

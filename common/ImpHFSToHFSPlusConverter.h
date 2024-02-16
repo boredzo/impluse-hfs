@@ -21,6 +21,13 @@ typedef void (^ImpConversionProgressUpdateBlock)(double progress, NSString *_Non
 ///Which encoding to interpret HFS volume, folder, and file names as. Defaults to MacRoman.
 @property TextEncoding hfsTextEncoding;
 
+///Whether to copy data blocks assigned to files' data and resource forks. Default is true. If false, forks will be filled in with placeholder data.
+///WARNING: SETTING THIS TO FALSE IS LITERALLY ASKING TO LOSE DATA.
+@property bool copyForkData;
+
+///Data to fill in non-copied fork data blocks with. Not used in normal operation; only used when copyForkData is false.
+@property(readonly) NSData *_Nonnull const placeholderForkData;
+
 ///Initialized during step 1 of conversion (the volume header) to the source volume's number of blocks used.
 @property(readwrite) NSUInteger numberOfSourceBlocksToCopy;
 ///The number of blocks from the source volume that have been copied.

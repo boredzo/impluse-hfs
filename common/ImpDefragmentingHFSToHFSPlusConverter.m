@@ -9,6 +9,7 @@
 
 #import "ImpTextEncodingConverter.h"
 #import "ImpSizeUtilities.h"
+#import "NSData+ImpMultiplication.h"
 #import "ImpHFSVolume.h"
 #import "ImpHFSPlusVolume.h"
 #import "ImpBTreeFile.h"
@@ -129,6 +130,8 @@
 //	ImpPrintf(@"Extents overflow file will be %llu bytes in %u blocks", L(vh->extentsFile.logicalSize), L(vh->extentsFile.totalBlocks));
 
 	__block bool copiedEverything = true;
+	bool const copyForkData = self.copyForkData;
+	NSData *_Nullable const placeholderForkData = copyForkData ? nil : self.placeholderForkData;
 
 	//Copy all the files over.
 	[srcCatalog walkLeafNodes:^bool(ImpBTreeNode *const _Nonnull srcLeafNode) {
@@ -169,8 +172,9 @@
 				block:^bool(NSData *const  _Nonnull fileData, const u_int64_t logicalLength)
 			{
 //				ImpPrintf(@"Read file data: %lu physical bytes (%llu length remaining)", fileData.length, logicalLength);
-				totalDataBlocksRead += ImpCeilingDivide(fileData.length, bytesPerSourceABlock);
-				NSInteger const bytesWrittenThisTime = [dataFH writeData:fileData error:&dataWriteError];
+				NSUInteger const numBlocksThisRead = ImpCeilingDivide(fileData.length, bytesPerSourceABlock);
+				totalDataBlocksRead += numBlocksThisRead;
+				NSInteger const bytesWrittenThisTime = [dataFH writeData:copyForkData ? fileData : [placeholderForkData times_Imp:numBlocksThisRead] error:&dataWriteError];
 //				ImpPrintf(@"Wrote file data: %ld bytes", (long)bytesWrittenThisTime);
 				if (bytesWrittenThisTime >= 0) {
 					totalDataBytesWritten += bytesWrittenThisTime;
@@ -215,8 +219,9 @@
 				readDataOrReturnError:&rsrcReadError
 				block:^bool(NSData *const  _Nonnull fileData, const u_int64_t logicalLength)
 			{
-				totalRsrcBlocksRead += ImpCeilingDivide(fileData.length, bytesPerSourceABlock);
-				NSInteger const bytesWrittenThisTime = [rsrcFH writeData:fileData error:&rsrcWriteError];
+				NSUInteger const numBlocksThisRead = ImpCeilingDivide(fileData.length, bytesPerSourceABlock);
+				totalRsrcBlocksRead += numBlocksThisRead;
+				NSInteger const bytesWrittenThisTime = [rsrcFH writeData:copyForkData ? fileData : [placeholderForkData times_Imp:numBlocksThisRead] error:&rsrcWriteError];
 				if (bytesWrittenThisTime >= 0) {
 					totalRsrcBytesWritten += bytesWrittenThisTime;
 					return true;
