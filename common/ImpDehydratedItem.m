@@ -7,6 +7,8 @@
 
 #import "ImpDehydratedItem.h"
 
+#import <os/overflow.h>
+
 #import "ImpTextEncodingConverter.h"
 #import "ImpByteOrder.h"
 #import "ImpPrintf.h"
@@ -1016,17 +1018,36 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		}
 	);
 
+	ImpHFSVolume *_Nullable const volume = self.hfsVolume;
+
 	ImpDehydratedItem *_Nonnull const rootDirectory = self;
 	ImpPrintf(@"Volume name:\t%@", rootDirectory.name);
 	ImpPrintf(@"Created:\t%@", rootDirectory.creationDate);
 	ImpPrintf(@"Last modified:\t%@", rootDirectory.modificationDate);
+
+	NSByteCountFormatter *_Nonnull const bcf = [NSByteCountFormatter new];
+	NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
+	fmtr.numberStyle = NSNumberFormatterDecimalStyle;
+	fmtr.hasThousandSeparators = true;
+
+	NSUInteger volumeCapacity = 0;
+	NSUInteger const blockSize = volume.numberOfBytesPerBlock;
+	NSUInteger const numBlocksTotal = volume.numberOfBlocksTotal;
+	if (os_mul_overflow(blockSize, numBlocksTotal, &volumeCapacity)) {
+		ImpPrintf(@"Capacity:\t%@ (%@ blocks of %@ bytes each)", @"huge", [fmtr stringFromNumber:@(numBlocksTotal)], [fmtr stringFromNumber:@(blockSize)]);
+	} else {
+		ImpPrintf(@"Capacity:\t%@ (%@ bytes across %@ blocks)", [bcf stringFromByteCount:volumeCapacity], [fmtr stringFromNumber:@(volumeCapacity)], [fmtr stringFromNumber:@(numBlocksTotal)]);
+	}
+	NSUInteger const blocksUsed = volume.numberOfBlocksUsed;
+	NSUInteger const bytesUsed = blockSize * blocksUsed;
+	ImpPrintf(@"Used:\t%@ (%@ bytes across %@ blocks)", [bcf stringFromByteCount:bytesUsed], [fmtr stringFromNumber:@(bytesUsed)], [fmtr stringFromNumber:@(blocksUsed)]);
+	NSUInteger const blocksFree = volume.numberOfBlocksFree;
+	NSUInteger const bytesFree = blockSize * blocksFree;
+	ImpPrintf(@"Free:\t%@ (%@ bytes across %@ blocks)", [bcf stringFromByteCount:bytesFree], [fmtr stringFromNumber:@(bytesFree)], [fmtr stringFromNumber:@(blocksFree)]);
 	ImpPrintf(@"");
 
 	ImpPrintf(@"%@   \tData size\tRsrc size\tTotal size", printAbsolutePaths ? @"Path" : @"Name");
 	ImpPrintf(@"═══════\t═════════\t═════════\t═════════");
-	NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
-	fmtr.numberStyle = NSNumberFormatterDecimalStyle;
-	fmtr.hasThousandSeparators = true;
 
 	__block u_int64_t totalDF = 0, totalRF = 0, totalTotal = 0;
 
@@ -1063,8 +1084,6 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	//Lastly, report the sizes of the catalog and extents files.
 	bool const includeCatAndExt = false;
 	if (includeCatAndExt) {
-		ImpHFSVolume *_Nullable const volume = self.hfsVolume;
-
 		ImpPrintf(@"═══════\t═════════\t═════════\t═════════");
 		{
 			u_int64_t const sizeDF = volume.catalogSizeInBytes, sizeRF = 0, sizeTotal = sizeDF + sizeRF;
