@@ -1,6 +1,6 @@
 #  impluse engine: Driving HFS volumes forward
 
-<p style="float: right"><img width="128" height="128" alt="impluse's icon, showing a Mac OS 9 hard disk icon dissolving through a column of green plusses into a modern macOS volume icon." src="impluse icon.jpg" /></p>
+<p style="float: right"><img width="128" height="128" alt="impluse's icon, showing a Mac OS 9 hard disk icon dissolving through a column of green plusses into a modern macOS volume icon." src="impluse icon.png" /></p>
 
 Got an old-school HFS (Mac OS Standard) volume that you can't mount anymore since macOS dropped support for it?
 
