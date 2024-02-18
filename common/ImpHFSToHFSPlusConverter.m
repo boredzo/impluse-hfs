@@ -236,17 +236,10 @@
 
 	//Translate the VBM into the allocation file, and the extents and catalog files into their HFS+ counterparts.
 	//The VBM is implied by IM:F to be necessarily contiguous (only the catalog and extents overflow files are expressly not), and is guaranteed to always be at block #3 in HFS. On HFS+, the VBM isn't necessarily contiguous nor does it have to start at block #3.
-	//The VBM (at least in HFS+) indicates the allocation state of the entire volume, so its length in bits is the number of allocation blocks for the whole volume. Divide by eight to get bytes, and then by the allocation block size to get blocks.
-	u_int32_t const numABlocks = L(mdbPtr->drNmAlBlks);
-	u_int16_t const allocationFileSizeInBytes = (u_int16_t)ImpCeilingDivide(numABlocks, 8); //drNmAlBlks is u_int16_t; we don't need to go any bigger than that for the result of this computation.
-	u_int16_t const allocationFileSizeInBlocks = allocationFileSizeInBytes / L(vh.blockSize);
-	S(vh.allocationFile.totalBlocks, allocationFileSizeInBlocks);
 	vh.allocationFile.clumpSize = mdbPtr->drClpSiz;
-	//DiskWarrior seems to be of the opinion that the logical length should be equal to the physical length (total size of occupied blocks). TN1150 says this is allowed, but doesn't say it's necessary.
-//	S(vh.allocationFile.logicalSize, allocationFileSizeInBytes);
-	S(vh.allocationFile.logicalSize, allocationFileSizeInBlocks * L(vh.blockSize));
 	//We intentionally don't use the HFS volume's drVBMSt. Generally, the block allocator will arrive at the same answer, placing the allocations file in the first available a-blocks. If that answer differs, it's probably because drVBMSt was something strange that we don't care about replicating.
 	vh.allocationFile.extents[0].startBlock = vh.allocationFile.extents[0].blockCount = vh.allocationFile.totalBlocks = 0;
+	vh.allocationFile.logicalSize = 0;
 
 	vh.catalogFile.clumpSize = mdbPtr->drCTClpSiz;
 	/*Does not make sense in a defragmenting conversion.
