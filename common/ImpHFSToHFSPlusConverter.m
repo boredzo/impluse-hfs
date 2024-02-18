@@ -607,6 +607,7 @@
 
 - (bool) step1_convertPreamble_error:(NSError *_Nullable *_Nullable const)outError {
 	self.destinationVolume.bootBlocks = self.sourceVolume.bootBlocks;
+	self.destinationVolume.lastBlock = self.sourceVolume.lastBlock;
 
 	[self.sourceVolume peekAtHFSVolumeHeader:^(NS_NOESCAPE const struct HFSMasterDirectoryBlock *const mdbPtr) {
 		NSMutableData *_Nonnull const volumeHeaderData = [NSMutableData dataWithLength:sizeof(struct HFSPlusVolumeHeader)];

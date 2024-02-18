@@ -27,6 +27,7 @@
 @implementation ImpHFSVolume
 {
 	NSMutableData *_bootBlocksData;
+	NSData *_lastBlockData;
 	NSData *_mdbData;
 	struct HFSMasterDirectoryBlock const *_mdb;
 	NSMutableData *_volumeBitmapData;
@@ -201,6 +202,23 @@
 	return (self.extentsOverflowBTree != nil);
 }
 
+- (bool) readLastBlockFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
+	NSMutableData *_Nonnull const lastBlockData = [NSMutableData dataWithLength:kISOStandardBlockSize];
+	ssize_t const amtRead = pread(readFD, lastBlockData.mutableBytes, lastBlockData.length, _startOffsetInBytes + _lengthInBytes - kISOStandardBlockSize);
+	if (amtRead < 0) {
+		NSError *_Nonnull const readError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: @"Error reading source volume last block" }];
+		if (outError != NULL) *outError = readError;
+		return false;
+	} else if ((NSUInteger)amtRead < lastBlockData.length) {
+		NSError *_Nonnull const underrunError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: @"Unexpected end of file reading source volume last block — are you sure this is an HFS volume?" }];
+		if (outError != NULL) *outError = underrunError;
+		return false;
+	}
+	//We don't do anything with the last block other than write it out verbatim to the HFS+ volume, but that comes later.
+	_lastBlockData = lastBlockData;
+	return true;
+}
+
 - (bool)loadAndReturnError:(NSError *_Nullable *_Nonnull const)outError {
 	int const readFD = self.fileDescriptor;
 	return (
@@ -213,6 +231,8 @@
 		[self readExtentsOverflowFileFromFileDescriptor:readFD error:outError]
 		&&
 		[self readCatalogFileFromFileDescriptor:readFD error:outError]
+		&&
+		[self readLastBlockFromFileDescriptor:readFD error:outError]
 	);
 }
 
@@ -386,6 +406,9 @@
 
 - (NSData *_Nonnull)bootBlocks {
 	return _bootBlocksData;
+}
+- (NSData *_Nonnull)lastBlock {
+	return _lastBlockData;
 }
 - (void) getVolumeHeader:(void *_Nonnull const)outMDB {
 	memcpy(outMDB, _mdb, sizeof(*_mdb));

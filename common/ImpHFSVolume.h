@@ -48,11 +48,15 @@
 - (bool)readCatalogFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
 ///Finer-grained method intended specifically for the analyze command. Most other uses should use loadAndReturnError:.
 - (bool)readExtentsOverflowFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
+///Finer-grained method intended specifically for the analyze command. Most other uses should use loadAndReturnError:.
+- (bool) readLastBlockFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
 
 ///For subclass implementations of readAllocationBitmapFromFileDescriptor:.
 - (void) setAllocationBitmapData:(NSMutableData *_Nonnull const)bitmapData numberOfBits:(u_int32_t const)numBits;
 
 - (NSData *_Nonnull)bootBlocks;
+///The last block in the volume, immediately following the alternate volume header. Always 0x200 bytes.
+- (NSData *_Nonnull)lastBlock;
 - (void) getVolumeHeader:(void *_Nonnull const)outMDB;
 - (void) peekAtHFSVolumeHeader:(void (^_Nonnull const)(struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr NS_NOESCAPE))block;
 

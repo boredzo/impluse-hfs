@@ -107,9 +107,19 @@
 
 	//The postamble is the last 1 K of the volume, containing the alternate volume header and the footer.
 	//The postamble needs to be in the very last 1 K of the disk, regardless of where the a-block boundary is. TN1150 is explicit that this region can lie outside of an a-block and any a-blocks it does lie inside of must be marked as used.
-	off_t const last1KStart = self.lengthInBytes - (kISOStandardBlockSize * 2);
-	amtWritten = pwrite(_writeFD, volumeHeader.bytes, volumeHeader.length, volumeStartInBytes + last1KStart);
+	amtWritten = pwrite(_writeFD, volumeHeader.bytes, volumeHeader.length, volumeStartInBytes + _postambleStartInBytes);
 	if (amtWritten < 0 || (NSUInteger)amtWritten < volumeHeader.length) {
+		NSError *_Nonnull const cantWriteAltVolumeHeaderError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Could not write alternate volume header", @"") }];
+		if (outError != NULL) {
+			*outError = cantWriteAltVolumeHeaderError;
+		}
+		return false;
+	}
+	off_t const lastHalfKStart = _postambleStartInBytes + kISOStandardBlockSize;
+	NSMutableData *_Nonnull const emptyHalfK = [NSMutableData dataWithLength:kISOStandardBlockSize];
+	NSData *_Nonnull const lastBlock = self.lastBlock ?: emptyHalfK;
+	amtWritten = pwrite(_writeFD, lastBlock.bytes, lastBlock.length, volumeStartInBytes + lastHalfKStart);
+	if (amtWritten < 0 || (NSUInteger)amtWritten < lastBlock.length) {
 		NSError *_Nonnull const cantWriteAltVolumeHeaderError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Could not write alternate volume header", @"") }];
 		if (outError != NULL) {
 			*outError = cantWriteAltVolumeHeaderError;

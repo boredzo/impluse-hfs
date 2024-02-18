@@ -44,6 +44,7 @@
 - (bool) flushVolumeStructures:(NSError *_Nullable *_Nullable const)outError;
 
 @property(nonatomic, copy) NSData *_Nonnull bootBlocks;
+@property(nonatomic, copy) NSData *_Nonnull lastBlock;
 @property(nonatomic, copy) NSData *_Nonnull volumeHeader;
 
 - (void) peekAtHFSPlusVolumeHeader:(void (^_Nonnull const)(struct HFSPlusVolumeHeader const *_Nonnull const vhPtr NS_NOESCAPE))block;
