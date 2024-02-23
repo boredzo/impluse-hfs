@@ -62,8 +62,12 @@
 
 ///Return a string concisely describing an HFS catalog key. If the data does not represent (or at least start with) an HFS catalog key, results are undefined. For debugging purposes only.
 + (NSString *_Nonnull const) describeHFSCatalogKeyWithData:(NSData *_Nonnull const)keyData;
+///Return a string concisely describing an HFS catalog thread record. If the data does not represent (or at least start with) an HFS catalog thread record, results are undefined. For debugging purposes only.
++ (NSString *_Nonnull const) describeHFSCatalogThreadRecordWithData:(NSData *_Nonnull const)threadRecData;
 ///Return a string concisely describing an HFS+ catalog key. If the data does not represent (or at least start with) an HFS+ catalog key, results are undefined. For debugging purposes only.
 + (NSString *_Nonnull const) describeHFSPlusCatalogKeyWithData:(NSData *_Nonnull const)keyData;
+///Return a string concisely describing an HFS+ catalog thread record. If the data does not represent (or at least start with) an HFS+ catalog thread record, results are undefined. For debugging purposes only.
++ (NSString *_Nonnull const) describeHFSPlusCatalogThreadRecordWithData:(NSData *_Nonnull const)threadRecData;
 ///Extract the node name from an HFS+ catalog key and return it as an NSString. For debugging purposes only.
 + (NSString *_Nonnull const) nodeNameFromHFSPlusCatalogKey:(NSData *_Nonnull const)keyData;
 

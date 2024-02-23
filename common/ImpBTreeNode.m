@@ -138,6 +138,14 @@
 	return nil;
 }
 
+- (ImpBTreeNode *_Nullable) siblingNodeAtIndex:(NSUInteger)idx {
+	ImpBTreeNode *_Nullable node = self;
+	for (; idx > 0; --idx) {
+		node = node.nextNode;
+	}
+	return node;
+}
+
 - (void)connectNextNode:(ImpBTreeNode *_Nullable const)newNextNode {
 	ImpBTreeNode *_Nullable const oldNextNode = self.nextNode;
 
@@ -178,11 +186,49 @@
 	}
 }
 
-- (NSString *)description {
+- (NSString *_Nonnull)description {
 	return [NSString stringWithFormat:@"<%@ #%u %p is a %@ node with %u records>",
 		self.class, self.nodeNumber, self,
 		self.nodeTypeName,
 		(unsigned)self.numberOfRecords
+	];
+}
+
+- (NSString *_Nonnull const) HFSCatalogLeafDescription {
+	NSMutableArray <NSString *> *_Nonnull const recordDescriptions = [NSMutableArray arrayWithCapacity:self.numberOfRecords];
+	ImpTextEncodingConverter *_Nonnull const tec = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:kTextEncodingMacRoman];
+	[self forEachHFSCatalogRecord_file:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogFile const *_Nonnull const fileRecPtr) {
+		[recordDescriptions addObject:[NSString stringWithFormat:@"📁 #%u → 📄 #%u “%@”", L(catalogKeyPtr->parentID), L(fileRecPtr->fileID), [tec stringForPascalString:catalogKeyPtr->nodeName fromHFSCatalogKey:catalogKeyPtr]]];
+	} folder:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRecPtr) {
+		[recordDescriptions addObject:[NSString stringWithFormat:@"📁 #%u → 📁 #%u “%@”", L(catalogKeyPtr->parentID), L(folderRecPtr->folderID), [tec stringForPascalString:catalogKeyPtr->nodeName fromHFSCatalogKey:catalogKeyPtr]]];
+	} thread:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogThread *const _Nonnull threadRecPtr) {
+		[recordDescriptions addObject:[NSString stringWithFormat:@"🧵 #%u “%@” in 📁 #%u", L(catalogKeyPtr->parentID), [tec stringForPascalString:catalogKeyPtr->nodeName fromHFSCatalogKey:catalogKeyPtr], L(threadRecPtr->parentID)]];
+	}];
+
+	return [NSString stringWithFormat:@"<%@ #%u %p is a %@ node with %u records: {\n\t%@\n}>",
+		self.class, self.nodeNumber, self,
+		self.nodeTypeName,
+		(unsigned)self.numberOfRecords,
+		[recordDescriptions componentsJoinedByString:@",\n\t"]
+	];
+}
+
+- (NSString *_Nonnull const) HFSPlusCatalogLeafDescription {
+	NSMutableArray <NSString *> *_Nonnull const recordDescriptions = [NSMutableArray arrayWithCapacity:self.numberOfRecords];
+	ImpTextEncodingConverter *_Nonnull const tec = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:kTextEncodingMacRoman];
+	[self forEachHFSPlusCatalogRecord_file:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSPlusCatalogFile const *_Nonnull const fileRecPtr) {
+		[recordDescriptions addObject:[NSString stringWithFormat:@"📁 #%u → 📄 #%u “%@”", L(catalogKeyPtr->parentID), L(fileRecPtr->fileID), [tec stringFromHFSUniStr255:&catalogKeyPtr->nodeName]]];
+	} folder:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSPlusCatalogFolder *_Nonnull const folderRecPtr) {
+		[recordDescriptions addObject:[NSString stringWithFormat:@"📁 #%u → 📁 #%u “%@”", L(catalogKeyPtr->parentID), L(folderRecPtr->folderID), [tec stringFromHFSUniStr255:&catalogKeyPtr->nodeName]]];
+	} thread:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSPlusCatalogThread *_Nonnull const threadRecPtr) {
+		[recordDescriptions addObject:[NSString stringWithFormat:@"🧵 #%u “%@” in 📁 #%u", L(catalogKeyPtr->parentID), [tec stringFromHFSUniStr255:&catalogKeyPtr->nodeName], L(threadRecPtr->parentID)]];
+	}];
+
+	return [NSString stringWithFormat:@"<%@ #%u %p is a %@ node with %u records: {\n\t%@\n}>",
+		self.class, self.nodeNumber, self,
+		self.nodeTypeName,
+		(unsigned)self.numberOfRecords,
+		[recordDescriptions componentsJoinedByString:@",\n\t"]
 	];
 }
 
@@ -191,14 +237,28 @@
 	HFSCatalogNodeID const parentID = L(catKeyPtr->parentID);
 	ImpTextEncodingConverter *_Nonnull const tec = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:kTextEncodingMacRoman];
 	NSString *_Nonnull const nodeName = [tec stringForPascalString:catKeyPtr->nodeName];
-	return [NSString stringWithFormat:@"%u/“%@”", parentID, nodeName];
+	return [NSString stringWithFormat:@"#%u/“%@”", parentID, nodeName];
+}
++ (NSString *_Nonnull const) describeHFSCatalogThreadRecordWithData:(NSData *_Nonnull const)threadRecData {
+	struct HFSCatalogThread const *_Nonnull const catThrPtr = threadRecData.bytes;
+	HFSCatalogNodeID const parentID = L(catThrPtr->parentID);
+	ImpTextEncodingConverter *_Nonnull const tec = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:kTextEncodingMacRoman];
+	NSString *_Nonnull const nodeName = [tec stringForPascalString:catThrPtr->nodeName];
+	return [NSString stringWithFormat:@"#%u/“%@”", parentID, nodeName];
 }
 + (NSString *_Nonnull const) describeHFSPlusCatalogKeyWithData:(NSData *_Nonnull const)keyData {
 	struct HFSPlusCatalogKey const *_Nonnull const catKeyPtr = keyData.bytes;
 	HFSCatalogNodeID const parentID = L(catKeyPtr->parentID);
 	ImpTextEncodingConverter *_Nonnull const tec = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:kTextEncodingMacRoman];
 	NSString *_Nonnull const nodeName = [tec stringFromHFSUniStr255:&(catKeyPtr->nodeName)];
-	return [NSString stringWithFormat:@"%u/“%@”", parentID, nodeName];
+	return [NSString stringWithFormat:@"#%u/“%@”", parentID, nodeName];
+}
++ (NSString *_Nonnull const) describeHFSPlusCatalogThreadRecordWithData:(NSData *_Nonnull const)threadRecData {
+	struct HFSPlusCatalogThread const *_Nonnull const catThrPtr = threadRecData.bytes;
+	HFSCatalogNodeID const parentID = L(catThrPtr->parentID);
+	ImpTextEncodingConverter *_Nonnull const tec = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:kTextEncodingMacRoman];
+	NSString *_Nonnull const nodeName = [tec stringFromHFSUniStr255:&(catThrPtr->nodeName)];
+	return [NSString stringWithFormat:@"#%u/“%@”", parentID, nodeName];
 }
 + (NSString *_Nonnull const) nodeNameFromHFSPlusCatalogKey:(NSData *_Nonnull const)keyData {
 	struct HFSPlusCatalogKey const *_Nonnull const catKeyPtr = keyData.bytes;
