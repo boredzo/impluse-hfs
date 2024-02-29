@@ -654,6 +654,14 @@
 		  //These keys are incomparable.
 		  return ImpBTreeComparisonQuarryIsIncomparable;
 		}
+
+		if (quarryExtentKey.fileID < L(foundExtentKeyPtr->fileID)) {
+		  return ImpBTreeComparisonQuarryIsLesser;
+		}
+		if (quarryExtentKey.fileID > L(foundExtentKeyPtr->fileID)) {
+		  return ImpBTreeComparisonQuarryIsGreater;
+		}
+
 		u_int8_t const foundForkType = L(foundExtentKeyPtr->forkType);
 		if (quarryExtentKey.forkType < foundForkType) {
 		  return ImpBTreeComparisonQuarryIsLesser;
@@ -661,18 +669,14 @@
 		if (quarryExtentKey.forkType > foundForkType) {
 		  return ImpBTreeComparisonQuarryIsGreater;
 		}
-		if (quarryExtentKey.fileID < L(foundExtentKeyPtr->fileID)) {
-		  return ImpBTreeComparisonQuarryIsLesser;
-		}
-		if (quarryExtentKey.fileID > L(foundExtentKeyPtr->fileID)) {
-		  return ImpBTreeComparisonQuarryIsGreater;
-		}
+
 		if (quarryExtentKey.startBlock < L(foundExtentKeyPtr->startBlock)) {
 		  return ImpBTreeComparisonQuarryIsLesser;
 		}
 		if (quarryExtentKey.startBlock > L(foundExtentKeyPtr->startBlock)) {
 		  return ImpBTreeComparisonQuarryIsGreater;
 		}
+
 		return ImpBTreeComparisonQuarryIsEqual;
 	};
 
