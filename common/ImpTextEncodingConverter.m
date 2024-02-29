@@ -54,7 +54,7 @@ enum {
 }
 + (bool) hasTextEncodingInExtendedFinderFlags:(UInt16 const)extFinderFlags {
 	UInt16 const hasEmbeddedScriptCodeBit = (extFinderFlags & ImpExtFinderFlagsHasEmbeddedScriptCodeMask);
-	return (extFinderFlags & ImpExtFinderFlagsHasEmbeddedScriptCodeMask);
+	return hasEmbeddedScriptCodeBit;
 }
 + (TextEncoding) textEncodingFromExtendedFinderFlags:(UInt16 const)extFinderFlags {
 	return (extFinderFlags & ImpExtFinderFlagsScriptCodeMask) >> 8;
@@ -127,7 +127,7 @@ enum {
 		};
 		OSStatus const err = CreateTextToUnicodeInfo(&mapping, &_ttui);
 		if (err != noErr) {
-			ImpPrintf(@"Failed to initialize Unicode conversion: error %d/%s", err, ImpExplainOSStatus(err));
+			ImpPrintf(@"Failed to initialize Unicode conversion from %x to %x: error %d/%s", _hfsTextEncoding, _hfsPlusTextEncoding, err, ImpExplainOSStatus(err));
 		}
 	}
 	return self;
@@ -142,9 +142,15 @@ enum {
 	DisposeTextToUnicodeInfo(&_ttui);
 }
 
-- (ByteCount) estimateSizeOfHFSUniStr255NeededForPascalString:(ConstStr31Param _Nonnull const)pascalString {
+- (ByteCount) estimateSizeOfHFSUniStr255NeededForPascalString:(ConstStr31Param _Nonnull const)pascalString maxLength:(u_int8_t const)maxLength {
+	u_int8_t const srcLength = *pascalString;
+	u_int8_t const workingLength = (
+		(maxLength > 0 && srcLength > maxLength)
+		? maxLength
+		: srcLength
+	);
 	//The length in MacRoman characters may include accented characters that HFS+ decomposition will decompose to a base character and a combining character, so we actually need to double the length *in characters*.
-	ByteCount outputPayloadSizeInBytes = (2 * *pascalString) * sizeof(UniChar);
+	ByteCount outputPayloadSizeInBytes = (2 * workingLength) * sizeof(UniChar);
 	//TECConvertText documentation: “Always allocate a buffer at least 32 bytes long.”
 	if (outputPayloadSizeInBytes < 32) {
 		outputPayloadSizeInBytes = 32;
@@ -152,8 +158,21 @@ enum {
 	ByteCount const outputBufferSizeInBytes = outputPayloadSizeInBytes + 1 * sizeof(UniChar);
 	return outputBufferSizeInBytes;
 }
-- (bool) convertPascalString:(ConstStr31Param _Nonnull const)pascalString intoHFSUniStr255:(HFSUniStr255 *_Nonnull const)outUnicode bufferSize:(ByteCount)outputBufferSizeInBytes {
+- (ByteCount) estimateSizeOfHFSUniStr255NeededForPascalString:(ConstStr31Param _Nonnull const)pascalString {
+	return [self estimateSizeOfHFSUniStr255NeededForPascalString:pascalString maxLength:0];
+}
+
+- (bool) convertPascalString:(ConstStr31Param _Nonnull const)pascalString maxLength:(u_int8_t const)maxInputLength intoHFSUniStr255:(HFSUniStr255 *_Nonnull const)outUnicode bufferSize:(ByteCount)outputBufferSizeInBytes {
 	UniChar *_Nonnull const outputBuf = outUnicode->unicode;
+
+	NSMutableData *_Nullable tempData = nil;
+	ConstStr31Param inputStringPtr = pascalString;
+	if (maxInputLength > 0 && inputStringPtr[0] > maxInputLength) {
+		tempData = [NSMutableData dataWithBytes:pascalString length:maxInputLength + 1];
+		StringPtr tempStrPtr = tempData.mutableBytes;
+		tempStrPtr[0] = (u_int8_t)maxInputLength;
+		inputStringPtr = tempData.bytes;
+	}
 
 	ByteCount const outputPayloadSizeInBytes = outputBufferSizeInBytes - 1 * sizeof(UniChar);
 	ByteCount actualOutputLengthInBytes = 0;
@@ -184,8 +203,12 @@ enum {
 	S(outUnicode->length, (u_int16_t)(actualOutputLengthInBytes / sizeof(UniChar)));
 	return true;
 }
-- (NSData *_Nonnull const)hfsUniStr255ForPascalString:(ConstStr31Param)pascalString {
-	ByteCount const outputBufferSizeInBytes = [self estimateSizeOfHFSUniStr255NeededForPascalString:pascalString];
+- (bool) convertPascalString:(ConstStr31Param _Nonnull const)pascalString intoHFSUniStr255:(HFSUniStr255 *_Nonnull const)outUnicode bufferSize:(ByteCount)outputBufferSizeInBytes {
+	return [self convertPascalString:pascalString maxLength:0 intoHFSUniStr255:outUnicode bufferSize:outputBufferSizeInBytes];
+}
+
+- (NSData *_Nonnull const)hfsUniStr255ForPascalString:(ConstStr31Param _Nonnull const)pascalString maxLength:(u_int8_t const)maxLength {
+	ByteCount const outputBufferSizeInBytes = [self estimateSizeOfHFSUniStr255NeededForPascalString:pascalString maxLength:maxLength];
 	NSMutableData *_Nonnull const unicodeData = [NSMutableData dataWithLength:outputBufferSizeInBytes];
 
 	if (*pascalString == 0) {
@@ -198,8 +221,12 @@ enum {
 
 	return converted ? unicodeData : nil;
 }
-- (NSString *_Nonnull const) stringForPascalString:(ConstStr31Param)pascalString {
-	NSData *_Nonnull const unicodeData = [self hfsUniStr255ForPascalString:pascalString];
+- (NSData *_Nonnull const)hfsUniStr255ForPascalString:(ConstStr31Param)pascalString {
+	return [self hfsUniStr255ForPascalString:pascalString maxLength:31];
+}
+
+- (NSString *_Nonnull const) stringForPascalString:(ConstStr31Param)pascalString maxLength:(const u_int8_t)maxLength {
+	NSData *_Nonnull const unicodeData = [self hfsUniStr255ForPascalString:pascalString maxLength:maxLength];
 	/* This does not seem to work.
 	 hfsUniStr255ForPascalString: needs to return UTF-16 BE so we can write it out to HFS+. But if we call CFStringCreateWithPascalString, it seems to always take the host-least-significant byte and treat it as a *byte count*. That basically means this always returns an empty string. If the length is unswapped, it returns the first half of the string.
 	NSString *_Nonnull const unicodeString = (__bridge_transfer NSString *)CFStringCreateWithPascalString(kCFAllocatorDefault, unicodeData.bytes, kCFStringEncodingUTF16BE);
@@ -207,6 +234,18 @@ enum {
 	CFIndex const numCharacters = L(*(UniChar *)unicodeData.bytes);
 	NSString *_Nonnull const unicodeString = (__bridge_transfer NSString *)CFStringCreateWithBytes(kCFAllocatorDefault, unicodeData.bytes + sizeof(UniChar), numCharacters * sizeof(UniChar), kCFStringEncodingUTF16BE, /*isExternalRep*/ false);
 	return unicodeString;
+}
+- (NSString *_Nonnull const) stringForPascalString:(ConstStr31Param _Nonnull const)pascalString fromHFSCatalogKey:(struct HFSCatalogKey const *_Nonnull const)keyPtr {
+	u_int8_t const keyLength = L(keyPtr->keyLength);
+	u_int8_t const subtrahend = sizeof(keyPtr->keyLength) + sizeof(keyPtr->reserved) + sizeof(keyPtr->parentID) + sizeof(keyPtr->nodeName[0]);
+	if (subtrahend >= keyLength) {
+		return @"";
+	}
+	u_int8_t const maxLength = keyLength - subtrahend;
+	return [self stringForPascalString:pascalString maxLength:maxLength];
+}
+- (NSString *_Nonnull const) stringForPascalString:(ConstStr31Param)pascalString {
+	return [self stringForPascalString:pascalString maxLength:31];
 }
 
 - (NSString *_Nonnull const) stringFromHFSUniStr255:(ConstHFSUniStr255Param)unicodeName {

@@ -48,10 +48,21 @@
 
 ///Obtain an estimate of how many bytes might be needed to hold the Unicode conversion of this string, including 2 bytes for the length.
 - (ByteCount) estimateSizeOfHFSUniStr255NeededForPascalString:(ConstStr31Param _Nonnull const)pascalString;
+///Obtain an estimate of how many bytes might be needed to hold the Unicode conversion of this string, including 2 bytes for the length. If length is not 0, it is the maximum length of the string in source bytes (i.e., if the string's length is greater than this limit, the limit should be used instead).
+- (ByteCount) estimateSizeOfHFSUniStr255NeededForPascalString:(ConstStr31Param _Nonnull const)pascalString maxLength:(u_int8_t const)maxLength;
+
 ///Returns true if the characters were successfully converted; returns false if some characters could not be converted or there wasn't enough space.
 - (bool) convertPascalString:(ConstStr31Param _Nonnull const)pascalString intoHFSUniStr255:(HFSUniStr255 *_Nonnull const)outUnicode bufferSize:(ByteCount)outputBufferSizeInBytes;
+///Returns true if the characters were successfully converted; returns false if some characters could not be converted or there wasn't enough space. If maxLength is not 0, the string will be truncated to this many input characters if the length byte is greater than this number, as if the length byte had been this number instead.
+- (bool) convertPascalString:(ConstStr31Param _Nonnull const)pascalString maxLength:(u_int8_t const)maxInputLength  intoHFSUniStr255:(HFSUniStr255 *_Nonnull const)outUnicode bufferSize:(ByteCount)outputBufferSizeInBytes;
 
+- (NSData *_Nonnull const)hfsUniStr255ForPascalString:(ConstStr31Param _Nonnull const)pascalString maxLength:(u_int8_t const)maxLength;
+///Equivalent to hfsUniStr255ForPascalString:pascalString maxLength:31.
 - (NSData *_Nonnull const)hfsUniStr255ForPascalString:(ConstStr31Param _Nonnull const)pascalString;
+
+- (NSString *_Nonnull const) stringForPascalString:(ConstStr31Param _Nonnull const)pascalString maxLength:(u_int8_t const)maxLength;
+- (NSString *_Nonnull const) stringForPascalString:(ConstStr31Param _Nonnull const)pascalString fromHFSCatalogKey:(struct HFSCatalogKey const *_Nonnull const)keyPtr;
+///Equivalent to stringForPascalString:pascalString maxLength:31.
 - (NSString *_Nonnull const) stringForPascalString:(ConstStr31Param _Nonnull const)pascalString;
 
 - (NSString *_Nonnull const) stringFromHFSUniStr255:(ConstHFSUniStr255Param _Nonnull const)unicodeName;
