@@ -443,20 +443,26 @@
 			NSData *_Nonnull const sourceRecData = [NSData dataWithBytesNoCopy:(void *)fileRecPtr length:sizeof(struct HFSCatalogFile) freeWhenDone:false];
 			NSMutableData *_Nonnull const destKeyData = [self convertHFSCatalogKeyToHFSPlus:sourceKeyData];
 			NSMutableData *_Nonnull const destRecData = [self convertHFSCatalogFileRecordToHFSPlus:sourceRecData];
-			[catBuilder addKey:destKeyData fileRecord:destRecData];
+			ImpCatalogItem *_Nonnull const item = [catBuilder addKey:destKeyData fileRecord:destRecData];
+			item.sourceKey = sourceKeyData;
+			item.sourceRecord = sourceRecData;
 
 		} folder:^(const struct HFSCatalogKey *const  _Nonnull catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRecPtr) {
 			NSData *_Nonnull const sourceKeyData = [NSData dataWithBytesNoCopy:(void *)catalogKeyPtr length:sizeof(struct HFSCatalogKey) freeWhenDone:false];
 			NSData *_Nonnull const sourceRecData = [NSData dataWithBytesNoCopy:(void *)folderRecPtr length:sizeof(struct HFSCatalogFolder) freeWhenDone:false];
 			NSMutableData *_Nonnull const destKeyData = [self convertHFSCatalogKeyToHFSPlus:sourceKeyData];
 			NSMutableData *_Nonnull const destRecData = [self convertHFSCatalogFolderRecordToHFSPlus:sourceRecData];
-			[catBuilder addKey:destKeyData folderRecord:destRecData];
+			ImpCatalogItem *_Nonnull const item = [catBuilder addKey:destKeyData folderRecord:destRecData];
+			item.sourceKey = sourceKeyData;
+			item.sourceRecord = sourceRecData;
 		} thread:^(const struct HFSCatalogKey *const  _Nonnull catalogKeyPtr, const struct HFSCatalogThread *const _Nonnull threadRecPtr) {
 			NSData *_Nonnull const sourceKeyData = [NSData dataWithBytesNoCopy:(void *)catalogKeyPtr length:sizeof(struct HFSCatalogKey) freeWhenDone:false];
 			NSData *_Nonnull const sourceRecData = [NSData dataWithBytesNoCopy:(void *)threadRecPtr length:sizeof(struct HFSCatalogThread) freeWhenDone:false];
 			NSMutableData *_Nonnull const destKeyData = [self convertHFSCatalogKeyToHFSPlus:sourceKeyData];
 			NSMutableData *_Nonnull const destRecData = [self convertHFSCatalogThreadRecordToHFSPlus:sourceRecData];
-			[catBuilder addKey:destKeyData threadRecord:destRecData];
+			ImpCatalogItem *_Nonnull const item = [catBuilder addKey:destKeyData threadRecord:destRecData];
+			item.sourceThreadKey = sourceKeyData;
+			item.sourceThreadRecord = sourceRecData;
 		}];
 		return true;
 	}];

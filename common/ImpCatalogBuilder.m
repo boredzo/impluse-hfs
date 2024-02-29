@@ -7,6 +7,7 @@
 
 #import "ImpCatalogBuilder.h"
 
+#import "ImpTextEncodingConverter.h"
 #import "ImpBTreeFile.h"
 #import "ImpMutableBTreeFile.h"
 #import "ImpBTreeNode.h"
@@ -15,30 +16,19 @@
 
 #pragma mark Prologue: Interfaces of the helper classes
 
-///Simple data object for an item in a catalog file being translated.
-@interface ImpCatalogItem: NSObject
+///Identifier object for an item on a volume.
+///Why not just use the CNID? Because some HFS volumes reuse CNIDs. Technically this is invalid, but hardly any consistency checkers catch it, including Apple's own Disk First Aid and fsck_hfs!!
+@interface ImpCatalogItemIdentifier : NSObject <NSCopying>
 
-- (instancetype _Nonnull) initWithCatalogNodeID:(HFSCatalogNodeID const)cnid;
++ (instancetype) identifierWithParentCNID:(HFSCatalogNodeID const)parentID ownCNID:(HFSCatalogNodeID const)ownID nodeName:(NSString *_Nonnull const)nodeName;
++ (instancetype) identifierWithHFSPlusCatalogKeyData:(NSData *_Nonnull const)keyData fileRecordData:(NSData *_Nonnull const)fileRecData;
++ (instancetype) identifierWithHFSPlusCatalogKeyData:(NSData *_Nonnull const)keyData folderRecordData:(NSData *_Nonnull const)folderRecData;
++ (instancetype) identifierWithHFSPlusCatalogKeyData:(NSData *_Nonnull const)keyData threadRecordData:(NSData *_Nonnull const)threadRecData;
 
-@property HFSCatalogNodeID cnid;
-@property bool needsThreadRecord;
-
-///The key for the item's file or folder record, containing its parent item CNID and its own name. This version of the key comes from the source volume.
-@property(strong) NSData *sourceKey;
-///The item's file or folder record. This version of the record comes from the source volume.
-@property(strong) NSData *sourceRecord;
-///The key for the item's file or folder record, containing its parent item CNID and its own name. This version of the key has been converted for the destination volume.
-@property(strong) NSMutableData *destinationKey;
-///The item's file or folder record, converted for the destination volume.
-@property(strong) NSMutableData *destinationRecord;
-///The key for the item's thread record, containing its own CNID. This version of the key comes from the source volume.
-@property(strong) NSData *sourceThreadKey;
-///The thread record, containing the item's parent CNID and its own name. This version of the key comes from the source volume.
-@property(strong) NSData *sourceThreadRecord;
-///The key for the item's thread record, containing its own CNID. This version of the key has been converted for the destination volume.
-@property(strong) NSMutableData *destinationThreadKey;
-///The thread record, containing the item's parent CNID and its own name. This version of the key has been converted for the destination volume.
-@property(strong) NSMutableData *destinationThreadRecord;
+@property(readonly) HFSCatalogNodeID parentID;
+@property(readonly) HFSCatalogNodeID ownID;
+@property(readonly, copy) NSString *_Nonnull nodeName;
+@property(readwrite, copy) NSString *_Nonnull typeEmoji;
 
 @end
 
@@ -49,6 +39,12 @@
 
 @property(strong) NSData *key;
 @property(strong) NSData *value;
+
+@end
+
+@interface ImpCatalogItem ()
+
+@property(readwrite, strong) ImpCatalogItemIdentifier *_Nonnull identifier;
 
 @end
 
@@ -101,7 +97,7 @@
 
 @implementation ImpCatalogBuilder
 {
-	NSMutableDictionary <NSNumber *, ImpCatalogItem *> *_Nonnull _sourceItemsByCNID;
+	NSMutableDictionary <ImpCatalogItemIdentifier *, ImpCatalogItem *> *_Nonnull _sourceItemsByIdentifier;
 	NSMutableSet <ImpCatalogItem *> *_Nonnull _sourceItemsThatNeedThreadRecords;
 	NSMutableArray <ImpCatalogItem *> *_Nonnull _allSourceItems;
 
@@ -123,7 +119,7 @@
 	if (version != ImpBTreeVersionHFSPlusCatalog) {
 		self = nil;
 	} else if ((self = [super init])) {
-		_sourceItemsByCNID = [NSMutableDictionary dictionaryWithCapacity:numItems];
+		_sourceItemsByIdentifier = [NSMutableDictionary dictionaryWithCapacity:numItems];
 		_sourceItemsThatNeedThreadRecords = [NSMutableSet setWithCapacity:numItems];
 		_allSourceItems = [NSMutableArray arrayWithCapacity:numItems];
 
@@ -137,7 +133,7 @@
 	return self;
 }
 
-- (void) addKey:(NSMutableData *_Nonnull const)keyData fileRecord:(NSMutableData *_Nonnull const)payloadData {
+- (ImpCatalogItem *_Nonnull const) addKey:(NSMutableData *_Nonnull const)keyData fileRecord:(NSMutableData *_Nonnull const)payloadData {
 	[self invalidateMockTree];
 
 	void const *_Nonnull const payloadPtr = payloadData.bytes;
@@ -151,19 +147,27 @@
 		}
 	}
 
-	ImpCatalogItem *_Nullable item = _sourceItemsByCNID[@(cnid)];
-	if (item == nil) {
-		item = [[ImpCatalogItem alloc] initWithCatalogNodeID:cnid];
-		_sourceItemsByCNID[@(cnid)] = item;
+	ImpCatalogItemIdentifier *_Nonnull const identifier = [ImpCatalogItemIdentifier identifierWithHFSPlusCatalogKeyData:keyData fileRecordData:payloadData];
+
+	ImpCatalogItem *_Nullable item = _sourceItemsByIdentifier[identifier];
+	if (item != nil){
+//		ImpPrintf(@"📄 Found existing item for %@: %@", identifier, item);
+	}else {
+		item = [[ImpCatalogItem alloc] initWithIdentifier:identifier];
+		_sourceItemsByIdentifier[identifier] = item;
 		[_allSourceItems addObject:item];
 		[_sourceItemsThatNeedThreadRecords addObject:item];
+//		ImpPrintf(@"📄 Created item for %@: %@", identifier, item);
 	}
 
 	item.destinationKey = keyData;
 	item.destinationRecord = payloadData;
+//	ImpPrintf(@"📄 Item is updated: %@", item);
+
+	return item;
 }
 
-- (void) addKey:(NSMutableData *_Nonnull const)keyData folderRecord:(NSMutableData *_Nonnull const)payloadData {
+- (ImpCatalogItem *_Nonnull const) addKey:(NSMutableData *_Nonnull const)keyData folderRecord:(NSMutableData *_Nonnull const)payloadData {
 	[self invalidateMockTree];
 
 	void const *_Nonnull const payloadPtr = payloadData.bytes;
@@ -177,19 +181,27 @@
 		}
 	}
 
-	ImpCatalogItem *_Nullable item = _sourceItemsByCNID[@(cnid)];
-	if (item == nil) {
-		item = [[ImpCatalogItem alloc] initWithCatalogNodeID:cnid];
-		_sourceItemsByCNID[@(cnid)] = item;
+	ImpCatalogItemIdentifier *_Nonnull const identifier = [ImpCatalogItemIdentifier identifierWithHFSPlusCatalogKeyData:keyData folderRecordData:payloadData];
+
+	ImpCatalogItem *_Nullable item = _sourceItemsByIdentifier[identifier];
+	if (item != nil){
+//		ImpPrintf(@"📁 Found existing item for %@: %@", identifier, item);
+	} else {
+		item = [[ImpCatalogItem alloc] initWithIdentifier:identifier];
+		_sourceItemsByIdentifier[identifier] = item;
 		[_allSourceItems addObject:item];
 		[_sourceItemsThatNeedThreadRecords addObject:item];
+//		ImpPrintf(@"📁 Created item for %@: %@", identifier, item);
 	}
 
 	item.destinationKey = keyData;
 	item.destinationRecord = payloadData;
+//	ImpPrintf(@"📁 Item is updated: %@", item);
+
+	return item;
 }
 
-- (void) addKey:(NSMutableData *_Nonnull const)keyData threadRecord:(NSMutableData *_Nonnull const)payloadData {
+- (ImpCatalogItem *_Nonnull const) addKey:(NSMutableData *_Nonnull const)keyData threadRecord:(NSMutableData *_Nonnull const)payloadData {
 	[self invalidateMockTree];
 
 	void const *_Nonnull const keyPtr = keyData.bytes;
@@ -198,18 +210,25 @@
 	HFSCatalogNodeID const cnid = L(catalogKeyPtr->parentID);
 	if (cnid > _largestCNIDYet) _largestCNIDYet = cnid;
 
-	ImpCatalogItem *_Nullable item = _sourceItemsByCNID[@(cnid)];
+	ImpCatalogItemIdentifier *_Nonnull const identifier = [ImpCatalogItemIdentifier identifierWithHFSPlusCatalogKeyData:keyData threadRecordData:payloadData];
+
+	ImpCatalogItem *_Nullable item = _sourceItemsByIdentifier[identifier];
 	if (item == nil) {
-		item = [[ImpCatalogItem alloc] initWithCatalogNodeID:cnid];
-		_sourceItemsByCNID[@(cnid)] = item;
+		item = [[ImpCatalogItem alloc] initWithIdentifier:identifier];
+		_sourceItemsByIdentifier[identifier] = item;
 		[_allSourceItems addObject:item];
+//		ImpPrintf(@"🧵 Created item for %@: %@", identifier, item);
 	} else {
+//		ImpPrintf(@"🧵 Thread-ified item for %@: %@", identifier, item);
 		[_sourceItemsThatNeedThreadRecords removeObject:item];
 	}
 
 	item.destinationThreadKey = keyData;
 	item.destinationThreadRecord = payloadData;
 	item.needsThreadRecord = false;
+//	ImpPrintf(@"🧵 Item is updated: %@", item);
+
+	return item;
 }
 
 - (void) buildMockTree {
@@ -226,14 +245,15 @@
 
 		//Now we have all the items. HFS requires folders to have thread records, so those should all have them, but files having thread records was optional (but is required under HFS+), so we may need to create those.
 		for (ImpCatalogItem *_Nonnull const item in _sourceItemsThatNeedThreadRecords) {
+			NSData *_Nonnull const keyData = item.destinationKey;
+			struct HFSPlusCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
+//			ImpPrintf(@"Item %p “%@” needs thread record: %@", item, [ImpBTreeNode describeHFSPlusCatalogKeyWithData:keyData], item.needsThreadRecord ? @"YES" : @"NO");
 			if (item.needsThreadRecord) {
 				NSMutableData *_Nonnull const threadKeyData = [NSMutableData dataWithLength:sizeof(struct HFSPlusCatalogKey)];
 				struct HFSPlusCatalogKey *_Nonnull const threadKeyPtr = threadKeyData.mutableBytes;
 				NSMutableData *_Nonnull const threadRecData = [NSMutableData dataWithLength:sizeof(struct HFSPlusCatalogThread)];
 				struct HFSPlusCatalogThread *_Nonnull const threadRecPtr = threadRecData.mutableBytes;
 
-				NSData *_Nonnull const keyData = item.destinationKey;
-				struct HFSPlusCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
 				NSMutableData *_Nonnull const recData = item.destinationRecord;
 				void *_Nonnull const recPtr = recData.mutableBytes;
 				int16_t const *_Nonnull const recTypePtr = recPtr;
@@ -431,11 +451,83 @@
 #pragma mark -
 #pragma mark Epilogue: Implementation of the helper classes
 
+@implementation ImpCatalogItemIdentifier
+
++ (ImpTextEncodingConverter *_Nonnull const) reusableTextEncodingConverter {
+	static ImpTextEncodingConverter *_Nullable _tec = nil;
+	if (_tec == nil) {
+		_tec = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:kTextEncodingMacRoman];
+	}
+	return _tec;
+}
+
+- (instancetype) initWithParentCNID:(HFSCatalogNodeID const)parentID ownCNID:(HFSCatalogNodeID const)ownID nodeName:(NSString *_Nonnull const)nodeName {
+	if ((self = [super init])) {
+		_parentID = parentID;
+		_ownID = ownID;
+		_nodeName = [nodeName copy];
+		_typeEmoji = @"📇";
+	}
+	return self;
+}
++ (instancetype) identifierWithParentCNID:(HFSCatalogNodeID const)parentID ownCNID:(HFSCatalogNodeID const)ownID nodeName:(NSString *_Nonnull const)nodeName {
+	return [[self alloc] initWithParentCNID:parentID ownCNID:ownID nodeName:nodeName];
+}
++ (instancetype) identifierWithHFSPlusCatalogKeyData:(NSData *_Nonnull const)keyData fileRecordData:(NSData *_Nonnull const)fileRecData {
+	struct HFSPlusCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
+	struct HFSPlusCatalogFile const *_Nonnull const fileRecPtr = fileRecData.bytes;
+	ImpCatalogItemIdentifier *_Nonnull const identifier = [self identifierWithParentCNID:L(keyPtr->parentID) ownCNID:L(fileRecPtr->fileID) nodeName:[[self reusableTextEncodingConverter] stringFromHFSUniStr255:&keyPtr->nodeName]];
+	identifier.typeEmoji = @"📄";
+	return identifier;
+}
++ (instancetype) identifierWithHFSPlusCatalogKeyData:(NSData *_Nonnull const)keyData folderRecordData:(NSData *_Nonnull const)folderRecData {
+	struct HFSPlusCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
+	struct HFSPlusCatalogFolder const *_Nonnull const folderRecPtr = folderRecData.bytes;
+	ImpCatalogItemIdentifier *_Nonnull const identifier = [self identifierWithParentCNID:L(keyPtr->parentID) ownCNID:L(folderRecPtr->folderID) nodeName:[[self reusableTextEncodingConverter] stringFromHFSUniStr255:&keyPtr->nodeName]];
+	identifier.typeEmoji = @"📁";
+	return identifier;
+}
++ (instancetype) identifierWithHFSPlusCatalogKeyData:(NSData *_Nonnull const)keyData threadRecordData:(NSData *_Nonnull const)threadRecData {
+	struct HFSPlusCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
+	struct HFSPlusCatalogThread const *_Nonnull const threadRecPtr = threadRecData.bytes;
+	ImpCatalogItemIdentifier *_Nonnull const identifier = [self identifierWithParentCNID:L(threadRecPtr->parentID) ownCNID:L(keyPtr->parentID) nodeName:[[self reusableTextEncodingConverter] stringFromHFSUniStr255:&threadRecPtr->nodeName]];
+	identifier.typeEmoji = (L(threadRecPtr->recordType) == kHFSPlusFileThreadRecord) ? @"📄" : @"📁";
+	return identifier;
+}
+
+- (id _Nonnull)copyWithZone:(NSZone *_Nullable)zone {
+	return self;
+}
+
+- (NSUInteger) hash {
+#if __LP64__
+	NSUInteger const parentID = self.parentID;
+	NSUInteger const ownID = self.ownID;
+	return parentID << 32 | ownID;
+#else
+	return self.ownID;
+#endif
+}
+
+- (BOOL) isEqual:(id _Nonnull)other {
+	ImpCatalogItemIdentifier *_Nonnull const otherIdent = other;
+	//TODO: Check this comment's veracity
+	//Note: In this case we really want exact comparison, not the case-insensitive sorting comparison used for inserting newly-created items into a catalog.
+	return self.ownID == otherIdent.ownID && self.parentID == otherIdent.parentID && [self.nodeName isEqualToString:otherIdent.nodeName];
+}
+
+- (NSString *_Nonnull) description {
+	return [NSString stringWithFormat:@"<%@ %p for 📁 #%u → %@ #%u “%@”>", self.class, self, self.parentID, self.typeEmoji, self.ownID, self.nodeName];
+}
+
+@end
+
 @implementation ImpCatalogItem
 
-- (instancetype _Nonnull) initWithCatalogNodeID:(HFSCatalogNodeID const)cnid {
+- (instancetype _Nonnull) initWithIdentifier:(ImpCatalogItemIdentifier *_Nonnull const)identifier {
 	if ((self = [super init])) {
-		_cnid = cnid;
+		_identifier = identifier;
+		_cnid = _identifier.ownID;
 		_needsThreadRecord = true;
 	}
 	return self;
@@ -447,10 +539,36 @@
 - (BOOL)isEqual:(id _Nonnull)other {
 	@try {
 		ImpCatalogItem *_Nonnull const fellowCatalogItemHopefully = other;
-		return self.cnid == fellowCatalogItemHopefully.cnid;
+		return [self.identifier isEqual:fellowCatalogItemHopefully.identifier];
 	} @catch (NSException *_Nonnull const exception) {
 		return false;
 	}
+}
+
+- (NSComparisonResult) caseInsensitiveCompare:(id)other {
+	ImpCatalogItem *_Nonnull const otherItem = other;
+	return (NSComparisonResult)ImpBTreeCompareHFSPlusCatalogKeys(self.destinationKey.bytes, otherItem.destinationKey.bytes);
+}
+
+- (NSString *_Nonnull) description {
+	NSMutableString *_Nonnull const description = [NSMutableString stringWithFormat:@"<%@ %p %CTR", self.class, self, (unichar)(self.needsThreadRecord ? 'N' : 'H')];
+	NSData *_Nonnull const srcKeyData       = self.sourceKey;
+	NSData *_Nonnull const srcThreadKeyData = self.sourceThreadKey;
+	NSData *_Nonnull const srcThreadRecData = self.sourceThreadRecord;
+	NSData *_Nonnull const dstKeyData       = self.destinationKey;
+	NSData *_Nonnull const dstThreadKeyData = self.destinationThreadKey;
+	NSData *_Nonnull const dstThreadRecData = self.destinationThreadRecord;
+	if (srcKeyData || srcThreadKeyData || srcThreadRecData || dstKeyData       || dstThreadKeyData || dstThreadRecData) {
+		if (srcKeyData) [description appendFormat:@"\nSK  %@", [ImpBTreeNode describeHFSCatalogKeyWithData:srcKeyData]];
+		if (srcThreadKeyData) [description appendFormat:@"\nSTK %@", [ImpBTreeNode describeHFSCatalogKeyWithData:srcThreadKeyData]];
+		if (srcThreadRecData) [description appendFormat:@"\nSTP %@", [ImpBTreeNode describeHFSCatalogThreadRecordWithData:srcThreadRecData]];
+		if (dstKeyData) [description appendFormat:@"\nDK  %@", [ImpBTreeNode describeHFSPlusCatalogKeyWithData:dstKeyData]];
+		if (dstThreadKeyData) [description appendFormat:@"\nDTK %@", [ImpBTreeNode describeHFSPlusCatalogKeyWithData:dstThreadKeyData]];
+		if (dstThreadRecData) [description appendFormat:@"\nDTP %@", [ImpBTreeNode describeHFSPlusCatalogThreadRecordWithData:dstThreadRecData]];
+		[description appendString:@"\n"];
+	}
+	[description appendString:@">"];
+	return description;
 }
 
 @end
@@ -525,6 +643,10 @@
 		_allPairs = [NSMutableArray arrayWithCapacity:maxNumBytes / kHFSCatalogKeyMinimumLength];
 	}
 	return self;
+}
+
+- (NSString *_Nonnull) description {
+	return [NSString stringWithFormat:@"<%@ %p with records: %@>", self.class, self, _allPairs];
 }
 
 - (NSData *_Nullable) firstKey {

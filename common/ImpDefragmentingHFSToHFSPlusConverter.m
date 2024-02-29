@@ -150,9 +150,13 @@
 			[self deliverProgressUpdateWithOperationDescription:[NSString stringWithFormat:NSLocalizedString(@"Copying file “%@”…", @"Conversion progress message"), [srcVol.textEncodingConverter stringFromHFSUniStr255:unicodeNamePtr]]];
 
 			//Copy the data fork.
-			struct HFSExtentDescriptor const *_Nonnull const firstDataExtents = fileRec->dataExtents;
 			u_int64_t const dataLogicalLength = L(fileRec->dataLogicalSize);
 			u_int64_t const dataPhysicalLength = L(fileRec->dataPhysicalSize);
+			u_int64_t const rsrcLogicalLength = L(fileRec->rsrcLogicalSize);
+			u_int64_t const rsrcPhysicalLength = L(fileRec->rsrcPhysicalSize);
+
+			struct HFSExtentDescriptor const *_Nonnull const firstDataExtents = fileRec->dataExtents;
+			struct HFSExtentDescriptor const *_Nonnull const firstRsrcExtents = fileRec->rsrcExtents;
 
 			u_int64_t bytesNotYetAllocatedForData = [dstVol allocateBytes:dataPhysicalLength forFork:ImpForkTypeData populateExtentRecord:convertedFilePtr->dataFork.extents];
 			//TODO: Handle bytesNotYetAllocated > 0 (by inserting the fork into the extents overflow file)
@@ -198,9 +202,6 @@
 			//Note: clumpSize should be left 0 per TN1150.
 
 			//Copy the resource fork.
-			struct HFSExtentDescriptor const *_Nonnull const firstRsrcExtents = fileRec->rsrcExtents;
-			u_int64_t const rsrcLogicalLength = L(fileRec->rsrcLogicalSize);
-			u_int64_t const rsrcPhysicalLength = L(fileRec->rsrcPhysicalSize);
 
 			u_int64_t bytesNotYetAllocatedForRsrc = [dstVol allocateBytes:rsrcPhysicalLength forFork:ImpForkTypeResource populateExtentRecord:convertedFilePtr->resourceFork.extents];
 			//TODO: Handle bytesNotYetAllocated > 0 (by inserting the fork into the extents overflow file)
