@@ -26,6 +26,20 @@
 
 @end
 
+@interface APMPartition : NSObject
+
++ (instancetype _Nonnull) partitionWithFirstBlockNumber:(u_int32_t const)startBlock numberOfBlocks:(u_int32_t const)numBlocks;
+
+///The 0-based number of the block where this partition starts. The partition map partition always starts at block 1 (immediately following the driver descriptor block at block 0).
+@property(readonly) u_int32_t firstBlockNumber;
+///The length of the partition in 0x200-byte blocks.
+@property(readonly) u_int32_t numberOfBlocks;
+
+///The start block times 0x200 bytes.
+@property(readonly) u_int64_t offsetIntoPartitionSchemeInBytes;
+
+@end
+
 ///IM:D calls this structure “Block0”. All fields are big-endian.
 ///We don't really care about trying to parse the driver descriptor block, other than checking the signature. If we find the driver descriptor block, we can expect it to be followed immediately by the partition map.
 ///(Note that absence of a DDB does not imply absence of an APM. There can be a PM block with no preceding ER block.)
@@ -34,11 +48,13 @@ enum {
 	APMDriverDescriptorBlockSignatureAlternate = 0x0000, //Sometimes there's no Driver Descriptor Record but block 0 is still followed by one or more partition map entries.
 
 	//IM:D: “This field should contain the value of the pMapSIG constant ($504D). An earlier but still supported version uses the value $5453.”
-	APMPartitionMapEntrySignature = 0x504D, //'PM'
-	APMPartitionMapEntrySignatureOldStyle = 0x5453, //'ST'
+	APMPartitionMapIM5EntrySignature = 0x504D, //'PM'
+	APMPartitionMapIM4EntrySignature = 0x5453, //'TS'
+	APMPartitionMapNullSignature = 0x0,
 };
+typedef u_int16_t APMBlockSignature;
 struct APMDriverDescriptorBlock {
-	u_int16_t signature; //'ER'
+	APMBlockSignature signature; //'ER'
 	u_int16_t bytesPerBlock;
 	u_int32_t numBlocks;
 	u_int16_t devType; //reserved
@@ -52,8 +68,23 @@ struct APMDriverDescriptorBlock {
 	} driverRecords[(0x200 - (2+2+4+2+2+4+2)) / 8];
 	u_int32_t pad; //reserved
 } __attribute__((aligned(2), packed));
-struct APMPartition {
-	u_int16_t signature; //'PM'
+
+struct APMPartitionRecord_IM4 {
+	u_int32_t thisPartitionStartBlock;
+	u_int32_t thisPartitionBlockCount;
+	OSType partitionType;
+} __attribute__((aligned(2), packed));
+enum {
+	APMPartitionMap_IM4_MaxPartitionsPerBlock = kISOStandardBlockSize / sizeof(struct APMPartitionRecord_IM4),
+	APMPartitionMap_IM4_PartitionTypeHFS = 'TFS1', //TFS = Turbo File System, an early name for what would later be officially named HFS
+};
+struct APMPartitionMap_IM4 {
+	APMBlockSignature signature; //'PM'
+	struct APMPartitionRecord_IM4 partitions[APMPartitionMap_IM4_MaxPartitionsPerBlock];
+} __attribute__((aligned(2), packed));
+
+struct APMPartitionRecord_IM5 {
+	APMBlockSignature signature; //'PM'
 	u_int16_t signaturePad;
 	u_int32_t numMapBlocks;
 	u_int32_t thisPartitionStartBlock;
@@ -159,13 +190,8 @@ struct APMPartition {
 
 #pragma mark -
 
+///Returns whether this storage appears to contain an Apple Partition Map. Even if the storage contains no interesting volumes (e.g., only Apple_Free or only ProDOS or something), finding an APM is success.
 - (bool) scanApplePartitionMap {
-	enum {
-		sbSIGWord = 0x4552, //'ER'
-		pMapSIG = 0x504D, //'PM'
-		pMapSIGOldStyle = 0x5453, //'TS'
-	};
-
 	NSUInteger firstPMBlock = 0;
 	NSData *_Nonnull const firstBlock = [self readOneISOStandardBlockAtIndex:0];
 	struct APMDriverDescriptorBlock const *_Nonnull const maybeDDB = (void const *)(firstBlock.bytes);
@@ -185,41 +211,65 @@ struct APMPartition {
 			return false;
 	}
 
-	bool foundPartitionMap = false;
+	NSData *_Nullable partitionMapEntryData = [self readOneISOStandardBlockAtIndex:firstPMBlock];
+	if (partitionMapEntryData != nil) {
+		void const *_Nonnull const partitionMapEntryBytes = partitionMapEntryData.bytes;
+		APMBlockSignature const * _Nonnull const signaturePtr = partitionMapEntryBytes;
+		switch (L(*signaturePtr)) {
+			case APMPartitionMapIM5EntrySignature:
+				if (self.verbose) ImpPrintf(@"Found an IM5 Apple Partition Map entry");
+				struct APMPartitionRecord_IM5 const *_Nullable partition5 = partitionMapEntryBytes;
+				return [self scanIM5PartitionMap:partition5 firstPartitionMapBlock:firstPMBlock];
+				break;
+			case APMPartitionMapIM4EntrySignature:
+				if (self.verbose) ImpPrintf(@"Found an IM4 Apple Partition Map");
+				struct APMPartitionMap_IM4 const *_Nullable partition4 = partitionMapEntryBytes;
+				return [self scanIM4PartitionMap:partition4 firstPartitionMapBlock:firstPMBlock];
+				break;
+			default:
+				//Signature mismatch—this is not an APM entry. And since it's supposed to be first APM entry, that means there's no APM.
+				if (self.verbose) ImpPrintf(@"Space where partition map entry should be is not an Apple Partition Map entry");
+				break;
+		}
+	}
 
-	NSUInteger partitionIndex = 0;
-	NSUInteger numPartitions = 0;
-	do {
-		NSData *_Nullable partitionMapEntryData = [self readOneISOStandardBlockAtIndex:firstPMBlock + partitionIndex];
+	return false;
+}
+
+- (bool) scanIM5PartitionMap:(struct APMPartitionRecord_IM5 const *_Nonnull const)firstPartitionBlock firstPartitionMapBlock:(NSUInteger const)firstPMBlockNum {
+	bool foundAnyPartitions = false;
+
+	//HAZARD: If the first partition map block has an incorrect number of map blocks, this could go wrong. Might need to take a majority vote of non-zero counts from other PMBs?
+	NSUInteger const numPartitions = L(firstPartitionBlock->numMapBlocks);
+	for (u_int32_t partitionIndex = 0; partitionIndex < numPartitions; ++partitionIndex) {
+		NSData *_Nullable partitionMapEntryData = [self readOneISOStandardBlockAtIndex:firstPMBlockNum + partitionIndex];
 		if (partitionMapEntryData != nil) {
-			struct APMPartition const *_Nonnull const partition = partitionMapEntryData.bytes;
-			if (numPartitions == 0) {
-				switch (L(partition->signature)) {
-					case APMPartitionMapEntrySignature:
-						if (self.verbose) ImpPrintf(@"Found an IM5 Apple Partition Map entry");
-						foundPartitionMap = true;
-						break;
-					case APMPartitionMapEntrySignatureOldStyle:
-						if (self.verbose) ImpPrintf(@"Found an IM4 Apple Partition Map");
-						foundPartitionMap = true;
-						break;
-					default:
-						//Signature mismatch—this is not an APM entry. And since it's supposed to be first APM entry, that means there's no APM.
-						if (self.verbose) ImpPrintf(@"Space where partition map entry should be is not an Apple Partition Map entry");
-						foundPartitionMap = false;
-						break;
-				}
-				if (! foundPartitionMap) {
-					break;
-				}
+			void const *_Nonnull const partitionMapEntryBytes = partitionMapEntryData.bytes;
+			APMBlockSignature const * _Nonnull const signaturePtr = partitionMapEntryBytes;
+			struct APMPartitionRecord_IM5 const *_Nullable thisPartition = NULL;
 
-				numPartitions = L(partition->numMapBlocks);
+			APMBlockSignature foundMapSignature = L(*signaturePtr);
+			switch (foundMapSignature) {
+				case APMPartitionMapIM5EntrySignature:
+					if (self.verbose) ImpPrintf(@"Found an IM5 Apple Partition Map entry");
+					thisPartition = partitionMapEntryBytes;
+					break;
+				case APMPartitionMapIM4EntrySignature:
+					if (self.verbose) ImpPrintf(@"Found an IM4 Apple Partition Map inside an IM5 Apple Partition Map????");
+					break;
+				default:
+					//Signature mismatch—this is not an APM entry. And since it's supposed to be first APM entry, that means there's no APM.
+					if (self.verbose) ImpPrintf(@"Space where partition map entry should be is not an Apple Partition Map entry");
+					break;
+			}
+			if (foundMapSignature != APMPartitionMapIM5EntrySignature) {
+				continue;
 			}
 
-			if (self.verbose) ImpPrintf(@"Partition type is %s", partition->partitionType);
-			if (strcmp(partition->partitionType, "Apple_HFS") == 0) {
-				u_int32_t const hfsBootBlocksStartBlockIndex = L(partition->thisPartitionStartBlock);
-				if (self.verbose) ImpPrintf(@"Entry describes an HFS volume. First physical block (location of boot blocks) is #%u", hfsBootBlocksStartBlockIndex);
+			if (self.verbose) ImpPrintf(@"Entry #%u partition type is %s", partitionIndex, thisPartition->partitionType);
+			if (strcmp(thisPartition->partitionType, "Apple_HFS") == 0) {
+				u_int32_t const hfsBootBlocksStartBlockIndex = L(thisPartition->thisPartitionStartBlock);
+				if (self.verbose) ImpPrintf(@"Entry #%u describes an HFS volume. First physical block (location of boot blocks) is #%u", partitionIndex, hfsBootBlocksStartBlockIndex);
 				u_int32_t const hfsVolumeHeaderBlockIndex = hfsBootBlocksStartBlockIndex + 2;
 				NSData *_Nonnull const thirdVolumeBlockData = [self readOneISOStandardBlockAtIndex:hfsVolumeHeaderBlockIndex];
 
@@ -241,14 +291,62 @@ struct APMPartition {
 					}
 				}
 
-				u_int32_t const hfsVolumeBlockCount = L(partition->thisPartitionBlockCount);
+				foundAnyPartitions = true;
+
+				u_int32_t const hfsVolumeBlockCount = L(thisPartition->thisPartitionBlockCount);
 				[self foundVolumeStartingAtBlock:hfsBootBlocksStartBlockIndex blockCount:hfsVolumeBlockCount class:identifiedClass];
 			}
 		}
-	} while (partitionIndex++ < numPartitions);
+	}
 
-	return foundPartitionMap;
+	return foundAnyPartitions;
 }
+
+- (bool) scanIM4PartitionMap:(struct APMPartitionMap_IM4 const *_Nonnull const)firstPartitionBlock firstPartitionMapBlock:(NSUInteger const)firstPMBlockNum {
+	bool haveFoundAnyPartitions = false;
+
+	for (u_int32_t partitionIndex = 0; partitionIndex < APMPartitionMap_IM4_MaxPartitionsPerBlock; ++partitionIndex) {
+		struct APMPartitionRecord_IM4 const *_Nonnull const thisPartition = &firstPartitionBlock->partitions[partitionIndex];
+		if (thisPartition->thisPartitionStartBlock == 0 || thisPartition->thisPartitionBlockCount == 0 || thisPartition->partitionType == 0) {
+			//We have scanned all partitions.
+			break;
+		} else {
+			OSType const partitionType = L(thisPartition->partitionType);
+			if (partitionType == APMPartitionMap_IM4_PartitionTypeHFS) {
+				u_int32_t const hfsBootBlocksStartBlockIndex = L(thisPartition->thisPartitionStartBlock);
+				if (self.verbose) ImpPrintf(@"Entry #%u describes an HFS volume. First physical block (location of boot blocks) is #%u", partitionIndex, hfsBootBlocksStartBlockIndex);
+				u_int32_t const hfsVolumeHeaderBlockIndex = hfsBootBlocksStartBlockIndex + 2;
+				NSData *_Nonnull const thirdVolumeBlockData = [self readOneISOStandardBlockAtIndex:hfsVolumeHeaderBlockIndex];
+
+				Class _Nullable identifiedClass = Nil;
+
+				struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr = (struct HFSMasterDirectoryBlock const *_Nonnull)thirdVolumeBlockData.bytes;
+				if (L(mdbPtr->drSigWord) == kHFSSigWord) {
+					if (self.verbose) ImpPrintf(@"Volume is an HFS volume");
+					identifiedClass = [ImpHFSVolume class];
+				} else {
+					struct HFSPlusVolumeHeader const *_Nonnull const vhPtr = (struct HFSPlusVolumeHeader const *_Nonnull)thirdVolumeBlockData.bytes;
+					if (L(vhPtr->signature) == kHFSPlusSigWord) {
+						if (self.verbose) ImpPrintf(@"Volume is an HFS+ volume");
+						identifiedClass = [ImpHFSPlusVolume class];
+					} else {
+						//Signature isn't HFS or HFS+? This may be mapped as an Apple_HFS partition, but it's not a usable HFS or HFS+ volume. Skip it.
+						if (self.verbose) ImpPrintf(@"Volume is not an HFS or HFS+ volume");
+						continue;
+					}
+				}
+
+				haveFoundAnyPartitions = true;
+
+				u_int32_t const hfsVolumeBlockCount = L(thisPartition->thisPartitionBlockCount);
+				[self foundVolumeStartingAtBlock:hfsBootBlocksStartBlockIndex blockCount:hfsVolumeBlockCount class:identifiedClass];
+			}
+		}
+	}
+
+	return haveFoundAnyPartitions;
+}
+
 - (bool) scanBareVolumeStartingAtBlock:(u_int64_t const)startBlock blockCount:(u_int64_t const)numBlocks  {
 	NSData *_Nonnull const thirdBlock = [self readOneISOStandardBlockAtIndex:startBlock + 2];
 	if (thirdBlock != nil) {
@@ -272,6 +370,22 @@ struct APMPartition {
 - (void) scan {
 	[self scanApplePartitionMap] || [self scanBareVolumeStartingAtBlock:0 blockCount:self.sizeInBytesAccordingToStat / kISOStandardBlockSize];
 	_hasScanned = true;
+}
+
+@end
+
+@implementation APMPartition
+
++ (instancetype _Nonnull) partitionWithFirstBlockNumber:(u_int32_t const)startBlock numberOfBlocks:(u_int32_t const)numBlocks {
+	return [[self alloc] initWithFirstBlockNumber:startBlock numberOfBlocks:numBlocks];
+}
+- (instancetype _Nonnull) initWithFirstBlockNumber:(u_int32_t const)startBlock numberOfBlocks:(u_int32_t const)numBlocks {
+	if ((self = [super init])) {
+		_firstBlockNumber = startBlock;
+		_numberOfBlocks = numBlocks;
+		_offsetIntoPartitionSchemeInBytes = _firstBlockNumber * kISOStandardBlockSize;
+	}
+	return self;
 }
 
 @end
