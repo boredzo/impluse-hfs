@@ -252,7 +252,7 @@
 		return [[ImpBTreeCursor alloc] initWithNode:foundNode recordIndex:recordIdx];
 	}
 
-	return false;
+	return nil;
 }
 
 - (ImpBTreeCursor *_Nullable) searchCatalogTreeForItemWithParentID:(HFSCatalogNodeID)cnid
