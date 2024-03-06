@@ -14,9 +14,9 @@
 		31077AD1293849EE00066789 /* ImpBTreeIndexNode.m in Sources */ = {isa = PBXBuildFile; fileRef = 31077AD0293849EE00066789 /* ImpBTreeIndexNode.m */; };
 		31077AD42939587400066789 /* NSData+ImpHexDump.m in Sources */ = {isa = PBXBuildFile; fileRef = 31077AD32939587300066789 /* NSData+ImpHexDump.m */; };
 		3135D7782960FFDC001E4890 /* ImpComparisonUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 3135D7772960FFDC001E4890 /* ImpComparisonUtilities.m */; };
-		313CF74A29C8415D00CAA05E /* ImpDehydratedResourceFork.m in Sources */ = {isa = PBXBuildFile; fileRef = 313CF74929C8415D00CAA05E /* ImpDehydratedResourceFork.m */; };
 		313662682B37742100931CF4 /* ImpHFSVolume+ConsistencyChecking.m in Sources */ = {isa = PBXBuildFile; fileRef = 313662672B37742100931CF4 /* ImpHFSVolume+ConsistencyChecking.m */; };
 		313662692B37742100931CF4 /* ImpHFSVolume+ConsistencyChecking.m in Sources */ = {isa = PBXBuildFile; fileRef = 313662672B37742100931CF4 /* ImpHFSVolume+ConsistencyChecking.m */; };
+		313CF74A29C8415D00CAA05E /* ImpDehydratedResourceFork.m in Sources */ = {isa = PBXBuildFile; fileRef = 313CF74929C8415D00CAA05E /* ImpDehydratedResourceFork.m */; };
 		314EFFDB2932CF3700CE74E9 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFDA2932CF3700CE74E9 /* main.m */; };
 		314EFFE4293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFE3293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m */; };
 		314EFFE72933160800CE74E9 /* ImpHFSVolume.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFE62933160800CE74E9 /* ImpHFSVolume.m */; };
@@ -89,10 +89,10 @@
 		31077AD32939587300066789 /* NSData+ImpHexDump.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSData+ImpHexDump.m"; sourceTree = "<group>"; };
 		3135D7762960FFDC001E4890 /* ImpComparisonUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpComparisonUtilities.h; sourceTree = "<group>"; };
 		3135D7772960FFDC001E4890 /* ImpComparisonUtilities.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpComparisonUtilities.m; sourceTree = "<group>"; };
-		313CF74829C8415D00CAA05E /* ImpDehydratedResourceFork.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpDehydratedResourceFork.h; sourceTree = "<group>"; };
-		313CF74929C8415D00CAA05E /* ImpDehydratedResourceFork.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpDehydratedResourceFork.m; sourceTree = "<group>"; };
 		313662662B37742100931CF4 /* ImpHFSVolume+ConsistencyChecking.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ImpHFSVolume+ConsistencyChecking.h"; sourceTree = "<group>"; };
 		313662672B37742100931CF4 /* ImpHFSVolume+ConsistencyChecking.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "ImpHFSVolume+ConsistencyChecking.m"; sourceTree = "<group>"; };
+		313CF74829C8415D00CAA05E /* ImpDehydratedResourceFork.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpDehydratedResourceFork.h; sourceTree = "<group>"; };
+		313CF74929C8415D00CAA05E /* ImpDehydratedResourceFork.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpDehydratedResourceFork.m; sourceTree = "<group>"; };
 		314EFFD72932CF3700CE74E9 /* impluse-hfs */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "impluse-hfs"; sourceTree = BUILT_PRODUCTS_DIR; };
 		314EFFDA2932CF3700CE74E9 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		314EFFE12932CF5B00CE74E9 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
