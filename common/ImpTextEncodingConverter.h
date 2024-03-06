@@ -67,4 +67,7 @@
 
 - (NSString *_Nonnull const) stringFromHFSUniStr255:(ConstHFSUniStr255Param _Nonnull const)unicodeName;
 
+///Convert a string to an HFSUniStr255 Pascal-style string. Returns whether the string was completely copied.
+- (bool) convertString:(NSString *_Nonnull const)inStr toHFSUniStr255:(struct HFSUniStr255 *_Nonnull const)outUnicodeName;
+
 @end

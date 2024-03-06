@@ -446,6 +446,109 @@
 	}];
 }
 
+#pragma mark Creation of original files
+
+- (HFSCatalogNodeID) createFileInParent:(HFSCatalogNodeID)parentID
+	name:(NSString *_Nonnull const)nodeName
+	type:(OSType const)fileType
+	creator:(OSType const)creator
+	finderFlags:(UInt16)finderFlags
+{
+	//TEMP: Stolen from -buildMockTree, where it belongs. The whole CNID-assignment mechanism needs to be reworked; it's currently very ad-hoc.
+	if (_largestCNIDYet < UINT32_MAX) {
+		self.nextCatalogNodeID = _largestCNIDYet + 1;
+		self.hasReusedCatalogNodeIDs = false;
+	} else {
+		self.nextCatalogNodeID = _firstUnusedCNID;
+		self.hasReusedCatalogNodeIDs = true;
+	}
+
+	//TODO: Really should make this failable in case all possible CNIDs are in use.
+	HFSCatalogNodeID const cnid = self.nextCatalogNodeID;
+	ImpTextEncodingConverter *_Nonnull const tec = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:kTextEncodingMacRoman];
+	struct HFSUniStr255 nodeName255;
+	[tec convertString:nodeName toHFSUniStr255:&nodeName255];
+
+	{
+		NSMutableData *_Nonnull const fileKeyData = [NSMutableData dataWithLength:sizeof(struct HFSPlusCatalogKey)];
+		struct HFSPlusCatalogKey *_Nonnull const fileKeyPtr = fileKeyData.mutableBytes;
+		S(fileKeyPtr->parentID, parentID);
+		memcpy(&fileKeyPtr->nodeName, &nodeName255, sizeof(nodeName255));
+		u_int16_t const keyLength = sizeof(fileKeyPtr->parentID) + sizeof(fileKeyPtr->nodeName.length) + sizeof(UniChar) * L(fileKeyPtr->nodeName.length);
+		S(fileKeyPtr->keyLength, keyLength);
+		fileKeyData.length = keyLength + sizeof(fileKeyPtr->keyLength);
+
+		NSMutableData *_Nonnull const fileRecData = [NSMutableData dataWithLength:sizeof(struct HFSPlusCatalogFile)];
+		struct HFSPlusCatalogFile *_Nonnull const fileRecPtr = fileRecData.mutableBytes;
+		S(fileRecPtr->recordType, kHFSPlusFileRecord);
+		S(fileRecPtr->flags, kHFSFileLockedMask | kHFSThreadExistsMask);
+		S(fileRecPtr->fileID, cnid);
+		NSDate *_Nonnull const now = [NSDate date];
+		static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z timeIntervalSinceReferenceDate
+		u_int32_t const nowSince1984 = (u_int32_t)(now.timeIntervalSinceReferenceDate - hfsEpochTISRD);
+		S(fileRecPtr->createDate, nowSince1984);
+		S(fileRecPtr->contentModDate, nowSince1984);
+		S(fileRecPtr->backupDate, nowSince1984);
+		//These two are not set by classic Mac OS, so ordinarily we would leave these fields alone. However, this is an original file being created by impluse in the present day, so making it distinguishable from files copied in from the past is desirable.
+		S(fileRecPtr->attributeModDate, nowSince1984);
+		S(fileRecPtr->accessDate, nowSince1984);
+
+		struct HFSPlusBSDInfo bsdInfo;
+		S(bsdInfo.ownerID, getuid());
+		S(bsdInfo.groupID, getgid());
+		bsdInfo.adminFlags = bsdInfo.ownerFlags = 0;
+		S(bsdInfo.fileMode, 0444);
+		bsdInfo.special.linkCount = 0;
+		memcpy(&fileRecPtr->bsdInfo, &bsdInfo, sizeof(bsdInfo));
+
+		struct FndrFileInfo userInfo;
+		S(userInfo.fdType, fileType);
+		S(userInfo.fdCreator, creator);
+		userInfo.fdLocation.h = userInfo.fdLocation.v = CFSwapInt16HostToBig(16);
+		S(userInfo.fdFlags, finderFlags);
+		userInfo.opaque = 0;
+		memcpy(&fileRecPtr->userInfo, &userInfo, sizeof(userInfo));
+
+		struct FndrExtendedFileInfo extInfo;
+		extInfo.document_id = 0;
+		extInfo.date_added = nowSince1984;
+		extInfo.extended_flags = kExtendedFlagsAreInvalid;
+		extInfo.reserved2 = 0;
+		extInfo.write_gen_counter = 0;
+		memcpy(&fileRecPtr->finderInfo, &extInfo, sizeof(extInfo));
+
+		S(fileRecPtr->textEncoding, kTextEncodingMacRoman);
+		fileRecPtr->reserved1 = fileRecPtr->reserved2 = 0;
+
+		S(fileRecPtr->dataFork.clumpSize, 4096);
+
+		[self addKey:fileKeyData fileRecord:fileRecData];
+	}
+
+	{
+		NSMutableData *_Nonnull const fileThreadKeyData = [NSMutableData dataWithLength:sizeof(struct HFSPlusCatalogKey)];
+		struct HFSPlusCatalogKey *_Nonnull const fileThreadKeyPtr = fileThreadKeyData.mutableBytes;
+		S(fileThreadKeyPtr->parentID, cnid);
+		//Thread keys have an empty node name.
+		u_int16_t const keyLength = sizeof(fileThreadKeyPtr->parentID) + sizeof(fileThreadKeyPtr->nodeName.length) + sizeof(UniChar) * L(fileThreadKeyPtr->nodeName.length);
+		S(fileThreadKeyPtr->keyLength, keyLength);
+		fileThreadKeyData.length = keyLength + sizeof(fileThreadKeyPtr->keyLength);
+
+		NSMutableData *_Nonnull const fileThreadRecData = [NSMutableData dataWithLength:sizeof(struct HFSPlusCatalogThread)];
+		struct HFSPlusCatalogThread *_Nonnull const fileThreadRecPtr = fileThreadRecData.mutableBytes;
+		S(fileThreadRecPtr->recordType, kHFSPlusFileThreadRecord);
+		S(fileThreadRecPtr->parentID, parentID);
+		memcpy(&fileThreadRecPtr->nodeName, &nodeName255, sizeof(nodeName255));
+		fileThreadRecPtr->reserved = 0;
+		u_int32_t const threadRecSize = sizeof(fileThreadRecPtr->recordType) + sizeof(fileThreadRecPtr->reserved) + sizeof(fileThreadRecPtr->parentID) + sizeof(fileThreadRecPtr->nodeName.length) + sizeof(UniChar) * L(fileThreadRecPtr->nodeName.length);
+		[fileThreadRecData setLength:threadRecSize];
+
+		[self addKey:fileThreadKeyData threadRecord:fileThreadRecData];
+	}
+
+	return cnid;
+}
+
 @end
 
 #pragma mark -

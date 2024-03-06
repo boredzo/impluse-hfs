@@ -47,6 +47,14 @@
 ///Populate a real tree with the records added so far. Note that this method does not work incrementally, so it should only be used on a real tree. Create the tree with a number of nodes equal to or greater than totalNodeCount.
 - (void) populateTree:(ImpMutableBTreeFile *_Nonnull const)tree;
 
+#pragma mark Creation of original files
+
+- (HFSCatalogNodeID) createFileInParent:(HFSCatalogNodeID)parentID
+	name:(NSString *_Nonnull const)nodeName
+	type:(OSType const)fileType
+	creator:(OSType const)creator
+	finderFlags:(UInt16)finderFlags;
+
 @end
 
 ///Simple data object for an item in a catalog file being translated.

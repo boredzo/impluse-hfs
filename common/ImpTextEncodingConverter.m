@@ -270,4 +270,15 @@ enum {
 	return str;
 }
 
+- (bool) convertString:(NSString *_Nonnull const)inStr toHFSUniStr255:(struct HFSUniStr255 *_Nonnull const)outUnicodeName {
+	NSUInteger const actualStringLength = inStr.length;
+	u_int16_t const cappedStringLength = actualStringLength > 255 ? 255 : (u_int16_t)actualStringLength;
+	NSData *_Nonnull const charactersData = [[inStr substringToIndex:cappedStringLength] dataUsingEncoding:NSUTF16BigEndianStringEncoding];
+	size_t const numBytes = charactersData.length;
+	unichar const *_Nonnull const nativeEndianCharacters = charactersData.bytes;
+	memcpy(outUnicodeName->unicode, nativeEndianCharacters, numBytes);
+	S(outUnicodeName->length, cappedStringLength);
+	return cappedStringLength == actualStringLength;
+}
+
 @end

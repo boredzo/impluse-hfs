@@ -84,6 +84,12 @@
 	file:(bool (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFile const *_Nonnull const fileRec))visitFile
 	folder:(bool (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFolder const *_Nonnull const folderRec))visitFolder;
 
+///Call one block or the other for every file and folder in the catalog.
+///You can pass nil for either or both blocks. If you pass nil for both blocks, you'll find out how many items are actually in the volume, regardless of what its header says.
+- (NSUInteger) forEachItemInHFSCatalog:(id _Nullable)reserved
+	file:(bool (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFile const *_Nonnull const fileRec))visitFile
+	folder:(bool (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFolder const *_Nonnull const folderRec))visitFolder;
+
 ///Internal method used by higher-level search methods in both this class and the mutable subclass.
 - (bool) searchTreeForItemWithKeyComparator:(ImpBTreeRecordKeyComparator _Nonnull const)compareKeys
 	getNode:(ImpBTreeNode *_Nullable *_Nullable const)outNode

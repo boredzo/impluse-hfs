@@ -26,6 +26,8 @@
 #import "ImpTextEncodingConverter.h"
 #import "ImpCatalogBuilder.h"
 
+NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered from orphaned blocks";
+
 @implementation ImpHFSToHFSPlusConverter
 {
 	NSData *_placeholderForkData;
@@ -466,6 +468,15 @@
 		}];
 		return true;
 	}];
+
+	if ([self.sourceVolume numberOfBlocksThatAreAllocatedButAreNotReferencedInTheBTrees] > 0) {
+		enum { HexEditCreatorCode = 'hDmp' };
+		[catBuilder createFileInParent:kHFSRootFolderID
+			name:ImpRescuedDataFileName
+			type:'????'
+			creator:HexEditCreatorCode
+			finderFlags:kHasBeenInited | kNameLocked | kHasNoINITs];
+	}
 
 	ImpMutableBTreeFile *_Nonnull const destTree = [[ImpMutableBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSPlusCatalog
 		bytesPerNode:self.destinationCatalogNodeSize

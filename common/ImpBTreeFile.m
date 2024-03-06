@@ -439,6 +439,35 @@
 	return numVisited;
 }
 
+- (NSUInteger) forEachItemInHFSCatalog:(id _Nullable)reserved
+	file:(bool (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFile const *_Nonnull const fileRec))visitFile
+	folder:(bool (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFolder const *_Nonnull const folderRec))visitFolder
+{
+	__block NSUInteger numVisited = 0;
+	__block bool keepIterating = true;
+	[self walkLeafNodes:^bool(ImpBTreeNode *_Nonnull const node) {
+		[node forEachHFSCatalogRecord_file:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogFile const *_Nonnull const fileRecPtr) {
+			if (keepIterating) {
+				++numVisited;
+				if (visitFile != nil) {
+					keepIterating = visitFile(catalogKeyPtr, fileRecPtr);
+				}
+			}
+		} folder:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogFolder const *_Nonnull const folderRecPtr) {
+			if (keepIterating) {
+				++numVisited;
+				if (visitFolder != nil) {
+					keepIterating = visitFolder(catalogKeyPtr, folderRecPtr);
+				}
+			}
+		} thread:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSCatalogThread const *_Nonnull const threadRecPtr) {
+		}];
+		return keepIterating;
+	}];
+
+	return numVisited;
+}
+
 - (bool) searchTreeForItemWithKeyComparator:(ImpBTreeRecordKeyComparator _Nonnull const)compareKeys
 	getNode:(ImpBTreeNode *_Nullable *_Nullable const)outNode
 	recordIndex:(u_int16_t *_Nullable const)outRecordIdx

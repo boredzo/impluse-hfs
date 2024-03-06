@@ -435,10 +435,11 @@
 	while ((foundRange.location = CFBitVectorGetFirstIndexOfBit(_blocksThatAreAllocatedButWereNotAccessed, searchRange, true)) != kCFNotFound) {
 		searchRange.length -= foundRange.location - searchRange.location;
 		searchRange.location = foundRange.location;
-		CFIndex const lastMissedBit = CFBitVectorGetLastIndexOfBit(_blocksThatAreAllocatedButWereNotAccessed, searchRange, true);
-		ImpPrintf(@"Blocks that have not been accessed: %lu through %lu", foundRange.location, lastMissedBit);
 
+		CFIndex const lastMissedBit = CFBitVectorGetLastIndexOfBit(_blocksThatAreAllocatedButWereNotAccessed, searchRange, true);
 		foundRange.length = (lastMissedBit - foundRange.location) + 1;
+		ImpPrintf(@"Blocks that have not been accessed: %lu through %lu (%lu blocks)", foundRange.location, lastMissedBit, foundRange.length);
+
 		searchRange.length -= foundRange.length;
 		searchRange.location += foundRange.length;
 	}
@@ -446,6 +447,93 @@
 	if (numUnreadBlocks > 0) {
 		ImpPrintf(@"Of the %lu blocks that are marked as allocated, %lu have not been read from", CFBitVectorGetCountOfBit(_bitVector, entireRange, true), numUnreadBlocks);
 	}
+}
+- (NSUInteger) numberOfBlocksThatAreAllocatedButHaveNotBeenAccessed {
+	CFRange const entireRange = { 0, self.numberOfBlocksTotal };
+	NSUInteger const numUnreadBlocks = CFBitVectorGetCountOfBit(_blocksThatAreAllocatedButWereNotAccessed, entireRange, true);
+	if (numUnreadBlocks > 0) {
+		ImpPrintf(@"Of the %lu blocks that are marked as allocated, %lu have not been read from", CFBitVectorGetCountOfBit(_bitVector, entireRange, true), numUnreadBlocks);
+	}
+
+	return numUnreadBlocks;
+}
+- (void) findExtents:(void (^_Nonnull const)(NSRange))block inBitVector:(CFBitVectorRef _Nonnull const)bitVector {
+	CFRange const entireRange = { 0, self.numberOfBlocksTotal };
+	CFRange searchRange = entireRange;
+	CFRange foundRange;
+	while ((foundRange.location = CFBitVectorGetFirstIndexOfBit(bitVector, searchRange, true)) != kCFNotFound) {
+		searchRange.length -= foundRange.location - searchRange.location;
+		searchRange.location = foundRange.location;
+
+		CFIndex const lastMissedBit = CFBitVectorGetLastIndexOfBit(bitVector, searchRange, true);
+		foundRange.length = (lastMissedBit - foundRange.location) + 1;
+
+		NSRange const extent = { foundRange.location, foundRange.length };
+		block(extent);
+
+		searchRange.length -= foundRange.length;
+		searchRange.location += foundRange.length;
+	}
+}
+- (void) findExtentsThatAreAllocatedButHaveNotBeenAccessed:(void (^_Nonnull const)(NSRange))block {
+	[self findExtents:block inBitVector:_blocksThatAreAllocatedButWereNotAccessed];
+}
+- (void) findExtentsThatAreAllocatedButAreNotReferencedInTheBTrees:(void (^_Nonnull const)(NSRange))block {
+	CFMutableBitVectorRef _Nonnull const orphanedBlocks = CFBitVectorCreateMutableCopy(kCFAllocatorDefault, CFBitVectorGetCount(_bitVector), _bitVector);
+
+	NSUInteger const blockSize = self.numberOfBytesPerBlock;
+	u_int64_t (^_Nonnull const markOffBits)(struct HFSExtentDescriptor const *_Nonnull const oneExtent, u_int64_t logicalBytesRemaining) = ^u_int64_t(struct HFSExtentDescriptor const *_Nonnull const oneExtent, u_int64_t logicalBytesRemaining) {
+		CFRange const range = { L(oneExtent->startBlock), L(oneExtent->blockCount) };
+		CFBitVectorSetBits(orphanedBlocks, range, 0);
+		return range.length * blockSize;
+	};
+
+	//Mark off bits as used.
+	[self.catalogBTree forEachItemInHFSCatalog:nil
+		file:^bool(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFile const *_Nonnull const fileRec) {
+			struct HFSExtentDescriptor const *_Nonnull const dataExtents = fileRec->dataExtents;
+			[self forEachExtentInFileWithID:L(fileRec->fileID)
+				fork:ImpForkTypeData
+				forkLogicalLength:L(fileRec->dataLogicalSize)
+				startingWithExtentsRecord:dataExtents
+				block:markOffBits];
+			struct HFSExtentDescriptor const *_Nonnull const rsrcExtents = fileRec->rsrcExtents;
+			[self forEachExtentInFileWithID:L(fileRec->fileID)
+				fork:ImpForkTypeResource
+				forkLogicalLength:L(fileRec->rsrcLogicalSize)
+				startingWithExtentsRecord:rsrcExtents
+				block:markOffBits];
+			return true;
+		}
+		folder:nil
+	];
+	//The catalog and extents overflow files themselves occupy extents, so mark those off as well.
+	[self forEachExtentInFileWithID:kHFSCatalogFileID
+		fork:ImpForkTypeData
+		forkLogicalLength:L(_mdb->drCTFlSize)
+		startingWithExtentsRecord:_mdb->drCTExtRec
+		block:markOffBits];
+	[self forEachExtentInFileWithID:kHFSExtentsFileID
+		fork:ImpForkTypeData
+		forkLogicalLength:L(_mdb->drXTFlSize)
+		startingWithExtentsRecord:_mdb->drXTExtRec
+		block:markOffBits];
+
+	[self findExtents:block inBitVector:orphanedBlocks];
+
+	CFRelease(orphanedBlocks);
+}
+- (NSUInteger) numberOfBlocksThatAreAllocatedButAreNotReferencedInTheBTrees {
+	__block NSUInteger numOrphanedBlocks = 0;
+	[self findExtentsThatAreAllocatedButAreNotReferencedInTheBTrees:^(NSRange extentRange) {
+		numOrphanedBlocks += extentRange.length;
+	}];
+	if (numOrphanedBlocks > 0) {
+		CFRange const entireRange = { 0, self.numberOfBlocksTotal };
+		ImpPrintf(@"Of the %lu blocks that are marked as allocated, %lu are not claimed by any fork", CFBitVectorGetCountOfBit(_bitVector, entireRange, true), numOrphanedBlocks);
+	}
+
+	return numOrphanedBlocks;
 }
 
 - (off_t) offsetOfFirstAllocationBlock {

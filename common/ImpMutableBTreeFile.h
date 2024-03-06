@@ -47,4 +47,12 @@
 - (ImpBTreeCursor *_Nullable) searchCatalogTreeForItemWithParentID:(HFSCatalogNodeID)cnid
 	unicodeName:(ConstHFSUniStr255Param _Nonnull)nodeName;
 
+#pragma mark Modifying existing catalog records
+
+- (void) setExtentRecord:(struct HFSPlusExtentDescriptor const *_Nonnull const)extentRec
+	forFork:(ImpForkType const)forkType
+	ofCatalogItemInParentID:(HFSCatalogNodeID const)parentID
+	withName:(NSString *_Nonnull const)nodeName
+	setLogicalLength:(u_int64_t const)newLogicalLength;
+
 @end

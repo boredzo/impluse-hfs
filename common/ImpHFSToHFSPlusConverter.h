@@ -13,6 +13,8 @@ typedef void (^ImpConversionProgressUpdateBlock)(double progress, NSString *_Non
 @class ImpHFSVolume, ImpHFSPlusVolume;
 @class ImpBTreeFile, ImpMutableBTreeFile;
 
+extern NSString *_Nonnull const ImpRescuedDataFileName;
+
 @interface ImpHFSToHFSPlusConverter : NSObject
 
 ///The number of bytes per node in the catalog file that will be created as part of conversion. Defaults to BTreeNodeLengthHFSPlusCatalogMinimum.

@@ -65,6 +65,12 @@
 - (u_int32_t) numberOfBlocksFreeAccordingToBitmap;
 ///Identify which blocks are marked as allocated in the volume bitmap but have not been read from, and print those to the log.
 - (void) reportBlocksThatAreAllocatedButHaveNotBeenAccessed;
+///Count how many blocks are marked as allocated in the volume bitmap but have not been read from. Use this method after all files have been copied when identifying orphaned blocks for recovery.
+- (NSUInteger) numberOfBlocksThatAreAllocatedButHaveNotBeenAccessed;
+///Call the block with an NSRange containing each contiguous extent of blocks that are marked as allocated in the volume bitmap but have not been read from. Use this method after all files have been copied when identifying orphaned blocks for recovery.
+- (void) findExtentsThatAreAllocatedButHaveNotBeenAccessed:(void (^_Nonnull const)(NSRange))block;
+
+- (NSUInteger) numberOfBlocksThatAreAllocatedButAreNotReferencedInTheBTrees;
 
 @property(strong) ImpBTreeFile *_Nonnull catalogBTree;
 @property(strong) ImpBTreeFile *_Nonnull extentsOverflowBTree;
@@ -112,5 +118,12 @@
 	startingWithExtentsRecord:(struct HFSExtentDescriptor const *_Nonnull const)hfsExtRec
 	readDataOrReturnError:(NSError *_Nullable *_Nonnull const)outError
 	block:(bool (^_Nonnull const)(NSData *_Nonnull const fileData, u_int64_t const logicalLength))block;
+
+///More general method for doing something with every extent, mainly exposed for the sake of analyze.
+- (u_int64_t) forEachExtentInFileWithID:(HFSCatalogNodeID)cnid
+	fork:(ImpForkType)forkType
+	forkLogicalLength:(u_int64_t const)forkLength
+	startingWithExtentsRecord:(struct HFSExtentDescriptor const *_Nonnull const)initialExtRec
+	block:(u_int64_t (^_Nonnull const)(struct HFSExtentDescriptor const *_Nonnull const oneExtent, u_int64_t logicalBytesRemaining))block;
 
 @end

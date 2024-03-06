@@ -8,6 +8,7 @@
 #import "ImpMutableBTreeFile.h"
 
 #import "NSData+ImpSubdata.h"
+#import "ImpSizeUtilities.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeHeaderNode.h"
 #import "ImpBTreeMapNode.h"
@@ -298,6 +299,59 @@
 	};
 
 	return [self searchCatalogTreeWithKeyComparator:compareKeys];
+}
+
+#pragma mark Modifying existing catalog records
+
+- (void) setExtentRecord:(struct HFSPlusExtentDescriptor const *_Nonnull const)extentRec
+	forFork:(ImpForkType const)forkType
+	ofCatalogItemInParentID:(HFSCatalogNodeID const)parentID
+	withName:(NSString *_Nonnull const)nodeName
+	setLogicalLength:(u_int64_t const)newLogicalLength
+{
+	//TODO: Largely copied from -[ImpBTreeFile searchCatalogTreeForItemWithParentID:name:getRecordKeyData:threadRecordData:]. There probably should be a more general implementation, perhaps calling a block with the found node and record index.
+	struct HFSPlusCatalogKey quarryCatalogKey;
+	S(quarryCatalogKey.parentID, parentID);
+	ImpTextEncodingConverter *_Nonnull const tec = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:kTextEncodingMacRoman];
+	[tec convertString:nodeName toHFSUniStr255:&quarryCatalogKey.nodeName];
+	u_int16_t const keyLength = sizeof(quarryCatalogKey.parentID) + sizeof(quarryCatalogKey.nodeName.length) + sizeof(UniChar) * L(quarryCatalogKey.nodeName.length);
+	S(quarryCatalogKey.keyLength, (u_int16_t)keyLength);
+
+	//TODO: Factor this out into -hfsCatalogKeyComparator and -hfsPlusCatalogKeyComparator (the latter should use Unicode name comparisons)
+	ImpBTreeRecordKeyComparator _Nonnull const compareKeys = ^ImpBTreeComparisonResult(const void *const  _Nonnull foundKeyPtr) {
+		struct HFSPlusCatalogKey const *_Nonnull const foundCatKeyPtr = foundKeyPtr;
+		return ImpBTreeCompareHFSPlusCatalogKeys(&quarryCatalogKey, foundCatKeyPtr);
+	};
+
+	ImpBTreeNode *_Nullable foundNode = nil;
+	u_int16_t recordIdx = 0;
+	bool const found = [self searchTreeForItemWithKeyComparator:compareKeys
+		getNode:&foundNode
+		recordIndex:&recordIdx];
+
+	if (found) {
+		NSData *_Nonnull const recordKeyData = [foundNode recordKeyDataAtIndex:recordIdx];
+		ImpBTreeComparisonResult const comparisonResult = compareKeys(recordKeyData.bytes);
+		if (comparisonResult != ImpBTreeComparisonQuarryIsEqual) {
+//			ImpPrintf(@"Not an exact match. Bummer.");
+		}
+		if (comparisonResult == ImpBTreeComparisonQuarryIsEqual) {
+//			ImpPrintf(@"This is a match!!!");
+			NSData *_Nonnull const dataBefore = [foundNode recordPayloadDataAtIndex:recordIdx];
+			NSMutableData *_Nonnull const dataAfter = [dataBefore mutableCopy];
+			struct HFSPlusCatalogFile *_Nonnull const fileRec = dataAfter.mutableBytes;
+			if (forkType == ImpForkTypeResource) {
+				memcpy(fileRec->resourceFork.extents, extentRec, sizeof(fileRec->resourceFork.extents));
+				S(fileRec->resourceFork.logicalSize, newLogicalLength);
+				S(fileRec->resourceFork.totalBlocks, ImpNumberOfBlocksInHFSPlusExtentRecord(extentRec));
+			} else {
+				memcpy(fileRec->dataFork.extents, extentRec, sizeof(fileRec->dataFork.extents));
+				S(fileRec->dataFork.logicalSize, newLogicalLength);
+				S(fileRec->dataFork.totalBlocks, ImpNumberOfBlocksInHFSPlusExtentRecord(extentRec));
+			}
+			[foundNode replacePayloadOfRecordAtIndex:recordIdx withPayload:dataAfter];
+		}
+	}
 }
 
 @end

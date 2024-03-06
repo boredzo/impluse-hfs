@@ -263,6 +263,51 @@
 
 	[self deliverProgressUpdateWithOperationDescription:[NSString stringWithFormat:NSLocalizedString(@"Copied %lu of %lu files and %lu of %lu folders", @"Conversion progress message"), numFilesCopied, srcVol.numberOfFiles, numFoldersCopied, srcVol.numberOfFolders]];
 
+	bool const shouldTryToRecoverOrphanedData = true;
+	NSUInteger const numOrphanedSrcBlocks = [srcVol numberOfBlocksThatAreAllocatedButHaveNotBeenAccessed];
+	if (shouldTryToRecoverOrphanedData && numOrphanedSrcBlocks > 0) {
+		if (numOrphanedSrcBlocks > UINT32_MAX) {
+			ImpPrintf(@"Source volume somehow contains %lu orphaned blocks. That seems unlikely, and probably indicative of other problems. At any rate, will try to rescue as many blocks as possible…", numOrphanedSrcBlocks);
+		} else {
+			ImpPrintf(@"Source volume contains %lu orphaned blocks. Attempting to rescue them…", numOrphanedSrcBlocks);
+		}
+		u_int32_t const numOrphanedSrcBlocks32 = numOrphanedSrcBlocks > UINT32_MAX ? UINT32_MAX : (u_int32_t)numOrphanedSrcBlocks;
+		u_int64_t const physicalLength = numOrphanedSrcBlocks32 * srcVol.numberOfBytesPerBlock;
+		u_int32_t const numDstBlocks32 = physicalLength / dstVol.numberOfBytesPerBlock;
+
+		HFSPlusExtentRecord rescuedBlocksExtents;
+		struct HFSPlusExtentDescriptor const *_Nonnull const rescuedBlocksExtentsPtr = rescuedBlocksExtents;
+		bool const allocatedRescuedBlocksDataFork = [dstVol allocateBlocks:numDstBlocks32 forFork:ImpForkTypeData getExtent:rescuedBlocksExtents];
+		if (! allocatedRescuedBlocksDataFork) {
+			ImpPrintf(@"Failed to allocate %u blocks for the rescued blocks file.", numDstBlocks32);
+		} else {
+			ImpVirtualFileHandle *_Nonnull const orphanedBlocksFH = [dstVol fileHandleForWritingToExtents:rescuedBlocksExtents];
+			[srcVol findExtentsThatAreAllocatedButHaveNotBeenAccessed:^(NSRange const extent) {
+				struct HFSExtentDescriptor orphanedExtent;
+				S(orphanedExtent.startBlock, (u_int16_t)extent.location);
+				S(orphanedExtent.blockCount, (u_int16_t)extent.length);
+				NSData *_Nonnull const recoveredBlocks = [srcVol readDataFromFileDescriptor:srcVol.fileDescriptor
+					logicalLength:physicalLength
+					extents:&orphanedExtent
+					numExtents:1
+					error:outError];
+				[orphanedBlocksFH writeData:recoveredBlocks error:outError];
+			}];
+			[orphanedBlocksFH closeFile];
+			//We set this extent as the data for *both* the data and resource forks, because if the recovered data is in fact a resource map (as has happened with at least one real volume!) then having it in the resource fork makes it much easier to recover it on a (real or emulated) vintage system.
+			[destCatalog setExtentRecord:rescuedBlocksExtentsPtr
+				forFork:ImpForkTypeData
+				ofCatalogItemInParentID:kHFSRootFolderID
+				withName:ImpRescuedDataFileName
+				setLogicalLength:physicalLength];
+			[destCatalog setExtentRecord:rescuedBlocksExtentsPtr
+				forFork:ImpForkTypeResource
+				ofCatalogItemInParentID:kHFSRootFolderID
+				withName:ImpRescuedDataFileName
+				setLogicalLength:physicalLength];
+		}
+	}
+
 	[self deliverProgressUpdateWithOperationDescription:NSLocalizedString(@"Updating catalog…", @"Conversion progress message")];
 
 	//Lastly (now that the catalog file has been populated with files' real extents), write the catalog and extents overflow files.
