@@ -392,7 +392,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		case ImpForkTypeData:
 			if (_isHFSPlus) {
 				logicalLength = L(hfsPlusFileRec->dataFork.logicalSize);
-				extents = hfsPlusFileRec->dataFork.extents;
+				extentsPlus = hfsPlusFileRec->dataFork.extents;
 			} else {
 				logicalLength = L(hfsFileRec->dataLogicalSize);
 				extents = hfsFileRec->dataExtents;
@@ -402,7 +402,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		case ImpForkTypeResource:
 			if (_isHFSPlus) {
 				logicalLength = L(hfsPlusFileRec->resourceFork.logicalSize);
-				extents = hfsPlusFileRec->resourceFork.extents;
+				extentsPlus = hfsPlusFileRec->resourceFork.extents;
 			} else {
 				logicalLength = L(hfsFileRec->rsrcLogicalSize);
 				extents = hfsFileRec->rsrcExtents;
