@@ -643,7 +643,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	//Now do that again, but for the resource fork.
 	bool (^_Nonnull const writeRsrcForkBlock)(NSData *_Nonnull const fileData, u_int64_t const logicalLength) = ^bool(NSData *_Nonnull const fileData, u_int64_t const logicalLength)
 	{
-		OSStatus const rsrcWriteErr = FSWriteFork(rsrcForkRefnum, fsAtMark, noCacheMask, logicalLength, fileData.bytes, /*actualCount*/ NULL);
+		OSStatus rsrcWriteErr = FSWriteFork(rsrcForkRefnum, fsAtMark, noCacheMask, fileData.length, fileData.bytes, /*actualCount*/ NULL);
 		allWritesSucceeded = allWritesSucceeded && (rsrcWriteErr == noErr);
 		if (rsrcWriteErr != noErr) {
 			writeError = [NSError errorWithDomain:NSOSStatusErrorDomain code:rsrcWriteErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedString(@"Can't write to resource fork of file “%@”", @""), name ]}];
