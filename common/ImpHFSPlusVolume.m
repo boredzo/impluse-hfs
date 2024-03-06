@@ -803,11 +803,11 @@
 			if (numBlocks == 0) {
 				break;
 			}
-//			ImpPrintf(@"Reading extent starting at block #%u, containing %u blocks", L(hfsExtRec[i].startBlock), numBlocks);
+//			ImpPrintf(@"HFS+ source: Reading extent starting at block #%u, containing %u blocks", L(hfsExtRec[i].startBlock), numBlocks);
 			u_int64_t const bytesConsumed = block(&hfsExtRec[i], logicalBytesRemaining);
 
 			if (bytesConsumed == 0) {
-				ImpPrintf(@"Consumer block consumed no bytes. Stopping further reads.");
+				ImpPrintf(@"HFS+ source: Consumer block consumed no bytes. Stopping further reads.");
 				keepIterating = false;
 			}
 
@@ -817,7 +817,7 @@
 				logicalBytesRemaining -= bytesConsumed;
 			}
 			if (logicalBytesRemaining == 0) {
-//				ImpPrintf(@"0 bytes remaining in logical length (all bytes consumed). No further reads warranted.");
+//				ImpPrintf(@"HFS+ source: 0 bytes remaining in logical length (all bytes consumed). No further reads warranted.");
 				keepIterating = false;
 			}
 		}
