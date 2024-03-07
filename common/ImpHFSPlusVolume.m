@@ -26,6 +26,12 @@
 
 @end
 
+@interface ImpHFSVolume ()
+
+@property(readwrite, nonnull, strong) ImpTextEncodingConverter *textEncodingConverter;
+
+@end
+
 @interface ImpHFSPlusVolume ()
 
 - (u_int32_t) numBlocksForPreambleWithSize:(u_int32_t const)aBlockSize;
@@ -68,6 +74,8 @@
 
 		_preamble = [NSMutableData dataWithLength:kISOStandardBlockSize * 3];
 		_vh = _preamble.mutableBytes + (kISOStandardBlockSize * 2);
+
+		self.textEncodingConverter = [[ImpTextEncodingConverter alloc] initWithHFSTextEncoding:kTextEncodingMacRoman];
 	}
 	return self;
 }
