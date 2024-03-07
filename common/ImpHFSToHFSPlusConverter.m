@@ -83,7 +83,7 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 		};
 		OSStatus const err = CreateTextToUnicodeInfo(&mapping, &_ttui);
 		if (err != noErr) {
-			ImpPrintf(@"Failed to initialize Unicode conversion: error %d/%s", err, ImpExplainOSStatus(err));
+			ImpPrintf(@"Volume converter failed to initialize Unicode conversion: error %d/%s", err, ImpExplainOSStatus(err));
 		}
 	}
 	return self;
