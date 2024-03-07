@@ -615,6 +615,7 @@
 
 	//Second, if we're not done yet, consult the extents overflow B*-tree for this item.
 	if (keepIterating && logicalBytesRemaining > 0) {
+//		ImpPrintf(@"Still need to find %llu bytes. Looking in the extents overflow file…", logicalBytesRemaining);
 		ImpBTreeFile *_Nonnull const extentsFile = self.extentsOverflowBTree;
 
 		__block u_int32_t precedingBlockCount = ImpNumberOfBlocksInHFSExtentRecord(initialExtRec);
