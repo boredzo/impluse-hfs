@@ -276,7 +276,7 @@
 		}
 		u_int32_t const numOrphanedSrcBlocks32 = numOrphanedSrcBlocks > UINT32_MAX ? UINT32_MAX : (u_int32_t)numOrphanedSrcBlocks;
 		u_int64_t const physicalLength = numOrphanedSrcBlocks32 * srcVol.numberOfBytesPerBlock;
-		u_int32_t const numDstBlocks32 = physicalLength / dstVol.numberOfBytesPerBlock;
+		u_int32_t const numDstBlocks32 = (u_int32_t)physicalLength / dstVol.numberOfBytesPerBlock;
 
 		HFSPlusExtentRecord rescuedBlocksExtents;
 		struct HFSPlusExtentDescriptor const *_Nonnull const rescuedBlocksExtentsPtr = rescuedBlocksExtents;
