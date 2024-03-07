@@ -31,7 +31,7 @@ static inline size_t ImpNextMultipleOfSize(size_t const size, size_t const facto
 
 #define ImpCeilingDivide(num, denom) (((num) / (denom)) + ((((num) % (denom)) != 0) ? 1 : 0))
 
-///Returns the sum of the block counts of the extents in the extent record, up to the first empty extent or the end of the record..
+///Returns the sum of the block counts of the extents in the extent record, up to the first empty extent or the end of the record.
 u_int32_t ImpNumberOfBlocksInHFSExtentRecord(struct HFSExtentDescriptor const *_Nonnull const extRec);
 
 ///Returns the sum of the block counts of the extents in the extent record, up to the first empty extent or the end of the record.
