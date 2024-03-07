@@ -12,6 +12,47 @@
 
 #import "ImpByteOrder.h"
 
+#pragma mark Extent utilities
+
+u_int32_t ImpFirstBlockInHFSExtent(struct HFSExtentDescriptor const *_Nonnull const extRec) {
+	return L(extRec->startBlock);
+}
+u_int32_t ImpLastBlockInHFSExtent(struct HFSExtentDescriptor const *_Nonnull const extRec) {
+	u_int32_t const blockCount = ImpNumberOfBlocksInHFSExtent(extRec);
+	if (blockCount > 0) {
+		return ImpFirstBlockInHFSExtent(extRec) + (blockCount - 1);
+	} else {
+		//There's kind of no valid answer here.
+		return ImpFirstBlockInHFSExtent(extRec);
+	}
+}
+
+u_int32_t ImpNumberOfBlocksInHFSExtent(struct HFSExtentDescriptor const *_Nonnull const extRec) {
+	return L(extRec->blockCount);
+}
+
+NSString *_Nonnull ImpDescribeHFSExtent(struct HFSExtentDescriptor const *_Nonnull const extRec) {
+	u_int32_t const startBlock = ImpFirstBlockInHFSExtent(extRec);
+	u_int32_t const blockCount = ImpNumberOfBlocksInHFSExtent(extRec);
+	if (blockCount > 0) {
+		return [NSString stringWithFormat:@"extent starting at block #%u, for %u blocks, ending at block %u", startBlock, blockCount, ImpLastBlockInHFSExtent(extRec)];
+	} else if (startBlock > 0) {
+		return [NSString stringWithFormat:@"empty extent starting at block #%u", startBlock];
+	} else {
+		return @"empty extent";
+	}
+}
+
+void ImpIterateHFSExtent(struct HFSExtentDescriptor const *_Nonnull const extRec, void (^_Nonnull const block)(u_int32_t const blockNumber)) {
+	u_int32_t const startBlock = ImpFirstBlockInHFSExtent(extRec);
+	u_int32_t const blockCount = ImpNumberOfBlocksInHFSExtent(extRec);
+	for (u_int32_t i = 0; i < blockCount; ++i) {
+		block(startBlock + i);
+	}
+}
+
+#pragma mark Extent record utilities
+
 u_int32_t ImpNumberOfBlocksInHFSExtentRecord(struct HFSExtentDescriptor const *_Nonnull const extRec) {
 	u_int32_t total = 0;
 	for (NSUInteger i = 0; i < kHFSExtentDensity; ++i) {

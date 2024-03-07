@@ -31,6 +31,17 @@ static inline size_t ImpNextMultipleOfSize(size_t const size, size_t const facto
 
 #define ImpCeilingDivide(num, denom) (((num) / (denom)) + ((((num) % (denom)) != 0) ? 1 : 0))
 
+#pragma mark Extent utilities
+
+u_int32_t ImpNumberOfBlocksInHFSExtent(struct HFSExtentDescriptor const *_Nonnull const extRec);
+///Returns a string concisely describing one extent.
+NSString *_Nonnull ImpDescribeHFSExtent(struct HFSExtentDescriptor const *_Nonnull const extRec);
+
+///Call a block with every block number covered by one extent.
+void ImpIterateHFSExtent(struct HFSExtentDescriptor const *_Nonnull const extRec, void (^_Nonnull const block)(u_int32_t const blockNumber));
+
+#pragma mark Extent record utilities
+
 ///Returns the sum of the block counts of the extents in the extent record, up to the first empty extent or the end of the record.
 u_int32_t ImpNumberOfBlocksInHFSExtentRecord(struct HFSExtentDescriptor const *_Nonnull const extRec);
 
