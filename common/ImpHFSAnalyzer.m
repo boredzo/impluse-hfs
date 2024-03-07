@@ -179,7 +179,7 @@
 			ImpPrintf(@"Clump size is 0x%llx (0x200 * %.1f; ABS * %.1f)", (u_int64_t)L(mdbPtr->drClpSiz), L(mdbPtr->drClpSiz) / (double)kISOStandardBlockSize, L(mdbPtr->drClpSiz) / (double)L(mdbPtr->drAlBlkSiz));
 		}];
 	}
-	ImpPrintf(@"Volume size is %@; %@ in use, %@ free", [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksTotal], [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksUsed], [bcf stringFromByteCount:srcVol.numberOfBytesPerBlock * srcVol.numberOfBlocksFree]);
+	ImpPrintf(@"Volume size is %@; %@ in use, %@ free", [bcf stringFromByteCount:blockSize * srcVol.numberOfBlocksTotal], [bcf stringFromByteCount:blockSize * srcVol.numberOfBlocksUsed], [bcf stringFromByteCount:blockSize * srcVol.numberOfBlocksFree]);
 
 	ImpBTreeFile *_Nonnull const catalog = srcVol.catalogBTree;
 	ImpPrintf(@"Slurped catalog file: %@", catalog);
