@@ -343,11 +343,11 @@
 			if (forkType == ImpForkTypeResource) {
 				memcpy(fileRec->resourceFork.extents, extentRec, sizeof(fileRec->resourceFork.extents));
 				S(fileRec->resourceFork.logicalSize, newLogicalLength);
-				S(fileRec->resourceFork.totalBlocks, ImpNumberOfBlocksInHFSPlusExtentRecord(extentRec));
+				S(fileRec->resourceFork.totalBlocks, (u_int32_t)ImpNumberOfBlocksInHFSPlusExtentRecord(extentRec));
 			} else {
 				memcpy(fileRec->dataFork.extents, extentRec, sizeof(fileRec->dataFork.extents));
 				S(fileRec->dataFork.logicalSize, newLogicalLength);
-				S(fileRec->dataFork.totalBlocks, ImpNumberOfBlocksInHFSPlusExtentRecord(extentRec));
+				S(fileRec->dataFork.totalBlocks, (u_int32_t)ImpNumberOfBlocksInHFSPlusExtentRecord(extentRec));
 			}
 			[foundNode replacePayloadOfRecordAtIndex:recordIdx withPayload:dataAfter];
 		}
