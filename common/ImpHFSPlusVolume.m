@@ -564,7 +564,14 @@
 	NSUInteger extentIdx = 0;
 
 	//Skip over any extents already populated.
-	while (L(outExts[extentIdx].blockCount) != 0 && extentIdx < kHFSPlusExtentDensity) {
+	u_int32_t blockCount = 0;
+	while ((blockCount = L(outExts[extentIdx].blockCount)) != 0 && extentIdx < kHFSPlusExtentDensity) {
+		u_int64_t const thisExtentInBytes = blockCount * aBlockSize;
+		if (remaining > thisExtentInBytes) {
+			remaining -= thisExtentInBytes;
+		} else {
+			remaining = 0;
+		}
 		++extentIdx;
 	}
 
