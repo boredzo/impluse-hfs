@@ -67,7 +67,7 @@
 	expectedLengthInBytes:(u_int64_t)lengthInBytes
 {
 	if ((self = [super init])) {
-		_writeFD = writeFD;
+		_fileDescriptor = _writeFD = writeFD;
 
 		_startOffsetInBytes = startOffsetInBytes;
 		_lengthInBytes = lengthInBytes;

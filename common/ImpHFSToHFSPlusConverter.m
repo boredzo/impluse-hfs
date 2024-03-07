@@ -747,7 +747,7 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 	NSNumber *_Nullable isRegularFileValue = nil;
 	bool const canCheckIsRegularFile = [self.destinationDevice getResourceValue:&isRegularFileValue forKey:NSURLIsRegularFileKey error:NULL];
 	if (canCheckIsRegularFile && isRegularFileValue != nil && isRegularFileValue.boolValue) {
-		chmod(self.destinationDevice.path.fileSystemRepresentation, 0444);
+		fchmod(self.destinationVolume.fileDescriptor, 0444);
 	}
 
 	return flushed;

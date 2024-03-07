@@ -15,6 +15,7 @@
 @interface ImpHFSVolume : NSObject
 {
 	u_int64_t _startOffsetInBytes, _lengthInBytes;
+	int _fileDescriptor;
 }
 
 ///startOffset should be 0 for volumes from bare-volume images. For volumes found in a partition map, startOffset should be the offset into the device/image in bytes where the preamble starts.
