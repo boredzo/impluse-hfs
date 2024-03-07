@@ -296,6 +296,63 @@
 				TextEncoding const embeddedScriptCode = [ImpTextEncodingConverter textEncodingFromExtendedFinderFlags:extFinderFlags];
 				ImpPrintf(@"- %u:%lu 📄 “%@”, ID #%u (0x%x), type %@ creator %@, script code %@", node.nodeNumber, recordIdx++, [tec stringByEscapingString:[tec stringForPascalString:catalogKeyPtr->nodeName fromHFSCatalogKey:catalogKeyPtr]], L(fileRec->fileID), L(fileRec->fileID),  NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdType)), NSFileTypeForHFSTypeCode(L(fileRec->userInfo.fdCreator)), hasEmbeddedScriptCode ? [NSString stringWithFormat:@"%u", embeddedScriptCode] : @"default");
 				ImpPrintf(@"    Parent ID: #%u (0x%x)", L(catalogKeyPtr->parentID), L(catalogKeyPtr->parentID));
+
+				NSMutableArray <NSString *> *_Nonnull const extentDescriptions = [NSMutableArray arrayWithCapacity:3];
+				__block u_int64_t totalBlockCount = 0;
+				__block u_int64_t totalPhysicalLength = 0;
+				///" []" times three extents times three extent records.
+				enum { numExtraCharacters = 3 * 3 * 3 };
+				NSMutableString *_Nonnull blockCheckResults = [NSMutableString stringWithCapacity:ImpCeilingDivide(L(fileRec->dataPhysicalSize), blockSize) + numExtraCharacters];
+
+				u_int64_t (^_Nonnull const checkExtentValidity)(const struct HFSExtentDescriptor *_Nonnull const oneExtent, u_int64_t logicalBytesRemaining) = ^u_int64_t(const struct HFSExtentDescriptor *_Nonnull const oneExtent, u_int64_t logicalBytesRemaining) {
+					[extentDescriptions addObject:ImpDescribeHFSExtent(oneExtent)];
+
+					u_int64_t const blockCount = ImpNumberOfBlocksInHFSExtent(oneExtent);
+					u_int64_t const byteCount = blockCount * blockSize;
+					totalBlockCount += blockCount;
+					totalPhysicalLength += byteCount;
+
+					[blockCheckResults appendString:@" ["];
+					ImpIterateHFSExtent(oneExtent, ^(u_int32_t const blockNumber) {
+						bool const isValidBlockNumber = [srcVol isBlockInBounds:blockNumber];
+						bool const isAllocated = [srcVol isBlockAllocated:blockNumber];
+						if (isValidBlockNumber && isAllocated) {
+							[blockCheckResults appendString:@"✅"];
+						} else if (isValidBlockNumber && ! isAllocated) {
+							[blockCheckResults appendString:@"☠️"];
+						} else if (isAllocated && ! isValidBlockNumber) {
+							[blockCheckResults appendString:@"🚀"];
+						} else {
+							[blockCheckResults appendString:@"🌌"];
+						}
+					});
+					[blockCheckResults appendString:@"]"];
+
+					return byteCount;
+				};
+
+				[srcVol forEachExtentInFileWithID:L(fileRec->fileID)
+					fork:ImpForkTypeData
+					forkLogicalLength:L(fileRec->dataLogicalSize)
+					startingWithExtentsRecord:fileRec->dataExtents
+					block:checkExtentValidity];
+				ImpPrintf(@"	Data fork lengths: %@ bytes physical, %@ bytes logical", [nf stringFromNumber:@(L(fileRec->dataPhysicalSize))], [nf stringFromNumber:@(L(fileRec->dataLogicalSize))]);
+				ImpPrintf(@"	Data fork extents: %@ (%@ blocks = %@ bytes)", [extentDescriptions componentsJoinedByString:@", "], [nf stringFromNumber:@(totalBlockCount)], [nf stringFromNumber:@(totalPhysicalLength)]);
+				ImpPrintf(@"	Data fork blocks: %@", blockCheckResults);
+
+				[extentDescriptions removeAllObjects];
+				totalBlockCount = totalPhysicalLength = 0;
+				blockCheckResults = [NSMutableString stringWithCapacity:ImpCeilingDivide(L(fileRec->rsrcPhysicalSize), blockSize) + numExtraCharacters];
+
+				[srcVol forEachExtentInFileWithID:L(fileRec->fileID)
+					fork:ImpForkTypeResource
+					forkLogicalLength:L(fileRec->rsrcLogicalSize)
+					startingWithExtentsRecord:fileRec->rsrcExtents
+					block:checkExtentValidity];
+				ImpPrintf(@"	Rsrc fork lengths: %@ bytes physical, %@ bytes logical", [nf stringFromNumber:@(L(fileRec->rsrcPhysicalSize))], [nf stringFromNumber:@(L(fileRec->rsrcLogicalSize))]);
+				ImpPrintf(@"	Rsrc fork extents: %@ (%@ blocks = %@ bytes)", [extentDescriptions componentsJoinedByString:@", "], [nf stringFromNumber:@(totalBlockCount)], [nf stringFromNumber:@(totalPhysicalLength)]);
+				ImpPrintf(@"	Rsrc fork blocks: %@", blockCheckResults);
+
 				++numFiles;
 			} folder:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRec) {
 				ImpTextEncodingConverter *_Nonnull const tec = [ImpTextEncodingConverter converterForHFSFolder:folderRec fallback:srcVol.textEncodingConverter];

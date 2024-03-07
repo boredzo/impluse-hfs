@@ -63,6 +63,10 @@
 - (NSData *_Nonnull)volumeBitmap;
 ///Calculate the number of bits in the bitmap that are zero. Should match the drFreeBks/freeBlocks value in the volume header.
 - (u_int32_t) numberOfBlocksFreeAccordingToBitmap;
+///Returns whether a block number is less than the number of blocks in the volume according to the volume header. Used by analyze as part of consistency checking of extents.
+- (bool) isBlockInBounds:(u_int32_t const)blockNumber;
+///Returns whether a block is marked as in use according to the volume bitmap. Does not guarantee that the block is actually referred to by an extent in the catalog or extents overflow trees.
+- (bool) isBlockAllocated:(u_int32_t const)blockNumber;
 ///Identify which blocks are marked as allocated in the volume bitmap but have not been read from, and print those to the log.
 - (void) reportBlocksThatAreAllocatedButHaveNotBeenAccessed;
 ///Count how many blocks are marked as allocated in the volume bitmap but have not been read from. Use this method after all files have been copied when identifying orphaned blocks for recovery.

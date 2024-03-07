@@ -420,6 +420,9 @@
 	return _volumeBitmapData;
 }
 
+- (bool) isBlockInBounds:(u_int32_t const)blockNumber {
+	return blockNumber < L(_mdb->drNmAlBlks);
+}
 - (bool) isBlockAllocated:(u_int32_t const)blockNumber {
 	return CFBitVectorGetBitAtIndex(_bitVector, blockNumber);
 }
