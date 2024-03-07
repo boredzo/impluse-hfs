@@ -577,6 +577,8 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 		if (! haveFoundHFSVolume) {
 			if (volumeClass != Nil && volumeClass != [ImpHFSVolume class]) {
 				//We have an identified volume class, but it isn't HFS. Most likely, this is already HFS+. Skip.
+				NSError *_Nonnull const noConvertibleVolumesError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: @"This volume format cannot be converted. It may already be HFS+ or it may be some other format that is not HFS and is not supported." }];
+				volumeLoadError = noConvertibleVolumesError;
 				return;
 			}
 
