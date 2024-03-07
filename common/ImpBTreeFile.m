@@ -676,6 +676,7 @@
 		.startBlock = (u_int16_t)totalBlockCount,
 	};
 	quarryExtentKey.keyLength -= sizeof(quarryExtentKey.keyLength);
+//	ImpPrintf(@"Searching extents overflow file for fork type 0x%02x, file ID #%u, preceding block count %u", forkType, cnid, totalBlockCount);
 
 	ImpBTreeRecordKeyComparator _Nonnull const compareKey = ^ImpBTreeComparisonResult(void const *_Nonnull const foundKeyPtr) {
 		struct HFSExtentKey const *_Nonnull const foundExtentKeyPtr = foundKeyPtr;
