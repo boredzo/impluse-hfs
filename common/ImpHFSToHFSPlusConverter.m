@@ -686,8 +686,14 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 - (bool) copyBytesAfterVolume_error:(NSError *_Nullable *_Nullable const)outError {
 	ImpHFSVolume *_Nonnull const srcVol = self.sourceVolume;
 	u_int64_t const numBytesBeforeEndOfVolume = srcVol.startOffsetInBytes + srcVol.lengthInBytes;
-	lseek(_readFD, numBytesBeforeEndOfVolume, SEEK_SET);
-	lseek(_writeFD, numBytesBeforeEndOfVolume, SEEK_SET);
+	off_t const readPos = lseek(_readFD, numBytesBeforeEndOfVolume, SEEK_SET);
+	off_t const writePos = lseek(_writeFD, numBytesBeforeEndOfVolume, SEEK_SET);
+
+	NSByteCountFormatter *_Nonnull const bcf = [NSByteCountFormatter new];
+	NSNumberFormatter *_Nonnull const nf = [NSNumberFormatter new];
+	nf.hasThousandSeparators = true;
+
+	ImpPrintf(@"Copying bytes following volume (including any subsequent partitions). Copy will start at %@ (%@ bytes) from the source and %@ (%@ bytes) in the destination.", [bcf stringFromByteCount:readPos], [nf stringFromNumber:@(readPos)], [bcf stringFromByteCount:writePos], [nf stringFromNumber:@(writePos)]);
 
 	u_int64_t const blockSize = srcVol.numberOfBytesPerBlock;
 
@@ -695,6 +701,7 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 	void *_Nonnull const buf = bufferData.mutableBytes;
 
 	ssize_t amtRead = 0;
+	off_t totalAmtWritten = 0;
 	while ((amtRead = read(_readFD, buf, blockSize)) > 0) {
 		ssize_t amtWritten = write(_writeFD, buf, blockSize);
 		if (amtWritten < 0) {
@@ -704,6 +711,7 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 			}
 			return false;
 		}
+		totalAmtWritten += amtWritten;
 
 		//If we haven't previously reported the number of these blocks to be copied, don't worry about reporting them copied.
 		if (_hasReportedPostVolumeLength) {
@@ -717,6 +725,8 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 		}
 		return false;
 	}
+
+	ImpPrintf(@"Copied %@ (%@ bytes) after volume", [bcf stringFromByteCount:totalAmtWritten], [nf stringFromNumber:@(totalAmtWritten)]);
 
 	return true;
 }
