@@ -297,6 +297,13 @@
 		//Now all of our items have both a file or folder record and a thread record. Each of these is filed under a different key in the catalog file, due to their different purposes. (File and folder records are stored under a key containing their parent item's CNID; thread records are stored under a key containing the item's own CNID, for the purpose of finding the parent ID stored in the thread record.) So turn our list of n items into n * 2 key-value pairs, half of them being file or folder records and half being thread records. These will be the contents of the leaf row.
 		_allKeyValuePairs = [NSMutableArray arrayWithCapacity:_allSourceItems.count];
 		for (ImpCatalogItem *_Nonnull const item in _allSourceItems) {
+//			ImpPrintf(@"Item from list of source items:");
+//			if (item.sourceThreadKey != nil) ImpPrintf(@"\tSource thread key %@", [ImpBTreeNode describeHFSCatalogKeyWithData:item.sourceThreadKey]);
+//			if (item.sourceThreadRecord != nil) ImpPrintf(@"\tSource thread record %@", [ImpBTreeNode describeHFSCatalogThreadRecordWithData:item.sourceThreadRecord]);
+//			if (item.destinationKey != nil) ImpPrintf(@"\tDestination key %@", [ImpBTreeNode describeHFSPlusCatalogKeyWithData:item.destinationKey]);
+//			if (item.destinationThreadKey != nil) ImpPrintf(@"\tDestination thread key %@", [ImpBTreeNode describeHFSPlusCatalogKeyWithData:item.destinationThreadKey]);
+//			if (item.destinationThreadRecord != nil) ImpPrintf(@"\tDestination thread record %@", [ImpBTreeNode describeHFSPlusCatalogThreadRecordWithData:item.destinationThreadRecord]);
+
 			[_allKeyValuePairs addObject:[[ImpCatalogKeyValuePair alloc] initWithKey:item.destinationKey value:item.destinationRecord]];
 			[_allKeyValuePairs addObject:[[ImpCatalogKeyValuePair alloc] initWithKey:item.destinationThreadKey value:item.destinationThreadRecord]];
 		}

@@ -437,6 +437,7 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 		bytesPerNode:self.destinationCatalogNodeSize
 		expectedNumberOfItems:numItems];
 	catBuilder.treeDepthHint = sourceTree.headerNode.treeDepth;
+//	ImpTextEncodingConverter *_Nonnull const tec = self.sourceVolume.textEncodingConverter;
 
 	//Gather our list of all items, converting file, folder, and thread records as we go and keeping each item's file/folder record and thread record (if it has one) together.
 	[sourceTree walkLeafNodes:^bool(ImpBTreeNode *const  _Nonnull node) {
@@ -625,6 +626,7 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 - (bool) step1_convertPreamble_error:(NSError *_Nullable *_Nullable const)outError {
 	self.destinationVolume.bootBlocks = self.sourceVolume.bootBlocks;
 	self.destinationVolume.lastBlock = self.sourceVolume.lastBlock;
+//	ImpPrintf(@"Set destination volume's last block to %@", self.sourceVolume.lastBlock);
 
 	[self.sourceVolume peekAtHFSVolumeHeader:^(NS_NOESCAPE const struct HFSMasterDirectoryBlock *const mdbPtr) {
 		NSMutableData *_Nonnull const volumeHeaderData = [NSMutableData dataWithLength:sizeof(struct HFSPlusVolumeHeader)];

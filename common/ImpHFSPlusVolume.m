@@ -81,6 +81,7 @@
 }
 
 - (bool) flushVolumeStructures:(NSError *_Nullable *_Nullable const)outError {
+//	ImpPrintf(@"Writing final allocations file");
 	NSUInteger const numABlocks = self.numberOfBlocksTotal;
 	NSMutableData *_Nonnull const bitmapData = [NSMutableData dataWithLength:ImpCeilingDivide(numABlocks, 8)];
 	CFBitVectorGetBits(_allocationsBitmap, (CFRange){ 0, numABlocks }, bitmapData.mutableBytes);
@@ -88,6 +89,7 @@
 		return false;
 	}
 
+//	ImpPrintf(@"Writing real boot blocks");
 	u_int64_t const volumeStartInBytes = self.startOffsetInBytes;
 	NSData *_Nonnull const bootBlocks = self.bootBlocks;
 	ssize_t amtWritten = pwrite(_writeFD, bootBlocks.bytes, bootBlocks.length, volumeStartInBytes + 0);
@@ -99,6 +101,7 @@
 		return false;
 	}
 
+//	ImpPrintf(@"Writing final volume header");
 	NSData *_Nonnull const volumeHeader = self.volumeHeader;
 //	struct HFSPlusVolumeHeader const *_Nonnull const vh = volumeHeader.bytes;
 //	ImpPrintf(@"Final catalog file will be %llu bytes in %u blocks", L(vh->catalogFile.logicalSize), L(vh->catalogFile.totalBlocks));
@@ -113,6 +116,7 @@
 		return false;
 	}
 
+//	ImpPrintf(@"Writing postamble");
 	//The postamble is the last 1 K of the volume, containing the alternate volume header and the footer.
 	//The postamble needs to be in the very last 1 K of the disk, regardless of where the a-block boundary is. TN1150 is explicit that this region can lie outside of an a-block and any a-blocks it does lie inside of must be marked as used.
 	amtWritten = pwrite(_writeFD, volumeHeader.bytes, volumeHeader.length, volumeStartInBytes + _postambleStartInBytes);
@@ -226,6 +230,7 @@
 	//And last but not least, allocate space for the allocations file that will hold our shiny new bitmap.
 	u_int32_t const numAllocationsBytes = ImpCeilingDivide(numABlocks, 8);
 	[self allocateBytes:numAllocationsBytes forFork:ImpForkTypeSpecialFileContents populateExtentRecord:_vh->allocationFile.extents];
+//	ImpPrintf(@"Allocated the allocations file: %@", ImpDescribeHFSPlusExtentRecord(_vh->allocationFile.extents));
 	_vh->allocationFile.totalBlocks = _vh->allocationFile.extents[0].blockCount;
 	//DiskWarrior seems to be of the opinion that the logical length should be equal to the physical length (total size of occupied blocks). TN1150 says this is allowed, but doesn't say it's necessary.
 //	S(_vh->allocationFile.logicalSize, numAllocationsBytes);
@@ -634,6 +639,7 @@
 
 	u_int64_t const volumeStartInBytes = self.startOffsetInBytes;
 	off_t const extentStartInBytes = L(oneExtent->startBlock) * self.blockSize;
+//	ImpPrintf(@"Writing %lu bytes to output volume starting at a-block #%u (output file offset %llu bytes)", data.length, L(oneExtent->startBlock), volumeStartInBytes + extentStartInBytes);
 	int64_t const amtWritten = pwrite(_writeFD, bytesPtr + offsetInData, bytesToWrite, volumeStartInBytes + extentStartInBytes);
 
 	if (amtWritten < 0) {

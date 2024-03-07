@@ -160,10 +160,12 @@
 
 			struct HFSExtentDescriptor const *_Nonnull const firstDataExtents = fileRec->dataExtents;
 			struct HFSExtentDescriptor const *_Nonnull const firstRsrcExtents = fileRec->rsrcExtents;
+//			ImpPrintf(@"Before copy: This file's lengths in the input volume are DF %llu bytes, RF %llu bytes. Physical sizes %u blocks + %u blocks = %u blocks", dataLogicalLength, rsrcLogicalLength, ImpNumberOfBlocksInHFSExtentRecord(firstDataExtents), ImpNumberOfBlocksInHFSExtentRecord(firstRsrcExtents), ImpNumberOfBlocksInHFSExtentRecord(firstDataExtents) + ImpNumberOfBlocksInHFSExtentRecord(firstRsrcExtents));
 
 			u_int64_t bytesNotYetAllocatedForData = [dstVol allocateBytes:dataPhysicalLength forFork:ImpForkTypeData populateExtentRecord:convertedFilePtr->dataFork.extents];
 			//TODO: Handle bytesNotYetAllocated > 0 (by inserting the fork into the extents overflow file)
 			NSAssert(bytesNotYetAllocatedForData == 0, @"Failed to allocate %llu contiguous bytes in destination volume; ended up with %llu left over", dataLogicalLength, bytesNotYetAllocatedForData);
+//			ImpPrintf(@"Allocated for data fork: #%u to #%u", L(convertedFilePtr->dataFork.extents[0].startBlock), L(convertedFilePtr->dataFork.extents[0].startBlock) + L(convertedFilePtr->dataFork.extents[0].blockCount));
 
 			NSError *_Nullable dataReadError = nil;
 			__block NSError *_Nullable dataWriteError = nil;
@@ -209,6 +211,7 @@
 			u_int64_t bytesNotYetAllocatedForRsrc = [dstVol allocateBytes:rsrcPhysicalLength forFork:ImpForkTypeResource populateExtentRecord:convertedFilePtr->resourceFork.extents];
 			//TODO: Handle bytesNotYetAllocated > 0 (by inserting the fork into the extents overflow file)
 			NSAssert(bytesNotYetAllocatedForRsrc == 0, @"Failed to allocate %llu contiguous bytes in destination volume; ended up with %llu left over", rsrcLogicalLength, bytesNotYetAllocatedForRsrc);
+//			ImpPrintf(@"Allocated for resource fork: #%u to #%u", L(convertedFilePtr->resourceFork.extents[0].startBlock), L(convertedFilePtr->resourceFork.extents[0].startBlock) + L(convertedFilePtr->resourceFork.extents[0].blockCount));
 
 			NSError *_Nullable rsrcReadError = nil;
 			__block NSError *_Nullable rsrcWriteError = nil;
@@ -238,7 +241,8 @@
 
 			NSAssert(totalRsrcBytesWritten == rsrcPhysicalLength, @"Failed to %@ all resource fork bytes due to %@: should have written %llu, but actually wrote %llu", rsrcReadError != nil ? @"read" : rsrcWriteError != nil ? @"write" : @"copy", rsrcReadError ?: rsrcWriteError, rsrcPhysicalLength, totalRsrcBytesWritten);
 
-//			ImpPrintf(@"This file's lengths are DF %llu bytes, RF %llu bytes. Physical sizes %u blocks + %u blocks = %u blocks. Copied %u blocks + %u blocks = %u blocks", dataLogicalLength, rsrcLogicalLength, ImpNumberOfBlocksInHFSExtentRecord(firstDataExtents), ImpNumberOfBlocksInHFSExtentRecord(firstRsrcExtents), ImpNumberOfBlocksInHFSExtentRecord(firstDataExtents) + ImpNumberOfBlocksInHFSExtentRecord(firstRsrcExtents), totalDataBlocksRead, totalRsrcBlocksRead, totalDataBlocksRead + totalRsrcBlocksRead);
+//			ImpPrintf(@"After copy: Copied %u blocks + %u blocks = %u blocks from the input volume.", totalDataBlocksRead, totalRsrcBlocksRead, totalDataBlocksRead + totalRsrcBlocksRead);
+//			ImpPrintf(@"After copy: This file's lengths in the output volume are DF %llu bytes, RF %llu bytes. Physical sizes %llu blocks + %llu blocks = %llu blocks.", dataLogicalLength, rsrcLogicalLength, ImpNumberOfBlocksInHFSPlusExtentRecord(convertedFilePtr->dataFork.extents), ImpNumberOfBlocksInHFSPlusExtentRecord(convertedFilePtr->resourceFork.extents), ImpNumberOfBlocksInHFSPlusExtentRecord(convertedFilePtr->dataFork.extents) + ImpNumberOfBlocksInHFSPlusExtentRecord(convertedFilePtr->resourceFork.extents));
 			[self reportSourceBlocksCopied:totalRsrcBlocksRead];
 
 			S(convertedFilePtr->resourceFork.logicalSize, rsrcLogicalLength);
