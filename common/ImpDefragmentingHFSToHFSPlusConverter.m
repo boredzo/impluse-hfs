@@ -141,13 +141,16 @@
 			[self convertHFSCatalogKey:keyPtr toHFSPlus:&convertedKey];
 
 			struct HFSUniStr255 *_Nonnull const unicodeNamePtr = &convertedKey.nodeName;
+			NSString *_Nonnull const srcFilename = [srcVol.textEncodingConverter stringForPascalString:keyPtr->nodeName fromHFSCatalogKey:keyPtr];
+			NSString *_Nonnull const dstFilename = [dstVol.textEncodingConverter stringFromHFSUniStr255:unicodeNamePtr];
+
 			ImpBTreeCursor *_Nullable const cursor = [destCatalog searchCatalogTreeForItemWithParentID:convertedKey.parentID unicodeName:unicodeNamePtr];
 			NSAssert(cursor != nil, @"Could not find file “%@” in parent ID %u in the converted catalog, and thus could not copy the file's contents", [srcVol.textEncodingConverter stringFromHFSUniStr255:unicodeNamePtr], L(convertedKey.parentID));
 			NSMutableData *_Nonnull const convertedFileRecData = [[cursor payloadData] mutableCopy];
 			struct HFSPlusCatalogFile *_Nonnull const convertedFilePtr = convertedFileRecData.mutableBytes;
 
 			hasAnyFiles = true;
-			[self deliverProgressUpdateWithOperationDescription:[NSString stringWithFormat:NSLocalizedString(@"Copying file “%@”…", @"Conversion progress message"), [srcVol.textEncodingConverter stringFromHFSUniStr255:unicodeNamePtr]]];
+			[self deliverProgressUpdateWithOperationDescription:[NSString stringWithFormat:NSLocalizedString(@"Copying file “%@” to “%@”…", @"Conversion progress message"), [srcVol.textEncodingConverter stringByEscapingString:srcFilename], [dstVol.textEncodingConverter stringByEscapingString:dstFilename]]];
 
 			//Copy the data fork.
 			u_int64_t const dataLogicalLength = L(fileRec->dataLogicalSize);

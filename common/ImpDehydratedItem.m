@@ -782,12 +782,12 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 			file:^bool(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFile const *_Nonnull const fileRec) {
 				HFSCatalogNodeID const fileID = L(fileRec->fileID);
 				ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSVolume:volume catalogNodeID:fileID key:keyPtr fileRecord:fileRec];
-				NSString *_Nonnull const filename = [[tec stringForPascalString:keyPtr->nodeName] stringByReplacingOccurrencesOfString:@"/" withString:@":"];
+				NSString *_Nonnull const filename = [[tec stringForPascalString:keyPtr->nodeName fromHFSCatalogKey:keyPtr] stringByReplacingOccurrencesOfString:@"/" withString:@":"];
 				NSURL *_Nonnull const fileURL = [realWorldURL URLByAppendingPathComponent:filename isDirectory:false];
-				ImpPrintf(@"Rehydrating descendant 📄 “%@”", filename);
+				ImpPrintf(@"Rehydrating descendant 📄 “%@”", [tec stringByEscapingString:filename]);
 				bool const rehydrated = [dehydratedFile rehydrateFileAtRealWorldURL:fileURL error:&rehydrationError];
 				if (! rehydrated) {
-					ImpPrintf(@"%@ in rehydrating descendant 📄 “%@”", rehydrated ? @"Success" : @"Failure", filename);
+					ImpPrintf(@"Failure in rehydrating descendant 📄 “%@”: %@", [tec stringByEscapingString:filename], rehydrationError);
 					anyRehydrationFailed = true;
 				}
 				return rehydrated;

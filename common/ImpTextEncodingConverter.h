@@ -70,4 +70,8 @@
 ///Convert a string to an HFSUniStr255 Pascal-style string. Returns whether the string was completely copied.
 - (bool) convertString:(NSString *_Nonnull const)inStr toHFSUniStr255:(struct HFSUniStr255 *_Nonnull const)outUnicodeName;
 
+#pragma mark -
+
+- (NSString *_Nonnull const) stringByEscapingString:(NSString *_Nonnull const)inStr;
+
 @end
