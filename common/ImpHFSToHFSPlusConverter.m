@@ -285,13 +285,15 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 }
 
 - (bool) performConversionOrReturnError:(NSError *_Nullable *_Nonnull) outError {
-	return (
-		true
-		&& [self step0_preflight_error:outError]
-		&& [self step1_convertPreamble_error:outError]
-		&& [self step2_convertVolume_error:outError]
-		&& [self step3_flushVolume_error:outError]
-	);
+	bool const preflightSuccess = [self step0_preflight_error:outError];
+	if (! preflightSuccess) return preflightSuccess;
+	bool const preambleSuccess = [self step1_convertPreamble_error:outError];
+	if (! preambleSuccess) return preambleSuccess;
+	bool const convertSuccess = [self step2_convertVolume_error:outError];
+	if (! convertSuccess) return convertSuccess;
+	bool const flushSuccess = [self step3_flushVolume_error:outError];
+	if (! convertSuccess) return convertSuccess;
+	return preflightSuccess && preambleSuccess && convertSuccess && flushSuccess;
 }
 
 #pragma mark Conversion utilities
