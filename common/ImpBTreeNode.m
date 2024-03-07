@@ -267,6 +267,11 @@
 	return nodeName;
 }
 
++ (NSString *_Nonnull const) describeHFSExtentsOverflowKeyWithData:(NSData *_Nonnull const)keyData {
+	struct HFSExtentKey const *_Nonnull const keyPtr = keyData.bytes;
+	return [NSString stringWithFormat:@"%@ fork of file #%u, %u blocks in", L(keyPtr->forkType) == ImpForkTypeData ? @"data" : @"resource", L(keyPtr->fileID), L(keyPtr->startBlock)];
+}
+
 - (int16_t) indexOfBestMatchingRecord:(ImpBTreeRecordKeyComparator _Nonnull)comparator {
 	//We *could* bisect this, but there are only likely to be a handful of records in each node, so let's just search linearly.
 	for (u_int16_t i = 0; i < (u_int16_t)_numberOfRecords; ++i) {

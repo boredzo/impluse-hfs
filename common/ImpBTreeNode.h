@@ -71,6 +71,9 @@
 ///Extract the node name from an HFS+ catalog key and return it as an NSString. For debugging purposes only.
 + (NSString *_Nonnull const) nodeNameFromHFSPlusCatalogKey:(NSData *_Nonnull const)keyData;
 
+///Return a string concisely describing an HFS extents overflow key. If the data does not represent (or at least start with) an HFS extents overflow key, results are undefined. For debugging purposes only.
++ (NSString *_Nonnull const) describeHFSExtentsOverflowKeyWithData:(NSData *_Nonnull const)keyData;
+
 ///Iterate from a given node forward to the end of its row.
 - (void) walkRow:(bool (^_Nonnull const)(ImpBTreeNode *_Nonnull const node))block;
 
