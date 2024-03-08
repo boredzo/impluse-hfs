@@ -13,8 +13,8 @@
 #import "ImpByteOrder.h"
 #import "ImpPrintf.h"
 
-#import "ImpHFSVolume.h"
-#import "ImpHFSPlusVolume.h"
+#import "ImpSourceVolume.h"
+#import "ImpDestinationVolume.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
 #import "ImpDehydratedResourceFork.h"
@@ -48,18 +48,18 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	bool _isHFSPlus;
 }
 
-- (instancetype _Nonnull) initWithHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol catalogNodeID:(HFSCatalogNodeID const)cnid {
+- (instancetype _Nonnull) initWithHFSVolume:(ImpSourceVolume *_Nonnull const)hfsVol catalogNodeID:(HFSCatalogNodeID const)cnid {
 	if ((self = [super init])) {
 		self.hfsVolume = hfsVol;
 		self.catalogNodeID = cnid;
 
 		_tec = hfsVol.textEncodingConverter;
-		_isHFSPlus = [_hfsVolume isKindOfClass:[ImpHFSPlusVolume class]];
+		_isHFSPlus = [_hfsVolume isKindOfClass:[ImpDestinationVolume class]];
 	}
 	return self;
 }
 
-- (instancetype _Nonnull) initWithHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol
+- (instancetype _Nonnull) initWithHFSVolume:(ImpSourceVolume *_Nonnull const)hfsVol
 	catalogNodeID:(HFSCatalogNodeID const)cnid
 	key:(struct HFSCatalogKey const *_Nonnull const)key
 	fileRecord:(struct HFSCatalogFile const *_Nonnull const)fileRec
@@ -73,7 +73,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	return self;
 }
 
-- (instancetype _Nonnull) initWithHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol catalogNodeID:(HFSCatalogNodeID const)cnid
+- (instancetype _Nonnull) initWithHFSVolume:(ImpSourceVolume *_Nonnull const)hfsVol catalogNodeID:(HFSCatalogNodeID const)cnid
 	key:(struct HFSCatalogKey const *_Nonnull const)key
 	folderRecord:(struct HFSCatalogFolder const *_Nonnull const)folderRec
 {
@@ -88,7 +88,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 }
 
 ///Create a dehydrated item object that references a given HFS+ catalog. The initializer will populate the object's properties with the catalog's data for the given catalog node ID.
-- (instancetype _Nonnull) initWithHFSPlusVolume:(ImpHFSPlusVolume *_Nonnull const)hfsVol
+- (instancetype _Nonnull) initWithHFSPlusVolume:(ImpDestinationVolume *_Nonnull const)hfsVol
 	catalogNodeID:(HFSCatalogNodeID const)cnid
 	key:(struct HFSPlusCatalogKey const *_Nonnull const)key
 	fileRecord:(struct HFSPlusCatalogFile const *_Nonnull const)fileRec
@@ -102,7 +102,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	return self;
 }
 
-- (instancetype _Nonnull) initWithHFSPlusVolume:(ImpHFSPlusVolume *_Nonnull const)hfsVol
+- (instancetype _Nonnull) initWithHFSPlusVolume:(ImpDestinationVolume *_Nonnull const)hfsVol
 	catalogNodeID:(HFSCatalogNodeID const)cnid
 	key:(struct HFSPlusCatalogKey const *_Nonnull const)key
 	folderRecord:(struct HFSPlusCatalogFolder const *_Nonnull const)folderRec
@@ -378,8 +378,8 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		return nil;
 	}
 
-	ImpHFSVolume *_Nonnull const hfsVolume = self.hfsVolume;
-	ImpHFSPlusVolume *_Nullable const hfsPlusVolume = _isHFSPlus ? (ImpHFSPlusVolume *)hfsVolume : nil;
+	ImpSourceVolume *_Nonnull const hfsVolume = self.hfsVolume;
+	ImpDestinationVolume *_Nullable const hfsPlusVolume = _isHFSPlus ? (ImpDestinationVolume *)hfsVolume : nil;
 
 	NSData *_Nonnull const fileRecData = self.hfsFileCatalogRecordData;
 	struct HFSCatalogFile const *_Nullable const hfsFileRec = _isHFSPlus ? NULL : fileRecData.bytes;
@@ -472,7 +472,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 }
 
 - (bool) rehydrateFileAtRealWorldURL:(NSURL *_Nonnull const)realWorldURL error:(NSError *_Nullable *_Nonnull const)outError {
-	ImpHFSVolume *_Nullable const volume = self.hfsVolume;
+	ImpSourceVolume *_Nullable const volume = self.hfsVolume;
 	NSAssert(volume != nil, @"Can't rehydrate a file from no volume. This is likely an internal inconsistency error and therefore a bug.");
 
 	struct HFSCatalogFile const *_Nonnull const fileRec = (struct HFSCatalogFile const *_Nonnull const)self.hfsFileCatalogRecordData.bytes;
@@ -613,7 +613,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		return allWritesSucceeded;
 	};
 	if (_isHFSPlus) {
-		[(ImpHFSPlusVolume *)volume forEachExtentInFileWithID:self.catalogNodeID
+		[(ImpDestinationVolume *)volume forEachExtentInFileWithID:self.catalogNodeID
 			fork:ImpForkTypeData
 			forkLogicalLength:dataForkSize
 			startingWithBigExtentsRecord:fileRecPlus->dataFork.extents
@@ -651,7 +651,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		return allWritesSucceeded;
 	};
 	if (_isHFSPlus) {
-		[(ImpHFSPlusVolume *)volume forEachExtentInFileWithID:self.catalogNodeID
+		[(ImpDestinationVolume *)volume forEachExtentInFileWithID:self.catalogNodeID
 			fork:ImpForkTypeResource
 			forkLogicalLength:rsrcForkSize
 			startingWithBigExtentsRecord:fileRecPlus->resourceFork.extents
@@ -698,7 +698,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	return wroteData && wroteMetadata;
 }
 - (bool) rehydrateFolderAtRealWorldURL:(NSURL *_Nonnull const)realWorldURL error:(NSError *_Nullable *_Nonnull const)outError {
-	ImpHFSVolume *_Nullable const volume = self.hfsVolume;
+	ImpSourceVolume *_Nullable const volume = self.hfsVolume;
 	NSAssert(volume != nil, @"Can't rehydrate a folder from no volume. This is likely an internal inconsistency error and therefore a bug.");
 
 	struct HFSCatalogFolder const *_Nonnull const folderRec = (struct HFSCatalogFolder const *_Nonnull const)self.hfsFolderCatalogRecordData.bytes;
@@ -833,7 +833,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 
 ///Returns a string that represents this item when printed to the console.
 - (NSString *_Nonnull) iconEmojiString {
-	ImpHFSVolume *_Nullable const volume = self.hfsVolume;
+	ImpSourceVolume *_Nullable const volume = self.hfsVolume;
 
 	switch (self.type) {
 		case ImpDehydratedItemTypeFile:
@@ -857,7 +857,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 }
 ///Returns a string that identifies a macOS icon that can be used to represent this icon in a Mac GUI. Pass this string to +[NSImage iconForFileType:].
 - (NSString *_Nonnull) iconTypeString {
-	ImpHFSVolume *_Nullable const volume = self.hfsVolume;
+	ImpSourceVolume *_Nullable const volume = self.hfsVolume;
 
 	switch (self.type) {
 		case ImpDehydratedItemTypeFile:
@@ -908,7 +908,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 	[self _walkBreadthFirstAtDepth:0 block:block];
 }
 
-+ (instancetype _Nonnull) rootDirectoryOfHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol {
++ (instancetype _Nonnull) rootDirectoryOfHFSVolume:(ImpSourceVolume *_Nonnull const)hfsVol {
 	ImpBTreeFile *_Nonnull const catalog = hfsVol.catalogBTree;
 
 	NSUInteger const totalNumItems = hfsVol.numberOfFiles + hfsVol.numberOfFolders;
@@ -950,7 +950,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		}];
 
 		[node forEachHFSPlusCatalogRecord_file:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSPlusCatalogFile const *_Nonnull const fileRec) {
-			ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSPlusVolume:(ImpHFSPlusVolume *)hfsVol catalogNodeID:L(fileRec->fileID) key:catalogKeyPtr fileRecord:fileRec];
+			ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSPlusVolume:(ImpDestinationVolume *)hfsVol catalogNodeID:L(fileRec->fileID) key:catalogKeyPtr fileRecord:fileRec];
 
 			ImpDehydratedItem *_Nullable const parent = dehydratedFolders[@(L(catalogKeyPtr->parentID))];
 			if (parent != nil) {
@@ -959,7 +959,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 				[itemsThatNeedToBeAddedToTheirParents addObject:dehydratedFile];
 			}
 		} folder:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSPlusCatalogFolder const *_Nonnull const folderRec) {
-			ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSPlusVolume:(ImpHFSPlusVolume *)hfsVol catalogNodeID:L(folderRec->folderID) key:catalogKeyPtr folderRecord:folderRec];
+			ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSPlusVolume:(ImpDestinationVolume *)hfsVol catalogNodeID:L(folderRec->folderID) key:catalogKeyPtr folderRecord:folderRec];
 			dehydratedFolder->_children = [NSMutableArray arrayWithCapacity:L(folderRec->valence)];
 
 			dehydratedFolders[@(dehydratedFolder.catalogNodeID)] = dehydratedFolder;
@@ -1018,7 +1018,7 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		}
 	);
 
-	ImpHFSVolume *_Nullable const volume = self.hfsVolume;
+	ImpSourceVolume *_Nullable const volume = self.hfsVolume;
 
 	ImpDehydratedItem *_Nonnull const rootDirectory = self;
 	ImpPrintf(@"Volume name:\t%@", rootDirectory.name);

@@ -7,14 +7,14 @@
 
 #import <Foundation/Foundation.h>
 
-@class ImpHFSVolume;
+@class ImpSourceVolume;
 
 @interface ImpHFSAnalyzer : NSObject
 
 @property(copy) NSURL *_Nonnull sourceDevice;
 @property TextEncoding hfsTextEncoding;
 
-@property ImpHFSVolume *_Nonnull sourceVolume;
+@property ImpSourceVolume *_Nonnull sourceVolume;
 
 - (bool)performAnalysisOrReturnError:(NSError *_Nullable *_Nonnull) outError;
 

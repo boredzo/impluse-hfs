@@ -10,8 +10,8 @@
 #import "ImpTextEncodingConverter.h"
 #import "ImpSizeUtilities.h"
 #import "NSData+ImpMultiplication.h"
-#import "ImpHFSVolume.h"
-#import "ImpHFSPlusVolume.h"
+#import "ImpSourceVolume.h"
+#import "ImpDestinationVolume.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
 #import "ImpBTreeIndexNode.h"
@@ -81,8 +81,8 @@
 - (bool) step2_convertVolume_error:(NSError *_Nullable *_Nullable const)outError {
 	NSAssert(_hasVolumeHeader, @"Conversion steps happening out of order! Cannot convert the volume without the volume header.");
 
-	ImpHFSVolume *_Nonnull const srcVol = self.sourceVolume;
-	ImpHFSPlusVolume *_Nonnull const dstVol = self.destinationVolume;
+	ImpSourceVolume *_Nonnull const srcVol = self.sourceVolume;
+	ImpDestinationVolume *_Nonnull const dstVol = self.destinationVolume;
 
 	__block struct HFSExtentDescriptor const *_Nonnull catalogFileSourceExtents;
 	__block struct HFSExtentDescriptor const *_Nonnull extentsOverflowFileSourceExtents;

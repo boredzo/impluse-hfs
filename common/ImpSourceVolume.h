@@ -1,5 +1,5 @@
 //
-//  ImpHFSVolume.h
+//  ImpSourceVolume.h
 //  impluse-hfs
 //
 //  Created by Peter Hosey on 2022-11-26.
@@ -12,7 +12,7 @@
 
 #import "ImpForkUtilities.h"
 
-@interface ImpHFSVolume : NSObject
+@interface ImpSourceVolume : NSObject
 {
 	u_int64_t _startOffsetInBytes, _lengthInBytes;
 	int _fileDescriptor;

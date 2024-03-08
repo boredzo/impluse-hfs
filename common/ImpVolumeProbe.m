@@ -11,8 +11,8 @@
 #import "ImpByteOrder.h"
 #import "NSData+ImpSubdata.h"
 
-#import "ImpHFSVolume.h"
-#import "ImpHFSPlusVolume.h"
+#import "ImpSourceVolume.h"
+#import "ImpDestinationVolume.h"
 
 #import <sys/stat.h>
 
@@ -278,12 +278,12 @@ struct APMPartitionRecord_IM5 {
 				struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr = (struct HFSMasterDirectoryBlock const *_Nonnull)thirdVolumeBlockData.bytes;
 				if (L(mdbPtr->drSigWord) == kHFSSigWord) {
 					if (self.verbose) ImpPrintf(@"Volume is an HFS volume");
-					identifiedClass = [ImpHFSVolume class];
+					identifiedClass = [ImpSourceVolume class];
 				} else {
 					struct HFSPlusVolumeHeader const *_Nonnull const vhPtr = (struct HFSPlusVolumeHeader const *_Nonnull)thirdVolumeBlockData.bytes;
 					if (L(vhPtr->signature) == kHFSPlusSigWord) {
 						if (self.verbose) ImpPrintf(@"Volume is an HFS+ volume");
-						identifiedClass = [ImpHFSPlusVolume class];
+						identifiedClass = [ImpDestinationVolume class];
 					} else {
 						//Signature isn't HFS or HFS+? This may be mapped as an Apple_HFS partition, but it's not a usable HFS or HFS+ volume. Skip it.
 						if (self.verbose) ImpPrintf(@"Volume is not an HFS or HFS+ volume");
@@ -323,12 +323,12 @@ struct APMPartitionRecord_IM5 {
 				struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr = (struct HFSMasterDirectoryBlock const *_Nonnull)thirdVolumeBlockData.bytes;
 				if (L(mdbPtr->drSigWord) == kHFSSigWord) {
 					if (self.verbose) ImpPrintf(@"Volume is an HFS volume");
-					identifiedClass = [ImpHFSVolume class];
+					identifiedClass = [ImpSourceVolume class];
 				} else {
 					struct HFSPlusVolumeHeader const *_Nonnull const vhPtr = (struct HFSPlusVolumeHeader const *_Nonnull)thirdVolumeBlockData.bytes;
 					if (L(vhPtr->signature) == kHFSPlusSigWord) {
 						if (self.verbose) ImpPrintf(@"Volume is an HFS+ volume");
-						identifiedClass = [ImpHFSPlusVolume class];
+						identifiedClass = [ImpDestinationVolume class];
 					} else {
 						//Signature isn't HFS or HFS+? This may be mapped as an Apple_HFS partition, but it's not a usable HFS or HFS+ volume. Skip it.
 						if (self.verbose) ImpPrintf(@"Volume is not an HFS or HFS+ volume");
@@ -356,10 +356,10 @@ struct APMPartitionRecord_IM5 {
 			signature = L(*maybeSignaturePtr);
 		}];
 		if (signature == kHFSSigWord) {
-			[self foundVolumeStartingAtBlock:startBlock blockCount:numBlocks class:[ImpHFSVolume class]];
+			[self foundVolumeStartingAtBlock:startBlock blockCount:numBlocks class:[ImpSourceVolume class]];
 			return true;
 		} else if (signature == kHFSPlusSigWord) {
-			[self foundVolumeStartingAtBlock:startBlock blockCount:numBlocks class:[ImpHFSPlusVolume class]];
+			[self foundVolumeStartingAtBlock:startBlock blockCount:numBlocks class:[ImpDestinationVolume class]];
 			return true;
 		}
 	}

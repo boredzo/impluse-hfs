@@ -1,11 +1,11 @@
 //
-//  ImpHFSPlusVolume.m
+//  ImpDestinationVolume.m
 //  impluse-hfs
 //
 //  Created by Peter Hosey on 2022-11-26.
 //
 
-#import "ImpHFSPlusVolume.h"
+#import "ImpDestinationVolume.h"
 
 #import "NSData+ImpSubdata.h"
 #import "ImpByteOrder.h"
@@ -21,18 +21,18 @@
 
 @interface ImpVirtualFileHandle ()
 
-///Create a new virtual file handle backed by an HFS+ volume (and its backing file descriptor). extentRecPtr must be a pointer to a populated HFS+ extent record (at least kHFSPlusExtentDensity extent descriptors).
-- (instancetype _Nonnull) initWithVolume:(ImpHFSPlusVolume *_Nonnull const)dstVol extents:(struct HFSPlusExtentDescriptor const *_Nonnull const)extentRecPtr;
+///Create a new virtual file handle backed by a destination volume (and its backing file descriptor). extentRecPtr must be a pointer to a populated HFS+ extent record (at least kHFSPlusExtentDensity extent descriptors).
+- (instancetype _Nonnull) initWithVolume:(ImpDestinationVolume *_Nonnull const)dstVol extents:(struct HFSPlusExtentDescriptor const *_Nonnull const)extentRecPtr;
 
 @end
 
-@interface ImpHFSVolume ()
+@interface ImpSourceVolume ()
 
 @property(readwrite, nonnull, strong) ImpTextEncodingConverter *textEncodingConverter;
 
 @end
 
-@interface ImpHFSPlusVolume ()
+@interface ImpDestinationVolume ()
 
 - (u_int32_t) numBlocksForPreambleWithSize:(u_int32_t const)aBlockSize;
 - (u_int32_t) numBlocksForPostambleWithSize:(u_int32_t const)aBlockSize;
@@ -47,7 +47,7 @@
 
 @end
 
-@implementation ImpHFSPlusVolume
+@implementation ImpDestinationVolume
 {
 	NSMutableData *_preamble; //Boot blocks + volume header = 1.5 K
 	struct HFSPlusVolumeHeader *_vh;
@@ -717,7 +717,7 @@
 
 }
 
-#pragma mark ImpHFSVolume overrides
+#pragma mark ImpSourceVolume overrides
 
 - (bool) readBootBlocksFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
 	_preamble = [NSMutableData dataWithLength:kISOStandardBlockSize * 3];
@@ -809,7 +809,7 @@
 	return (self.extentsOverflowBTree != nil);
 }
 
-//TODO: This is pretty much copied wholesale from ImpHFSVolume. It would be nice to de-dup the code somehow…
+//TODO: This is pretty much copied wholesale from ImpSourceVolume. It would be nice to de-dup the code somehow…
 - (u_int64_t) forEachExtentInFileWithID:(HFSCatalogNodeID)cnid
 	fork:(ImpForkType)forkType
 	forkLogicalLength:(u_int64_t const)forkLength
@@ -1032,7 +1032,7 @@
 
 @implementation ImpVirtualFileHandle
 {
-	__block ImpHFSPlusVolume *_Nonnull _backingVolume;
+	__block ImpDestinationVolume *_Nonnull _backingVolume;
 	NSMutableData *_Nonnull _extentsData;
 	struct HFSPlusExtentDescriptor *_Nonnull _extentsPtr;
 	NSUInteger _numExtents;
@@ -1044,7 +1044,7 @@
 	struct HFSPlusExtentDescriptor _remainderOfCurrentExtent;
 }
 
-- (instancetype _Nonnull) initWithVolume:(ImpHFSPlusVolume *_Nonnull const)dstVol extents:(struct HFSPlusExtentDescriptor const *_Nonnull const)extentRecPtr {
+- (instancetype _Nonnull) initWithVolume:(ImpDestinationVolume *_Nonnull const)dstVol extents:(struct HFSPlusExtentDescriptor const *_Nonnull const)extentRecPtr {
 	if ((self = [super init])) {
 		_backingVolume = dstVol;
 

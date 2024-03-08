@@ -10,7 +10,7 @@
 ///progress is a value from 0.0 to 1.0. 1.0 means the conversion has finished. operationDescription is a string describing what work is currently being done.
 typedef void (^ImpConversionProgressUpdateBlock)(double progress, NSString *_Nonnull operationDescription);
 
-@class ImpHFSVolume, ImpHFSPlusVolume;
+@class ImpSourceVolume, ImpDestinationVolume;
 @class ImpBTreeFile, ImpMutableBTreeFile;
 
 extern NSString *_Nonnull const ImpRescuedDataFileName;
@@ -66,9 +66,9 @@ extern NSString *_Nonnull const ImpRescuedDataFileName;
 - (void) deliverProgressUpdateWithOperationDescription:(NSString *_Nonnull)operationDescription;
 
 ///Set by concrete subclasses as part of the conversion.
-@property(strong) ImpHFSVolume *_Nonnull sourceVolume;
+@property(strong) ImpSourceVolume *_Nonnull sourceVolume;
 ///Set by concrete subclasses as part of the conversion.
-@property(strong) ImpHFSPlusVolume *_Nonnull destinationVolume;
+@property(strong) ImpDestinationVolume *_Nonnull destinationVolume;
 
 - (NSData *_Nonnull const)hfsUniStr255ForPascalString:(ConstStr31Param _Nonnull)pascalString;
 - (NSString *_Nonnull const) stringForPascalString:(ConstStr31Param _Nonnull)pascalString;

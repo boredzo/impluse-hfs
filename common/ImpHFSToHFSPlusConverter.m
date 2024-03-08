@@ -15,8 +15,8 @@
 #import "ImpSizeUtilities.h"
 #import "ImpErrorUtilities.h"
 #import "NSData+ImpMultiplication.h"
-#import "ImpHFSVolume.h"
-#import "ImpHFSPlusVolume.h"
+#import "ImpSourceVolume.h"
+#import "ImpDestinationVolume.h"
 #import "ImpVolumeProbe.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
@@ -575,14 +575,14 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 	__block NSError *_Nullable volumeLoadError = nil;
 	[probe findVolumes:^(u_int64_t const startOffsetInBytes, u_int64_t const lengthInBytes, Class _Nullable const volumeClass) {
 		if (! haveFoundHFSVolume) {
-			if (volumeClass != Nil && volumeClass != [ImpHFSVolume class]) {
+			if (volumeClass != Nil && volumeClass != [ImpSourceVolume class]) {
 				//We have an identified volume class, but it isn't HFS. Most likely, this is already HFS+. Skip.
 				NSError *_Nonnull const noConvertibleVolumesError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: @"This volume format cannot be converted. It may already be HFS+ or it may be some other format that is not HFS and is not supported." }];
 				volumeLoadError = noConvertibleVolumesError;
 				return;
 			}
 
-			ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:self->_readFD
+			ImpSourceVolume *_Nonnull const srcVol = [[ImpSourceVolume alloc] initWithFileDescriptor:self->_readFD
 				startOffsetInBytes:startOffsetInBytes
 				lengthInBytes:lengthInBytes
 				textEncoding:self.hfsTextEncoding];
@@ -592,7 +592,7 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 
 				u_int64_t const totalSizeOfSourceBlocks = self.sourceVolume.numberOfBytesPerBlock * self.sourceVolume.numberOfBlocksTotal;
 				u_int64_t const destinationLengthInBytes = MAX(lengthInBytes, totalSizeOfSourceBlocks);
-				self.destinationVolume = [[ImpHFSPlusVolume alloc] initForWritingToFileDescriptor:self->_writeFD
+				self.destinationVolume = [[ImpDestinationVolume alloc] initForWritingToFileDescriptor:self->_writeFD
 					startAtOffset:startOffsetInBytes
 					expectedLengthInBytes:destinationLengthInBytes];
 
@@ -655,7 +655,7 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 	lseek(_readFD, 0, SEEK_SET);
 	lseek(_writeFD, 0, SEEK_SET);
 
-	ImpHFSVolume *_Nonnull const srcVol = self.sourceVolume;
+	ImpSourceVolume *_Nonnull const srcVol = self.sourceVolume;
 	u_int64_t const blockSize = srcVol.numberOfBytesPerBlock;
 	NSMutableData *_Nonnull const bufferData = [NSMutableData dataWithLength:blockSize];
 	void *_Nonnull const buf = bufferData.mutableBytes;
@@ -688,7 +688,7 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 }
 ///Copy any other partitions after the volume.
 - (bool) copyBytesAfterVolume_error:(NSError *_Nullable *_Nullable const)outError {
-	ImpHFSVolume *_Nonnull const srcVol = self.sourceVolume;
+	ImpSourceVolume *_Nonnull const srcVol = self.sourceVolume;
 	u_int64_t const numBytesBeforeEndOfVolume = srcVol.startOffsetInBytes + srcVol.lengthInBytes;
 	off_t const readPos = lseek(_readFD, numBytesBeforeEndOfVolume, SEEK_SET);
 	off_t const writePos = lseek(_writeFD, numBytesBeforeEndOfVolume, SEEK_SET);

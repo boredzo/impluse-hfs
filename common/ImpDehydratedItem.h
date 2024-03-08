@@ -9,8 +9,8 @@
 
 #import "ImpForkUtilities.h"
 
-@class ImpHFSVolume;
-@class ImpHFSPlusVolume;
+@class ImpSourceVolume;
+@class ImpDestinationVolume;
 
 typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
 	ImpDehydratedItemTypeFile = 1,
@@ -22,29 +22,29 @@ typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
 @interface ImpDehydratedItem : NSObject
 
 ///Create a dehydrated item object that references a given HFS catalog. The initializer will populate the object's properties with the catalog's data for the given catalog node ID.
-- (instancetype _Nonnull) initWithHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol
+- (instancetype _Nonnull) initWithHFSVolume:(ImpSourceVolume *_Nonnull const)hfsVol
 	catalogNodeID:(HFSCatalogNodeID const)cnid
 	key:(struct HFSCatalogKey const *_Nonnull const)key
 	fileRecord:(struct HFSCatalogFile const *_Nonnull const)fileRec;
 
 ///Create a dehydrated item object that references a given HFS catalog. The initializer will populate the object's properties with the catalog's data for the given catalog node ID.
-- (instancetype _Nonnull) initWithHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol	catalogNodeID:(HFSCatalogNodeID const)cnid
+- (instancetype _Nonnull) initWithHFSVolume:(ImpSourceVolume *_Nonnull const)hfsVol	catalogNodeID:(HFSCatalogNodeID const)cnid
 	key:(struct HFSCatalogKey const *_Nonnull const)key
 	folderRecord:(struct HFSCatalogFolder const *_Nonnull const)folderRec;
 
 ///Create a dehydrated item object that references a given HFS+ catalog. The initializer will populate the object's properties with the catalog's data for the given catalog node ID.
-- (instancetype _Nonnull) initWithHFSPlusVolume:(ImpHFSPlusVolume *_Nonnull const)hfsVol
+- (instancetype _Nonnull) initWithHFSPlusVolume:(ImpDestinationVolume *_Nonnull const)hfsVol
 	catalogNodeID:(HFSCatalogNodeID const)cnid
 	key:(struct HFSPlusCatalogKey const *_Nonnull const)key
 	fileRecord:(struct HFSPlusCatalogFile const *_Nonnull const)fileRec;
 
 ///Create a dehydrated item object that references a given HFS+ catalog. The initializer will populate the object's properties with the catalog's data for the given catalog node ID.
-- (instancetype _Nonnull) initWithHFSPlusVolume:(ImpHFSPlusVolume *_Nonnull const)hfsVol
+- (instancetype _Nonnull) initWithHFSPlusVolume:(ImpDestinationVolume *_Nonnull const)hfsVol
 	catalogNodeID:(HFSCatalogNodeID const)cnid
 	key:(struct HFSPlusCatalogKey const *_Nonnull const)key
 	folderRecord:(struct HFSPlusCatalogFolder const *_Nonnull const)folderRec;
 
-@property(weak) ImpHFSVolume * _Nullable hfsVolume;
+@property(weak) ImpSourceVolume * _Nullable hfsVolume;
 @property HFSCatalogNodeID catalogNodeID;
 @property ImpDehydratedItemType type;
 ///True for folders and volumes. False for files.
@@ -92,7 +92,7 @@ typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
 #pragma mark Directory trees
 
 ///From an HFS volume, create a hierarchy of ImpDehydratedItems representing the files and folders on that volume. Returns the root directory.
-+ (instancetype _Nonnull) rootDirectoryOfHFSVolume:(ImpHFSVolume *_Nonnull const)hfsVol;
++ (instancetype _Nonnull) rootDirectoryOfHFSVolume:(ImpSourceVolume *_Nonnull const)hfsVol;
 
 ///Only present on dehydrated folders created by rootDirectoryOfHFSVolume:. Contains all of the files and folders that are immediate children of this folder (i.e., whose parent is this folder).
 @property(nullable, nonatomic, readonly, copy) NSArray <ImpDehydratedItem *> *children;

@@ -1,11 +1,11 @@
 //
-//  ImpHFSVolume.m
+//  ImpSourceVolume.m
 //  impluse-hfs
 //
 //  Created by Peter Hosey on 2022-11-26.
 //
 
-#import "ImpHFSVolume.h"
+#import "ImpSourceVolume.h"
 
 #import "ImpByteOrder.h"
 #import "ImpPrintf.h"
@@ -18,13 +18,13 @@
 
 #import <hfs/hfs_format.h>
 
-@interface ImpHFSVolume ()
+@interface ImpSourceVolume ()
 
 @property(readwrite, nonnull, strong) ImpTextEncodingConverter *textEncodingConverter;
 
 @end
 
-@implementation ImpHFSVolume
+@implementation ImpSourceVolume
 {
 	NSMutableData *_bootBlocksData;
 	NSData *_lastBlockData;

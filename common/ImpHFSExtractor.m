@@ -7,7 +7,7 @@
 
 #import "ImpHFSExtractor.h"
 
-#import "ImpHFSVolume.h"
+#import "ImpSourceVolume.h"
 #import "ImpVolumeProbe.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
@@ -114,12 +114,12 @@
 
 	ImpVolumeProbe *_Nonnull const probe = [[ImpVolumeProbe alloc] initWithFileDescriptor:readFD];
 	[probe findVolumes:^(const u_int64_t startOffsetInBytes, const u_int64_t lengthInBytes, Class  _Nullable const __unsafe_unretained volumeClass) {
-		if (volumeClass != Nil && volumeClass != [ImpHFSVolume class]) {
+		if (volumeClass != Nil && volumeClass != [ImpSourceVolume class]) {
 			//We only extract from HFS volumes. Skip.
 			return;
 		}
 
-		ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
+		ImpSourceVolume *_Nonnull const srcVol = [[ImpSourceVolume alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
 		if (! [srcVol loadAndReturnError:&volumeLoadError])
 			return;
 

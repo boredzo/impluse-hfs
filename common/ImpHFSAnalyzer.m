@@ -10,9 +10,9 @@
 #import "ImpSizeUtilities.h"
 #import "ImpTextEncodingConverter.h"
 
-#import "ImpHFSVolume.h"
-#import "ImpHFSVolume+ConsistencyChecking.h"
-#import "ImpHFSPlusVolume.h"
+#import "ImpSourceVolume.h"
+#import "ImpSourceVolume+ConsistencyChecking.h"
+#import "ImpDestinationVolume.h"
 #import "ImpVolumeProbe.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
@@ -21,7 +21,7 @@
 
 @interface ImpHFSAnalyzer ()
 
-- (bool) analyzeVolume:(ImpHFSVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError;
+- (bool) analyzeVolume:(ImpSourceVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError;
 
 @end
 @implementation ImpHFSAnalyzer
@@ -41,7 +41,7 @@
 	ImpVolumeProbe *_Nonnull const probe = [[ImpVolumeProbe alloc] initWithFileDescriptor:readFD];
 	probe.verbose = true;
 	[probe findVolumes:^(const u_int64_t startOffsetInBytes, const u_int64_t lengthInBytes, Class  _Nullable const __unsafe_unretained volumeClass) {
-		ImpHFSVolume *_Nonnull const srcVol = [[volumeClass alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
+		ImpSourceVolume *_Nonnull const srcVol = [[volumeClass alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
 		analyzed = [self analyzeVolume:srcVol error:&analysisError] || analyzed;
 	}];
 
@@ -53,7 +53,7 @@
 
 	return analyzed;
 }
-- (bool) analyzeVolume:(ImpHFSVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError {
+- (bool) analyzeVolume:(ImpSourceVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError {
 	NSByteCountFormatter *_Nonnull const bcf = [NSByteCountFormatter new];
 
 	int const readFD = srcVol.fileDescriptor;
@@ -64,8 +64,8 @@
 		return false;
 	}
 
-	if ([srcVol isKindOfClass:[ImpHFSPlusVolume class]]) {
-		ImpHFSPlusVolume *_Nonnull const srcVolPlus = (ImpHFSPlusVolume *_Nonnull const)srcVol;
+	if ([srcVol isKindOfClass:[ImpDestinationVolume class]]) {
+		ImpDestinationVolume *_Nonnull const srcVolPlus = (ImpDestinationVolume *_Nonnull const)srcVol;
 		[srcVolPlus peekAtHFSPlusVolumeHeader:^(NS_NOESCAPE const struct HFSPlusVolumeHeader *const vhPtr) {
 			ImpPrintf(@"Found HFS+ volume");
 
@@ -157,8 +157,8 @@
 	ImpPrintf(@"Volume's name is “%@”", srcVol.volumeName);
 	ImpPrintf(@"“%@” contains %lu files and %lu folders", srcVol.volumeName, srcVol.numberOfFiles, srcVol.numberOfFolders);
 	ImpPrintf(@"Allocation block size is %lu (%lx) bytes; volume has %lu blocks in use, %lu free, for a total of %lu total", srcVol.numberOfBytesPerBlock, srcVol.numberOfBytesPerBlock, srcVol.numberOfBlocksUsed, srcVol.numberOfBlocksFree, srcVol.numberOfBlocksTotal);
-	if ([srcVol isKindOfClass:[ImpHFSPlusVolume class]]) {
-		ImpHFSPlusVolume *_Nonnull const srcVolPlus = (ImpHFSPlusVolume *_Nonnull const)srcVol;
+	if ([srcVol isKindOfClass:[ImpDestinationVolume class]]) {
+		ImpDestinationVolume *_Nonnull const srcVolPlus = (ImpDestinationVolume *_Nonnull const)srcVol;
 		[srcVolPlus peekAtHFSPlusVolumeHeader:^(NS_NOESCAPE const struct HFSPlusVolumeHeader *const vhPtr) {
 			ImpPrintf(@"Volume attributes: 0x%08x", L(vhPtr->attributes));
 			ImpPrintf(@"Creation date: %u", L(vhPtr->createDate));

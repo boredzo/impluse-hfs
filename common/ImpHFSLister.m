@@ -9,8 +9,8 @@
 
 #import "ImpCSVProducer.h"
 
-#import "ImpHFSVolume.h"
-#import "ImpHFSPlusVolume.h"
+#import "ImpSourceVolume.h"
+#import "ImpDestinationVolume.h"
 #import "ImpVolumeProbe.h"
 #import "ImpDehydratedItem.h"
 
@@ -31,7 +31,7 @@
 
 	ImpVolumeProbe *_Nonnull const probe = [[ImpVolumeProbe alloc] initWithFileDescriptor:readFD];
 	[probe findVolumes:^(const u_int64_t startOffsetInBytes, const u_int64_t lengthInBytes, Class  _Nullable const __unsafe_unretained volumeClass) {
-		ImpHFSVolume *_Nonnull srcVol = [[volumeClass alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
+		ImpSourceVolume *_Nonnull srcVol = [[volumeClass alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
 		bool const loaded = [srcVol loadAndReturnError:&volumeLoadError];
 
 		if (loaded) {

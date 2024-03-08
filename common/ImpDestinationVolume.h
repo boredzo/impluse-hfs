@@ -1,5 +1,5 @@
 //
-//  ImpHFSPlusVolume.h
+//  ImpDestinationVolume.h
 //  impluse-hfs
 //
 //  Created by Peter Hosey on 2022-11-26.
@@ -9,7 +9,7 @@
 
 #import <hfs/hfs_format.h>
 
-#import "ImpHFSVolume.h"
+#import "ImpSourceVolume.h"
 
 #import "ImpForkUtilities.h"
 
@@ -30,10 +30,10 @@
 
 @end
 
-///Like ImpHFSVolume, this wraps a file descriptor and is responsible for volume structures (primarily the volume header and allocations bitmap).
-///Unlike ImpHFSVolume, this is not (at least primarily) for reading an existing volume from disk, but for writing a new volume to disk. As such, its interface is quite different. An ImpHFSPlusVolume is used by an HFS-to-HFS+ converter to initialize the HFS+ volume structures and take receipt of special and user file contents, including the catalog file.
-///ImpHFSPlusVolume is a subclass of ImpHFSVolume so that the same methods can be used to read (or diagnose) an HFS+ volume.
-@interface ImpHFSPlusVolume : ImpHFSVolume
+///Like ImpSourceVolume, this wraps a file descriptor and is responsible for volume structures (primarily the volume header and allocations bitmap).
+///Unlike ImpSourceVolume, this is not (at least primarily) for reading an existing volume from disk, but for writing a new volume to disk. As such, its interface is quite different. An ImpDestinationVolume is used by an HFS-to-HFS+ converter to initialize the HFS+ volume structures and take receipt of special and user file contents, including the catalog file.
+///ImpDestinationVolume is a subclass of ImpSourceVolume so that the same methods can be used to read (or diagnose) an HFS+ volume.
+@interface ImpDestinationVolume : ImpSourceVolume
 
 - (instancetype _Nonnull)initForWritingToFileDescriptor:(int)writeFD
 	startAtOffset:(u_int64_t)startOffsetInBytes

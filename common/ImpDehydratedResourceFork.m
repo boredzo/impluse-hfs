@@ -7,7 +7,7 @@
 
 #import "ImpDehydratedResourceFork.h"
 
-#import "ImpHFSVolume.h"
+#import "ImpSourceVolume.h"
 #import "ImpDehydratedItem.h"
 #import "ImpTextEncodingConverter.h"
 
