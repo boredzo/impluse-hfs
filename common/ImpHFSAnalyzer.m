@@ -65,6 +65,7 @@
 		return false;
 	}
 
+#if MOVE_TO_ImpHFSPlusSourceVolume
 	if ([srcVol isKindOfClass:[ImpDestinationVolume class]]) {
 		ImpDestinationVolume *_Nonnull const srcVolPlus = (ImpDestinationVolume *_Nonnull const)srcVol;
 		[srcVolPlus peekAtHFSPlusVolumeHeader:^(NS_NOESCAPE const struct HFSPlusVolumeHeader *const vhPtr) {
@@ -88,7 +89,9 @@
 				ImpPrintf(@"Extents overflow extent #%lu: start block #%@, length %@ blocks", i, [fmtr stringFromNumber:@(L(eoExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[0].blockCount))]);
 			}
 		}];
-	} else if ([srcVol isKindOfClass:[ImpHFSSourceVolume class]]) {
+	} else
+#endif
+	if ([srcVol isKindOfClass:[ImpHFSSourceVolume class]]) {
 		ImpHFSSourceVolume *_Nonnull const hfsVol = (ImpHFSSourceVolume *)srcVol;
 		[hfsVol peekAtHFSVolumeHeader:^(NS_NOESCAPE const struct HFSMasterDirectoryBlock *const mdbPtr) {
 			ImpPrintf(@"Found HFS volume with name: %@", [srcVol.textEncodingConverter stringForPascalString:mdbPtr->drVN]);
@@ -159,6 +162,7 @@
 	ImpPrintf(@"Volume's name is “%@”", srcVol.volumeName);
 	ImpPrintf(@"“%@” contains %lu files and %lu folders", srcVol.volumeName, srcVol.numberOfFiles, srcVol.numberOfFolders);
 	ImpPrintf(@"Allocation block size is %lu (%lx) bytes; volume has %lu blocks in use, %lu free, for a total of %lu total", srcVol.numberOfBytesPerBlock, srcVol.numberOfBytesPerBlock, srcVol.numberOfBlocksUsed, srcVol.numberOfBlocksFree, srcVol.numberOfBlocksTotal);
+#if MOVE_TO_ImpHFSPlusSourceVolume
 	if ([srcVol isKindOfClass:[ImpDestinationVolume class]]) {
 		ImpDestinationVolume *_Nonnull const srcVolPlus = (ImpDestinationVolume *_Nonnull const)srcVol;
 		[srcVolPlus peekAtHFSPlusVolumeHeader:^(NS_NOESCAPE const struct HFSPlusVolumeHeader *const vhPtr) {
@@ -173,7 +177,9 @@
 			logFork("", "Extents overflow file", &(vhPtr->extentsFile));
 			logFork("", "Catalog file", &(vhPtr->catalogFile));
 		}];
-	} else if ([srcVol isKindOfClass:[ImpHFSSourceVolume class]]) {
+	} else
+#endif
+	if ([srcVol isKindOfClass:[ImpHFSSourceVolume class]]) {
 		ImpHFSSourceVolume *_Nonnull const hfsVol = (ImpHFSSourceVolume *)srcVol;
 		[hfsVol peekAtHFSVolumeHeader:^(NS_NOESCAPE struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr) {
 			ImpPrintf(@"Creation date: %u", L(mdbPtr->drCrDate));

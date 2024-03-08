@@ -424,12 +424,14 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 
 	u_int64_t totalLengthRead = 0;
 	if (_isHFSPlus) {
+#if MOVE_TO_ImpHFSPlusSourceVolume
 		totalLengthRead = [hfsPlusVolume forEachExtentInFileWithID:self.catalogNodeID
 			fork:whichFork
 			forkLogicalLength:logicalLength
 			startingWithBigExtentsRecord:extentsPlus
 			readDataOrReturnError:&readError
 			block:appendBlock];
+#endif
 	} else {
 		totalLengthRead = [hfsVolume forEachExtentInFileWithID:self.catalogNodeID
 			fork:whichFork
@@ -613,12 +615,14 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		return allWritesSucceeded;
 	};
 	if (_isHFSPlus) {
+#if MOVE_TO_ImpHFSPlusSourceVolume
 		[(ImpDestinationVolume *)volume forEachExtentInFileWithID:self.catalogNodeID
 			fork:ImpForkTypeData
 			forkLogicalLength:dataForkSize
 			startingWithBigExtentsRecord:fileRecPlus->dataFork.extents
 			readDataOrReturnError:outError
 			block:writeDataForkBlock];
+#endif
 	} else {
 		[volume forEachExtentInFileWithID:self.catalogNodeID
 			fork:ImpForkTypeData
@@ -651,12 +655,14 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 		return allWritesSucceeded;
 	};
 	if (_isHFSPlus) {
+#if MOVE_TO_ImpHFSPlusSourceVolume
 		[(ImpDestinationVolume *)volume forEachExtentInFileWithID:self.catalogNodeID
 			fork:ImpForkTypeResource
 			forkLogicalLength:rsrcForkSize
 			startingWithBigExtentsRecord:fileRecPlus->resourceFork.extents
 			readDataOrReturnError:outError
 			block:writeRsrcForkBlock];
+#endif
 	} else {
 		[volume forEachExtentInFileWithID:self.catalogNodeID
 			fork:ImpForkTypeResource

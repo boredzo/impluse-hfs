@@ -18,6 +18,7 @@
 #import "ImpSourceVolume.h"
 #import "ImpHFSSourceVolume.h"
 #import "ImpDestinationVolume.h"
+#import "ImpHFSPlusDestinationVolume.h"
 #import "ImpVolumeProbe.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
@@ -489,7 +490,10 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 
 	[catBuilder populateTree:destTree];
 
-	struct HFSPlusVolumeHeader *_Nonnull const vhPtr = _destinationVolume.mutableVolumeHeaderPointer;
+	NSAssert([_destinationVolume isKindOfClass:[ImpHFSPlusDestinationVolume class]], @"ERROR: Destination volume is not an HFS+ volume! Can't convert to anything but an HFS+ volume yet.");
+	ImpHFSPlusDestinationVolume *_Nonnull const hfsPlusVol = (ImpHFSPlusDestinationVolume *)_destinationVolume;
+
+	struct HFSPlusVolumeHeader *_Nonnull const vhPtr = hfsPlusVol.mutableVolumeHeaderPointer;
 	S(vhPtr->nextCatalogID, catBuilder.nextCatalogNodeID);
 	if (catBuilder.hasReusedCatalogNodeIDs) {
 		S(vhPtr->attributes, L(vhPtr->attributes) | kHFSCatalogNodeIDsReusedMask);
@@ -590,7 +594,8 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 
 				u_int64_t const totalSizeOfSourceBlocks = self.sourceVolume.numberOfBytesPerBlock * self.sourceVolume.numberOfBlocksTotal;
 				u_int64_t const destinationLengthInBytes = MAX(lengthInBytes, totalSizeOfSourceBlocks);
-				self.destinationVolume = [[ImpDestinationVolume alloc] initForWritingToFileDescriptor:self->_writeFD
+				//TODO: Need to determine the right destination class by some dynamic means (including based on a --file-system argument).
+				self.destinationVolume = [[ImpHFSPlusDestinationVolume alloc] initForWritingToFileDescriptor:self->_writeFD
 					startAtOffset:startOffsetInBytes
 					expectedLengthInBytes:destinationLengthInBytes];
 
@@ -626,8 +631,11 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 }
 
 - (bool) step1_convertPreamble_error:(NSError *_Nullable *_Nullable const)outError {
-	self.destinationVolume.bootBlocks = self.sourceVolume.bootBlocks;
-	self.destinationVolume.lastBlock = self.sourceVolume.lastBlock;
+	NSAssert([_destinationVolume isKindOfClass:[ImpHFSPlusDestinationVolume class]], @"ERROR: Destination volume is not an HFS+ volume! Can't convert to anything but an HFS+ volume yet.");
+	ImpHFSPlusDestinationVolume *_Nonnull const hfsPlusVol = (ImpHFSPlusDestinationVolume *)_destinationVolume;
+
+	hfsPlusVol.bootBlocks = self.sourceVolume.bootBlocks;
+	hfsPlusVol.lastBlock = self.sourceVolume.lastBlock;
 //	ImpPrintf(@"Set destination volume's last block to %@", self.sourceVolume.lastBlock);
 
 	ImpSourceVolume *_Nonnull const srcVol = self.sourceVolume;
@@ -639,7 +647,7 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 			[self convertHFSVolumeHeader:mdbPtr toHFSPlusVolumeHeader:vhPtr];
 
 			//We currently do this so the volume's _hasVolumeHeader gets set to true. Maybe that should have a setter method so we can use mutableVolumeHeaderPointer instead?
-			self.destinationVolume.volumeHeader = volumeHeaderData;
+			hfsPlusVol.volumeHeader = volumeHeaderData;
 		}];
 	}
 	[self reportSourceBlocksWillBeCopied:self.sourceVolume.numberOfBlocksUsed];

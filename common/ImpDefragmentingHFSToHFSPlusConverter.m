@@ -13,6 +13,8 @@
 #import "ImpSourceVolume.h"
 #import "ImpHFSSourceVolume.h"
 #import "ImpDestinationVolume.h"
+#import "ImpHFSPlusDestinationVolume.h"
+#import "ImpVirtualFileHandle.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
 #import "ImpBTreeIndexNode.h"
@@ -87,6 +89,8 @@
 
 	NSAssert([srcVol isKindOfClass:[ImpHFSSourceVolume class]], @"ERROR: Source volume is not an HFS volume! Can't convert anything but an HFS volume yet.");
 	ImpHFSSourceVolume *_Nonnull const hfsVol = (ImpHFSSourceVolume *)srcVol;
+	NSAssert([dstVol isKindOfClass:[ImpHFSPlusDestinationVolume class]], @"ERROR: Destination volume is not an HFS+ volume! Can't convert to anything but an HFS+ volume yet.");
+	ImpHFSPlusDestinationVolume *_Nonnull const hfsPlusVol = (ImpHFSPlusDestinationVolume *)dstVol;
 
 	__block struct HFSExtentDescriptor const *_Nonnull catalogFileSourceExtents;
 	__block struct HFSExtentDescriptor const *_Nonnull extentsOverflowFileSourceExtents;
@@ -95,7 +99,7 @@
 		extentsOverflowFileSourceExtents = mdbPtr->drXTExtRec;
 	}];
 
-	struct HFSPlusVolumeHeader *_Nonnull const vh = dstVol.mutableVolumeHeaderPointer;
+	struct HFSPlusVolumeHeader *_Nonnull const vh = hfsPlusVol.mutableVolumeHeaderPointer;
 	__block bool hasAnyFiles = false;
 	__block NSUInteger numFilesCopied = 0, numFoldersCopied = 0;
 
@@ -105,7 +109,7 @@
 
 	u_int32_t const bytesPerABlock = L(vh->blockSize);
 	u_int32_t const numBlocksInVolume = (u_int32_t)ImpCeilingDivide(volumeLengthInBytes, bytesPerABlock);
-	[dstVol initializeAllocationBitmapWithBlockSize:bytesPerABlock count:numBlocksInVolume];
+	[hfsPlusVol initializeAllocationBitmapWithBlockSize:bytesPerABlock count:numBlocksInVolume];
 
 	//We do need to create/have an extents overflow file, even if it's empty.
 	ImpBTreeFile *_Nonnull const srcExtentsOverflow = srcVol.extentsOverflowBTree;
@@ -123,11 +127,11 @@
 
 	//Allocate the special files before anything else, so they get placed first on the disk.
 	u_int64_t const catFileLength = destCatalog.lengthInBytes;
-	[dstVol allocateBytes:catFileLength forFork:ImpForkTypeSpecialFileContents populateExtentRecord:vh->catalogFile.extents];
+	[hfsPlusVol allocateBytes:catFileLength forFork:ImpForkTypeSpecialFileContents populateExtentRecord:vh->catalogFile.extents];
 	S(vh->catalogFile.logicalSize, catFileLength);
 	S(vh->catalogFile.totalBlocks, L(vh->catalogFile.extents[0].blockCount));
 	u_int64_t const extFileLength = destExtentsOverflow.lengthInBytes;
-	[dstVol allocateBytes:extFileLength forFork:ImpForkTypeSpecialFileContents populateExtentRecord:vh->extentsFile.extents];
+	[hfsPlusVol allocateBytes:extFileLength forFork:ImpForkTypeSpecialFileContents populateExtentRecord:vh->extentsFile.extents];
 	S(vh->extentsFile.logicalSize, extFileLength);
 	S(vh->extentsFile.totalBlocks, L(vh->extentsFile.extents[0].blockCount));
 //	ImpPrintf(@"Catalog file will be %llu bytes in %u blocks", L(vh->catalogFile.logicalSize), L(vh->catalogFile.totalBlocks));
@@ -166,7 +170,7 @@
 			struct HFSExtentDescriptor const *_Nonnull const firstRsrcExtents = fileRec->rsrcExtents;
 //			ImpPrintf(@"Before copy: This file's lengths in the input volume are DF %llu bytes, RF %llu bytes. Physical sizes %u blocks + %u blocks = %u blocks", dataLogicalLength, rsrcLogicalLength, ImpNumberOfBlocksInHFSExtentRecord(firstDataExtents), ImpNumberOfBlocksInHFSExtentRecord(firstRsrcExtents), ImpNumberOfBlocksInHFSExtentRecord(firstDataExtents) + ImpNumberOfBlocksInHFSExtentRecord(firstRsrcExtents));
 
-			u_int64_t bytesNotYetAllocatedForData = [dstVol allocateBytes:dataPhysicalLength forFork:ImpForkTypeData populateExtentRecord:convertedFilePtr->dataFork.extents];
+			u_int64_t bytesNotYetAllocatedForData = [hfsPlusVol allocateBytes:dataPhysicalLength forFork:ImpForkTypeData populateExtentRecord:convertedFilePtr->dataFork.extents];
 			//TODO: Handle bytesNotYetAllocated > 0 (by inserting the fork into the extents overflow file)
 			NSAssert(bytesNotYetAllocatedForData == 0, @"Failed to allocate %llu contiguous bytes in destination volume; ended up with %llu left over", dataLogicalLength, bytesNotYetAllocatedForData);
 //			ImpPrintf(@"Allocated for data fork: #%u to #%u", L(convertedFilePtr->dataFork.extents[0].startBlock), L(convertedFilePtr->dataFork.extents[0].startBlock) + L(convertedFilePtr->dataFork.extents[0].blockCount));
@@ -212,7 +216,7 @@
 
 			//Copy the resource fork.
 
-			u_int64_t bytesNotYetAllocatedForRsrc = [dstVol allocateBytes:rsrcPhysicalLength forFork:ImpForkTypeResource populateExtentRecord:convertedFilePtr->resourceFork.extents];
+			u_int64_t bytesNotYetAllocatedForRsrc = [hfsPlusVol allocateBytes:rsrcPhysicalLength forFork:ImpForkTypeResource populateExtentRecord:convertedFilePtr->resourceFork.extents];
 			//TODO: Handle bytesNotYetAllocated > 0 (by inserting the fork into the extents overflow file)
 			NSAssert(bytesNotYetAllocatedForRsrc == 0, @"Failed to allocate %llu contiguous bytes in destination volume; ended up with %llu left over", rsrcLogicalLength, bytesNotYetAllocatedForRsrc);
 //			ImpPrintf(@"Allocated for resource fork: #%u to #%u", L(convertedFilePtr->resourceFork.extents[0].startBlock), L(convertedFilePtr->resourceFork.extents[0].startBlock) + L(convertedFilePtr->resourceFork.extents[0].blockCount));
@@ -288,7 +292,7 @@
 
 		HFSPlusExtentRecord rescuedBlocksExtents;
 		struct HFSPlusExtentDescriptor const *_Nonnull const rescuedBlocksExtentsPtr = rescuedBlocksExtents;
-		bool const allocatedRescuedBlocksDataFork = [dstVol allocateBlocks:numDstBlocks32 forFork:ImpForkTypeData getExtent:rescuedBlocksExtents];
+		bool const allocatedRescuedBlocksDataFork = [hfsPlusVol allocateBlocks:numDstBlocks32 forFork:ImpForkTypeData getExtent:rescuedBlocksExtents];
 		if (! allocatedRescuedBlocksDataFork) {
 			ImpPrintf(@"Failed to allocate %u blocks for the rescued blocks file.", numDstBlocks32);
 		} else {
@@ -340,7 +344,7 @@
 	}];
 
 	S(vh->totalBlocks, numBlocksInVolume);
-	S(vh->freeBlocks, [dstVol numberOfBlocksFreeAccordingToWorkingBitmap]);
+	S(vh->freeBlocks, [hfsPlusVol numberOfBlocksFreeAccordingToWorkingBitmap]);
 	if (! hasAnyFiles) {
 		//The encodings bitmap must have 1 bit set for each encoding used by files in the volume.
 		//The superclass sets this to 1 << self.hfsTextEncoding, which is correct IFF we have at least one file (we set all files to the same encoding).
