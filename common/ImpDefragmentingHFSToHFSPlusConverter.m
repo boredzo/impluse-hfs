@@ -11,6 +11,7 @@
 #import "ImpSizeUtilities.h"
 #import "NSData+ImpMultiplication.h"
 #import "ImpSourceVolume.h"
+#import "ImpHFSSourceVolume.h"
 #import "ImpDestinationVolume.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
@@ -84,9 +85,12 @@
 	ImpSourceVolume *_Nonnull const srcVol = self.sourceVolume;
 	ImpDestinationVolume *_Nonnull const dstVol = self.destinationVolume;
 
+	NSAssert([srcVol isKindOfClass:[ImpHFSSourceVolume class]], @"ERROR: Source volume is not an HFS volume! Can't convert anything but an HFS volume yet.");
+	ImpHFSSourceVolume *_Nonnull const hfsVol = (ImpHFSSourceVolume *)srcVol;
+
 	__block struct HFSExtentDescriptor const *_Nonnull catalogFileSourceExtents;
 	__block struct HFSExtentDescriptor const *_Nonnull extentsOverflowFileSourceExtents;
-	[srcVol peekAtHFSVolumeHeader:^(NS_NOESCAPE const struct HFSMasterDirectoryBlock *const mdbPtr) {
+	[hfsVol peekAtHFSVolumeHeader:^(NS_NOESCAPE const struct HFSMasterDirectoryBlock *const mdbPtr) {
 		catalogFileSourceExtents = mdbPtr->drCTExtRec;
 		extentsOverflowFileSourceExtents = mdbPtr->drXTExtRec;
 	}];

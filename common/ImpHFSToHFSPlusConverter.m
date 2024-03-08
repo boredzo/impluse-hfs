@@ -16,6 +16,7 @@
 #import "ImpErrorUtilities.h"
 #import "NSData+ImpMultiplication.h"
 #import "ImpSourceVolume.h"
+#import "ImpHFSSourceVolume.h"
 #import "ImpDestinationVolume.h"
 #import "ImpVolumeProbe.h"
 #import "ImpBTreeFile.h"
@@ -508,10 +509,7 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 
 ///Map the number of an allocation block from the source volume (e.g., the start block of an extent) to the number of the corresponding block on the destination volume. By default, returns sourceBlock plus the source volume's first block number. You may need to override this method if the destination volume uses a different block size, or if you need to make exceptions for certain blocks (in extents that were relocated due to not fitting in the new volume).
 - (u_int32_t) destinationBlockNumberForSourceBlockNumber:(u_int16_t) sourceBlock {
-	__block u_int32_t firstBlockNumber = 0;
-	[self.sourceVolume peekAtHFSVolumeHeader:^(NS_NOESCAPE const struct HFSMasterDirectoryBlock *const mdbPtr) {
-		firstBlockNumber = L(mdbPtr->drAlBlSt);
-	}];
+	u_int32_t const firstBlockNumber = self.sourceVolume.firstPhysicalBlockOfFirstAllocationBlock;
 	return firstBlockNumber + sourceBlock;
 }
 
@@ -575,14 +573,14 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 	__block NSError *_Nullable volumeLoadError = nil;
 	[probe findVolumes:^(u_int64_t const startOffsetInBytes, u_int64_t const lengthInBytes, Class _Nullable const volumeClass) {
 		if (! haveFoundHFSVolume) {
-			if (volumeClass != Nil && volumeClass != [ImpSourceVolume class]) {
+			if (volumeClass != Nil && ! [volumeClass isSubclassOfClass:[ImpSourceVolume class]]) {
 				//We have an identified volume class, but it isn't HFS. Most likely, this is already HFS+. Skip.
 				NSError *_Nonnull const noConvertibleVolumesError = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: @"This volume format cannot be converted. It may already be HFS+ or it may be some other format that is not HFS and is not supported." }];
 				volumeLoadError = noConvertibleVolumesError;
 				return;
 			}
 
-			ImpSourceVolume *_Nonnull const srcVol = [[ImpSourceVolume alloc] initWithFileDescriptor:self->_readFD
+			ImpSourceVolume *_Nonnull const srcVol = [[volumeClass alloc] initWithFileDescriptor:self->_readFD
 				startOffsetInBytes:startOffsetInBytes
 				lengthInBytes:lengthInBytes
 				textEncoding:self.hfsTextEncoding];
@@ -632,14 +630,18 @@ NSString *_Nonnull const ImpRescuedDataFileName = @"!!! Data impluse recovered f
 	self.destinationVolume.lastBlock = self.sourceVolume.lastBlock;
 //	ImpPrintf(@"Set destination volume's last block to %@", self.sourceVolume.lastBlock);
 
-	[self.sourceVolume peekAtHFSVolumeHeader:^(NS_NOESCAPE const struct HFSMasterDirectoryBlock *const mdbPtr) {
-		NSMutableData *_Nonnull const volumeHeaderData = [NSMutableData dataWithLength:sizeof(struct HFSPlusVolumeHeader)];
-		struct HFSPlusVolumeHeader *_Nonnull const vhPtr = volumeHeaderData.mutableBytes;
-		[self convertHFSVolumeHeader:mdbPtr toHFSPlusVolumeHeader:vhPtr];
+	ImpSourceVolume *_Nonnull const srcVol = self.sourceVolume;
+	if ([srcVol isKindOfClass:[ImpHFSSourceVolume class]]) {
+		ImpHFSSourceVolume *_Nonnull const hfsVol = (ImpHFSSourceVolume *)srcVol;
+		[hfsVol peekAtHFSVolumeHeader:^(NS_NOESCAPE const struct HFSMasterDirectoryBlock *const mdbPtr) {
+			NSMutableData *_Nonnull const volumeHeaderData = [NSMutableData dataWithLength:sizeof(struct HFSPlusVolumeHeader)];
+			struct HFSPlusVolumeHeader *_Nonnull const vhPtr = volumeHeaderData.mutableBytes;
+			[self convertHFSVolumeHeader:mdbPtr toHFSPlusVolumeHeader:vhPtr];
 
-		//We currently do this so the volume's _hasVolumeHeader gets set to true. Maybe that should have a setter method so we can use mutableVolumeHeaderPointer instead?
-		self.destinationVolume.volumeHeader = volumeHeaderData;
-	}];
+			//We currently do this so the volume's _hasVolumeHeader gets set to true. Maybe that should have a setter method so we can use mutableVolumeHeaderPointer instead?
+			self.destinationVolume.volumeHeader = volumeHeaderData;
+		}];
+	}
 	[self reportSourceBlocksWillBeCopied:self.sourceVolume.numberOfBlocksUsed];
 
 	return [self.destinationVolume writeTemporaryPreamble:outError];

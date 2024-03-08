@@ -12,6 +12,7 @@
 
 #import "ImpSourceVolume.h"
 #import "ImpSourceVolume+ConsistencyChecking.h"
+#import "ImpHFSSourceVolume.h"
 #import "ImpDestinationVolume.h"
 #import "ImpVolumeProbe.h"
 #import "ImpBTreeFile.h"
@@ -87,8 +88,9 @@
 				ImpPrintf(@"Extents overflow extent #%lu: start block #%@, length %@ blocks", i, [fmtr stringFromNumber:@(L(eoExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[0].blockCount))]);
 			}
 		}];
-	} else {
-		[srcVol peekAtHFSVolumeHeader:^(NS_NOESCAPE const struct HFSMasterDirectoryBlock *const mdbPtr) {
+	} else if ([srcVol isKindOfClass:[ImpHFSSourceVolume class]]) {
+		ImpHFSSourceVolume *_Nonnull const hfsVol = (ImpHFSSourceVolume *)srcVol;
+		[hfsVol peekAtHFSVolumeHeader:^(NS_NOESCAPE const struct HFSMasterDirectoryBlock *const mdbPtr) {
 			ImpPrintf(@"Found HFS volume with name: %@", [srcVol.textEncodingConverter stringForPascalString:mdbPtr->drVN]);
 
 			NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
@@ -171,8 +173,9 @@
 			logFork("", "Extents overflow file", &(vhPtr->extentsFile));
 			logFork("", "Catalog file", &(vhPtr->catalogFile));
 		}];
-	} else {
-		[srcVol peekAtHFSVolumeHeader:^(NS_NOESCAPE struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr) {
+	} else if ([srcVol isKindOfClass:[ImpHFSSourceVolume class]]) {
+		ImpHFSSourceVolume *_Nonnull const hfsVol = (ImpHFSSourceVolume *)srcVol;
+		[hfsVol peekAtHFSVolumeHeader:^(NS_NOESCAPE struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr) {
 			ImpPrintf(@"Creation date: %u", L(mdbPtr->drCrDate));
 			ImpPrintf(@"First allocation block: 0x%llx", (u_int64_t)(L(mdbPtr->drAlBlSt) * kISOStandardBlockSize));
 			ImpPrintf(@"Space remaining: %u blocks (0x%llx bytes)", L(mdbPtr->drFreeBks), (u_int64_t)(L(mdbPtr->drFreeBks) * L(mdbPtr->drAlBlkSiz)));

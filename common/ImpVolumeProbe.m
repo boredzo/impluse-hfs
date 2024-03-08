@@ -12,6 +12,7 @@
 #import "NSData+ImpSubdata.h"
 
 #import "ImpSourceVolume.h"
+#import "ImpHFSSourceVolume.h"
 #import "ImpDestinationVolume.h"
 
 #import <sys/stat.h>
@@ -278,7 +279,7 @@ struct APMPartitionRecord_IM5 {
 				struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr = (struct HFSMasterDirectoryBlock const *_Nonnull)thirdVolumeBlockData.bytes;
 				if (L(mdbPtr->drSigWord) == kHFSSigWord) {
 					if (self.verbose) ImpPrintf(@"Volume is an HFS volume");
-					identifiedClass = [ImpSourceVolume class];
+					identifiedClass = [ImpHFSSourceVolume class];
 				} else {
 					struct HFSPlusVolumeHeader const *_Nonnull const vhPtr = (struct HFSPlusVolumeHeader const *_Nonnull)thirdVolumeBlockData.bytes;
 					if (L(vhPtr->signature) == kHFSPlusSigWord) {
@@ -323,7 +324,7 @@ struct APMPartitionRecord_IM5 {
 				struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr = (struct HFSMasterDirectoryBlock const *_Nonnull)thirdVolumeBlockData.bytes;
 				if (L(mdbPtr->drSigWord) == kHFSSigWord) {
 					if (self.verbose) ImpPrintf(@"Volume is an HFS volume");
-					identifiedClass = [ImpSourceVolume class];
+					identifiedClass = [ImpHFSSourceVolume class];
 				} else {
 					struct HFSPlusVolumeHeader const *_Nonnull const vhPtr = (struct HFSPlusVolumeHeader const *_Nonnull)thirdVolumeBlockData.bytes;
 					if (L(vhPtr->signature) == kHFSPlusSigWord) {
@@ -356,7 +357,7 @@ struct APMPartitionRecord_IM5 {
 			signature = L(*maybeSignaturePtr);
 		}];
 		if (signature == kHFSSigWord) {
-			[self foundVolumeStartingAtBlock:startBlock blockCount:numBlocks class:[ImpSourceVolume class]];
+			[self foundVolumeStartingAtBlock:startBlock blockCount:numBlocks class:[ImpHFSSourceVolume class]];
 			return true;
 		} else if (signature == kHFSPlusSigWord) {
 			[self foundVolumeStartingAtBlock:startBlock blockCount:numBlocks class:[ImpDestinationVolume class]];

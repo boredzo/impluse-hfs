@@ -14,10 +14,13 @@
 
 @interface ImpSourceVolume : NSObject
 {
+	NSMutableData *_bootBlocksData;
+	CFBitVectorRef _bitVector;
 	u_int64_t _startOffsetInBytes, _lengthInBytes;
 	int _fileDescriptor;
 }
 
+///Initializer to be overridden by subclasses. Do not use to directly instantiate the abstract class.
 ///startOffset should be 0 for volumes from bare-volume images. For volumes found in a partition map, startOffset should be the offset into the device/image in bytes where the preamble starts.
 ///lengthInBytes can be 0, in which case the whole device/image should be used.
 - (instancetype _Nonnull) initWithFileDescriptor:(int const)readFD
@@ -58,8 +61,6 @@
 - (NSData *_Nonnull)bootBlocks;
 ///The last block in the volume, immediately following the alternate volume header. Always 0x200 bytes.
 - (NSData *_Nonnull)lastBlock;
-- (void) getVolumeHeader:(void *_Nonnull const)outMDB;
-- (void) peekAtHFSVolumeHeader:(void (^_Nonnull const)(struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr NS_NOESCAPE))block;
 
 - (NSData *_Nonnull)volumeBitmap;
 ///Calculate the number of bits in the bitmap that are zero. Should match the drFreeBks/freeBlocks value in the volume header.
@@ -68,6 +69,10 @@
 - (bool) isBlockInBounds:(u_int32_t const)blockNumber;
 ///Returns whether a block is marked as in use according to the volume bitmap. Does not guarantee that the block is actually referred to by an extent in the catalog or extents overflow trees.
 - (bool) isBlockAllocated:(u_int32_t const)blockNumber;
+
+///Abstract method for subclasses.
+- (void) findExtents:(void (^_Nonnull const)(NSRange))block inBitVector:(CFBitVectorRef _Nonnull const)bitVector;
+
 ///Identify which blocks are marked as allocated in the volume bitmap but have not been read from, and print those to the log.
 - (void) reportBlocksThatAreAllocatedButHaveNotBeenAccessed;
 ///Count how many blocks are marked as allocated in the volume bitmap but have not been read from. Use this method after all files have been copied when identifying orphaned blocks for recovery.
@@ -81,6 +86,9 @@
 @property(strong) ImpBTreeFile *_Nonnull extentsOverflowBTree;
 
 - (NSString *_Nonnull) volumeName;
+- (u_int32_t) firstPhysicalBlockOfFirstAllocationBlock;
+///The offset in bytes at which the first allocation block begins. (I.e., firstPhysicalBlockOfFirstAllocationBlock converted to a byte offset.)
+- (off_t) offsetOfFirstAllocationBlock;
 - (NSUInteger) numberOfBytesPerBlock;
 ///The total number of allocation blocks in the volume, according to the volume header.
 - (NSUInteger) numberOfBlocksTotal;
