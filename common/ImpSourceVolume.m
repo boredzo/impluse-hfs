@@ -438,6 +438,8 @@
 	return 0;
 }
 
+#pragma mark Reading fork contents
+
 - (u_int64_t) forEachExtentInFileWithID:(HFSCatalogNodeID)cnid
 	fork:(ImpForkType)forkType
 	forkLogicalLength:(u_int64_t const)forkLength

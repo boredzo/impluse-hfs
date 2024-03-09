@@ -102,7 +102,7 @@
 - (NSUInteger) catalogSizeInBytes;
 - (NSUInteger) extentsOverflowSizeInBytes;
 
-#pragma mark -
+#pragma mark Reading fork contents
 
 ///Read fork contents from the sections of the volume indicated by the given extents.
 - (NSData *_Nullable) readDataFromFileDescriptor:(int const)readFD

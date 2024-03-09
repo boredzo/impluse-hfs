@@ -63,6 +63,8 @@
 	return false;
 }
 
+#pragma mark Block allocation
+
 + (u_int32_t) optimalAllocationBlockSizeForVolumeLength:(u_int64_t)numBytes {
 	u_int32_t naiveBlockSize = (u_int32_t)(numBytes / UINT32_MAX);
 	if (naiveBlockSize % kISOStandardBlockSize != 0) {
@@ -134,6 +136,8 @@
 	}
 	return totalWritten;
 }
+
+#pragma mark Accessors
 
 - (off_t) offsetOfFirstAllocationBlock {
 	[self impluseBugDetected_messageSentToAbstractClass];
