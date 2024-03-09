@@ -16,6 +16,7 @@
 		31108C7A2B9AC59700C7D59B /* ImpHFSSourceVolume.m in Sources */ = {isa = PBXBuildFile; fileRef = 31108C792B9AC59700C7D59B /* ImpHFSSourceVolume.m */; };
 		31108C7D2B9AEA0900C7D59B /* ImpHFSPlusDestinationVolume.m in Sources */ = {isa = PBXBuildFile; fileRef = 31108C7C2B9AEA0900C7D59B /* ImpHFSPlusDestinationVolume.m */; };
 		31108C802B9AEE5300C7D59B /* ImpVirtualFileHandle.m in Sources */ = {isa = PBXBuildFile; fileRef = 31108C7F2B9AEE5300C7D59B /* ImpVirtualFileHandle.m */; };
+		31108C832B9B978700C7D59B /* ImpHFSPlusSourceVolume.m in Sources */ = {isa = PBXBuildFile; fileRef = 31108C822B9B978700C7D59B /* ImpHFSPlusSourceVolume.m */; };
 		3135D7782960FFDC001E4890 /* ImpComparisonUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 3135D7772960FFDC001E4890 /* ImpComparisonUtilities.m */; };
 		313662682B37742100931CF4 /* ImpSourceVolume+ConsistencyChecking.m in Sources */ = {isa = PBXBuildFile; fileRef = 313662672B37742100931CF4 /* ImpSourceVolume+ConsistencyChecking.m */; };
 		313662692B37742100931CF4 /* ImpSourceVolume+ConsistencyChecking.m in Sources */ = {isa = PBXBuildFile; fileRef = 313662672B37742100931CF4 /* ImpSourceVolume+ConsistencyChecking.m */; };
@@ -96,6 +97,8 @@
 		31108C7C2B9AEA0900C7D59B /* ImpHFSPlusDestinationVolume.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpHFSPlusDestinationVolume.m; sourceTree = "<group>"; };
 		31108C7E2B9AEE5300C7D59B /* ImpVirtualFileHandle.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpVirtualFileHandle.h; sourceTree = "<group>"; };
 		31108C7F2B9AEE5300C7D59B /* ImpVirtualFileHandle.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpVirtualFileHandle.m; sourceTree = "<group>"; };
+		31108C812B9B978700C7D59B /* ImpHFSPlusSourceVolume.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpHFSPlusSourceVolume.h; sourceTree = "<group>"; };
+		31108C822B9B978700C7D59B /* ImpHFSPlusSourceVolume.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpHFSPlusSourceVolume.m; sourceTree = "<group>"; };
 		3135D7762960FFDC001E4890 /* ImpComparisonUtilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpComparisonUtilities.h; sourceTree = "<group>"; };
 		3135D7772960FFDC001E4890 /* ImpComparisonUtilities.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpComparisonUtilities.m; sourceTree = "<group>"; };
 		313662662B37742100931CF4 /* ImpSourceVolume+ConsistencyChecking.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ImpSourceVolume+ConsistencyChecking.h"; sourceTree = "<group>"; };
@@ -223,6 +226,8 @@
 				313662672B37742100931CF4 /* ImpSourceVolume+ConsistencyChecking.m */,
 				31108C782B9AC59700C7D59B /* ImpHFSSourceVolume.h */,
 				31108C792B9AC59700C7D59B /* ImpHFSSourceVolume.m */,
+				31108C812B9B978700C7D59B /* ImpHFSPlusSourceVolume.h */,
+				31108C822B9B978700C7D59B /* ImpHFSPlusSourceVolume.m */,
 				314EFFE829332FEA00CE74E9 /* ImpDestinationVolume.h */,
 				314EFFE929332FEA00CE74E9 /* ImpDestinationVolume.m */,
 				31108C7B2B9AEA0900C7D59B /* ImpHFSPlusDestinationVolume.h */,
@@ -390,6 +395,7 @@
 				3105F1C6294574160062C6F8 /* ImpDefragmentingHFSToHFSPlusConverter.m in Sources */,
 				31077AD1293849EE00066789 /* ImpBTreeIndexNode.m in Sources */,
 				31A5B1C2296127CB00D8A731 /* ImpHFSAnalyzer.m in Sources */,
+				31108C832B9B978700C7D59B /* ImpHFSPlusSourceVolume.m in Sources */,
 				314EFFED29346AB300CE74E9 /* ImpBTreeFile.m in Sources */,
 				31F719B2293A8FD90055EEA3 /* ImpErrorUtilities.m in Sources */,
 				313662682B37742100931CF4 /* ImpSourceVolume+ConsistencyChecking.m in Sources */,

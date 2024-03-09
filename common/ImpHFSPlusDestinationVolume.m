@@ -106,20 +106,6 @@
 	return L(_vh->extentsFile.logicalSize);
 }
 
-#if MOVE_TO_ImpHFSPlusSourceVolume
-- (NSString *_Nonnull const) volumeName {
-	//Unlike in HFS, where the volume name is conveniently part of the volume header, in HFS+ we actually have to look up the root directory and get its name.
-	NSData *_Nullable threadRecData = nil;
-	struct HFSUniStr255 const emptyName = { .length = 0 };
-	bool const foundRootDirectory = [self.catalogBTree searchCatalogTreeForItemWithParentID:kHFSRootFolderID unicodeName:&emptyName getRecordKeyData:NULL threadRecordData:&threadRecData];
-	if (foundRootDirectory) {
-		struct HFSPlusCatalogThread const *_Nonnull const threadRecPtr = threadRecData.bytes;
-		return [self.textEncodingConverter stringFromHFSUniStr255:&(threadRecPtr->nodeName)];
-	}
-	return @":::Volume root not found:::";
-}
-#endif
-
 #pragma mark Block allocation bookkeeping
 
 - (u_int32_t) numberOfBlocksFreeAccordingToWorkingBitmap {
@@ -357,16 +343,6 @@
 		L(oneExtent->blockCount),
 	};
 	CFBitVectorSetBits(_allocationsBitmap, range, false);
-}
-
-#warning Do we need this? This is an ImpSourceVolume method. Maybe this goes under #if MOVE_TO_ImpHFSPlusSourceVolume.
-- (bool) isBlockAllocated:(u_int32_t const)blockNumber {
-	if (_allocationsBitmap != nil) {
-		return CFBitVectorGetBitAtIndex(_allocationsBitmap, blockNumber);
-	} else {
-		//We're reading the allocations bitmap. Just claim any block we're reading for it is allocated.
-		return true;
-	}
 }
 
 ///Grow an already-allocated extent (in one or both directions) to satisfy a requested number of blocks. Returns true if this succeeded or false if there wasn't enough space surrounding the extent to grow it to the requested size. If the extent was grown, the old extent will have been deallocated and the new extent allocated, and *outExt will have been updated with the revised extent, which is not guaranteed to overlap the original extent at all (this algorithm will not search the whole disk but will use empty space that adjoins the original extent, even if the movement would ultimately be farther than the length of the new extent). If this method returns false, no changes were made.

@@ -44,7 +44,7 @@ typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
 	key:(struct HFSPlusCatalogKey const *_Nonnull const)key
 	folderRecord:(struct HFSPlusCatalogFolder const *_Nonnull const)folderRec;
 
-@property(weak) ImpSourceVolume * _Nullable hfsVolume;
+@property(weak) ImpSourceVolume * _Nullable sourceVolume;
 @property HFSCatalogNodeID catalogNodeID;
 @property ImpDehydratedItemType type;
 ///True for folders and volumes. False for files.

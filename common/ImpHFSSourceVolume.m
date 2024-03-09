@@ -34,7 +34,7 @@
 - (u_int32_t) firstPhysicalBlockOfFirstAllocationBlock {
 	return L(_mdb->drAlBlSt);
 }
-- (NSUInteger) numberOfBytesPerBlock {
+- (u_int32_t) numberOfBytesPerBlock {
 	return L(_mdb->drAlBlkSiz);
 }
 - (NSUInteger) numberOfBlocksTotal {

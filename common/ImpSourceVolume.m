@@ -405,7 +405,7 @@
 	[self impluseBugDetected_messageSentToAbstractClass];
 	return @"Unknown volume";
 }
-- (NSUInteger) numberOfBytesPerBlock {
+- (u_int32_t) numberOfBytesPerBlock {
 	[self impluseBugDetected_messageSentToAbstractClass];
 	return 0;
 }
