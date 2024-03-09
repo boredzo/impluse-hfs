@@ -435,14 +435,12 @@ static NSTimeInterval hfsEpochTISRD = -3061152000.0; //1904-01-01T00:00:00Z time
 
 	u_int64_t totalLengthRead = 0;
 	if (_isHFSPlus) {
-#if MOVE_TO_ImpHFSPlusSourceVolume
 		totalLengthRead = [hfsPlusVolume forEachExtentInFileWithID:self.catalogNodeID
 			fork:whichFork
 			forkLogicalLength:logicalLength
 			startingWithBigExtentsRecord:extentsPlus
 			readDataOrReturnError:&readError
 			block:appendBlock];
-#endif
 	} else {
 		totalLengthRead = [hfsVolume forEachExtentInFileWithID:self.catalogNodeID
 			fork:whichFork
