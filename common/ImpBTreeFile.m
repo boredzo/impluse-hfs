@@ -368,7 +368,7 @@
 	return numVisited;
 }
 
-- (NSUInteger) forEachItemInDirectory:(HFSCatalogNodeID)dirID
+- (NSUInteger) forEachItemInHFSDirectory:(HFSCatalogNodeID)dirID
 	file:(bool (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFile const *_Nonnull const fileRec))visitFile
 	folder:(bool (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFolder const *_Nonnull const folderRec))visitFolder
 {

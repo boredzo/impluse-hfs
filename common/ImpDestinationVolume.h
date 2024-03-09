@@ -36,25 +36,14 @@
 
 @property(readwrite, nonnull, strong) ImpTextEncodingConverter *textEncodingConverter;
 
-#if MOVE_TO_ImpHFSPlusSourceVolume
+#pragma mark Block allocation
 
-#pragma mark Reading fork contents
+///Calculate the minimum physical length in blocks for a fork of a given logical length in bytes.
+- (u_int64_t) countOfBlocksOfSize:(u_int32_t const)blockSize neededForLogicalLength:(u_int64_t const)length;
 
-///Read fork contents from the sections of the volume indicated by the given extents.
-- (NSData *_Nullable) readDataFromFileDescriptor:(int const)readFD
-	logicalLength:(u_int64_t const)numBytes
-	bigExtents:(struct HFSPlusExtentDescriptor const *_Nonnull const)hfsPlusExtRec
-	numExtents:(NSUInteger const)numExtents
-	error:(NSError *_Nullable *_Nonnull const)outError;
-
-///For every extent in the file (the initial eight plus any overflow records) until an empty extent, call the block with that extent and the number of bytes remaining in the file. The block should return the number of bytes it consumed (e.g., read from the file descriptor). Returns the total number of bytes consumed.
-- (u_int64_t) forEachExtentInFileWithID:(HFSCatalogNodeID)cnid
-	fork:(ImpForkType)forkType
-	forkLogicalLength:(u_int64_t const)forkLength
-	startingWithBigExtentsRecord:(struct HFSPlusExtentDescriptor const *_Nonnull const)hfsExtRec
-	readDataOrReturnError:(NSError *_Nullable *_Nonnull const)outError
-	block:(bool (^_Nonnull const)(NSData *_Nonnull const forkData, u_int64_t const logicalLength))block;
-#endif
+///Given a volume length, return a valid block size that will be usable for a volume of that size.
+///HFS+ (TN1150) requires block sizes to be a multiple of 0x200 and a power of two. This method will find the smallest block size that fits those constraints.
++ (u_int32_t) optimalAllocationBlockSizeForVolumeLength:(u_int64_t)numBytes;
 
 #pragma mark Writing fork contents
 

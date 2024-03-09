@@ -22,9 +22,6 @@
 
 #pragma mark Allocating blocks
 
-///Calculate the minimum physical length in blocks for a fork of a given logical length in bytes.
-- (u_int64_t) countOfBlocksOfSize:(u_int32_t const)blockSize neededForLogicalLength:(u_int64_t const)length;
-
 ///Set the size of each allocation block, and the total number of them. As allocation blocks in HFS+ span from the boot blocks to the footer, this sets the size of the volume.
 ///You should not call this method after anything that has allocated blocks past the volume header (including populating the catalog file), because this method creates the allocations bitmap and initializes it to allocate only the minimum set of a-blocks (those containing the volume header and other required sectors and nothing else).
 ///aBlockSize must be a multiple of kISOStandardBlockSize (0x200 bytes), and a power of two.
@@ -36,10 +33,6 @@
 ///Walks through the in-progress allocations file counting up free blocks, and returns the count. This is used to update the volume header after changes that may allocate or deallocate blocks.
 ///(Note that this is used when *creating* HFS+ volumes, whereas the superclass method with a similar name and purpose is for volumes being *read in*.)
 - (u_int32_t) numberOfBlocksFreeAccordingToWorkingBitmap;
-
-///Given a volume length, return a valid block size that will be usable for a volume of that size.
-///HFS+ (TN1150) requires block sizes to be a multiple of 0x200 and a power of two. This method will find the smallest block size that fits those constraints.
-+ (u_int32_t) optimalAllocationBlockSizeForVolumeLength:(u_int64_t)numBytes;
 
 /*!Attempt to allocate a contiguous range of available blocks. Writes the range allocated to the given extent.
  * Returns true if a contiguous extent containing this number of blocks was allocated. Returns false (without making any changes to existing allocations) if the request could not be fulfilled because not enough contiguous blocks were available.

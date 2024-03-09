@@ -10,7 +10,8 @@
 #import "ImpForkUtilities.h"
 
 @class ImpSourceVolume;
-@class ImpDestinationVolume;
+@class ImpHFSSourceVolume;
+@class ImpHFSPlusSourceVolume;
 
 typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
 	ImpDehydratedItemTypeFile = 1,
@@ -22,24 +23,25 @@ typedef NS_ENUM(NSUInteger, ImpDehydratedItemType) {
 @interface ImpDehydratedItem : NSObject
 
 ///Create a dehydrated item object that references a given HFS catalog. The initializer will populate the object's properties with the catalog's data for the given catalog node ID.
-- (instancetype _Nonnull) initWithHFSVolume:(ImpSourceVolume *_Nonnull const)hfsVol
+- (instancetype _Nonnull) initWithHFSSourceVolume:(ImpHFSSourceVolume *_Nonnull const)srcVol
 	catalogNodeID:(HFSCatalogNodeID const)cnid
 	key:(struct HFSCatalogKey const *_Nonnull const)key
 	fileRecord:(struct HFSCatalogFile const *_Nonnull const)fileRec;
 
 ///Create a dehydrated item object that references a given HFS catalog. The initializer will populate the object's properties with the catalog's data for the given catalog node ID.
-- (instancetype _Nonnull) initWithHFSVolume:(ImpSourceVolume *_Nonnull const)hfsVol	catalogNodeID:(HFSCatalogNodeID const)cnid
+- (instancetype _Nonnull) initWithHFSSourceVolume:(ImpHFSSourceVolume *_Nonnull const)srcVol
+	catalogNodeID:(HFSCatalogNodeID const)cnid
 	key:(struct HFSCatalogKey const *_Nonnull const)key
 	folderRecord:(struct HFSCatalogFolder const *_Nonnull const)folderRec;
 
 ///Create a dehydrated item object that references a given HFS+ catalog. The initializer will populate the object's properties with the catalog's data for the given catalog node ID.
-- (instancetype _Nonnull) initWithHFSPlusVolume:(ImpDestinationVolume *_Nonnull const)hfsVol
+- (instancetype _Nonnull) initWithHFSPlusSourceVolume:(ImpHFSPlusSourceVolume *_Nonnull const)hfsVol
 	catalogNodeID:(HFSCatalogNodeID const)cnid
 	key:(struct HFSPlusCatalogKey const *_Nonnull const)key
 	fileRecord:(struct HFSPlusCatalogFile const *_Nonnull const)fileRec;
 
 ///Create a dehydrated item object that references a given HFS+ catalog. The initializer will populate the object's properties with the catalog's data for the given catalog node ID.
-- (instancetype _Nonnull) initWithHFSPlusVolume:(ImpDestinationVolume *_Nonnull const)hfsVol
+- (instancetype _Nonnull) initWithHFSPlusSourceVolume:(ImpHFSPlusSourceVolume *_Nonnull const)hfsVol
 	catalogNodeID:(HFSCatalogNodeID const)cnid
 	key:(struct HFSPlusCatalogKey const *_Nonnull const)key
 	folderRecord:(struct HFSPlusCatalogFolder const *_Nonnull const)folderRec;

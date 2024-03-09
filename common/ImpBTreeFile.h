@@ -80,7 +80,7 @@
 
 ///Given the CNID of a folder, call one of the blocks with each item in that folder. Either block can return false to stop iteration. Returns the number of items visited. If the CNID does not refer to a folder, returns 0. (This includes if it is a file.)
 ///You can pass nil for either or both blocks. If you pass nil for both blocks, you'll find out how many items are actually in the folder, regardless of what its valence says.
-- (NSUInteger) forEachItemInDirectory:(HFSCatalogNodeID)dirID
+- (NSUInteger) forEachItemInHFSDirectory:(HFSCatalogNodeID)dirID
 	file:(bool (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFile const *_Nonnull const fileRec))visitFile
 	folder:(bool (^_Nullable const)(struct HFSCatalogKey const *_Nonnull const keyPtr, struct HFSCatalogFolder const *_Nonnull const folderRec))visitFolder;
 

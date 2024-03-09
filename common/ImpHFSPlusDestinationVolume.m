@@ -10,6 +10,22 @@
 #import "ImpSizeUtilities.h"
 #import "NSData+ImpSubdata.h"
 
+@interface ImpHFSPlusDestinationVolume ()
+
+- (u_int32_t) numBlocksForPreambleWithSize:(u_int32_t const)aBlockSize;
+- (u_int32_t) numBlocksForPostambleWithSize:(u_int32_t const)aBlockSize;
+
+///Low-level method. Marks the blocks within the extent as allocated.
+///WARNING: This method does not check that these blocks are available/not already allocated. It is meant for implementing higher-level allocation methods, such as those declared in the header, that do perform such checks. You probably want one of those.
+- (void) allocateBlocksOfExtent:(const struct HFSPlusExtentDescriptor *_Nonnull const)oneExtent;
+
+///Low-level method. Marks the blocks within the extent as unallocated (available).
+///You should not use this extent afterward, or write to any blocks newly freed.
+///WARNING: This method does not check that these blocks are allocated, nor does it make sure nothing is using these blocks. It is meant for implementing higher-level allocation and deallocation methods, such as those declared in the header, that do perform such checks. You probably want one of those.
+- (void) deallocateBlocksOfExtent:(const struct HFSPlusExtentDescriptor *_Nonnull const)oneExtent;
+
+@end
+
 @implementation ImpHFSPlusDestinationVolume
 {
 	NSMutableData *_preamble; //Boot blocks + volume header = 1.5 K

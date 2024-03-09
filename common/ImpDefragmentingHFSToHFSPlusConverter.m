@@ -181,7 +181,7 @@
 			__block u_int64_t totalDataBytesWritten = 0;
 			__block u_int32_t totalDataBlocksRead = 0;
 
-			[srcVol forEachExtentInFileWithID:L(fileRec->fileID)
+			[hfsVol forEachExtentInFileWithID:L(fileRec->fileID)
 				fork:ImpForkTypeData
 				forkLogicalLength:dataLogicalLength
 				startingWithExtentsRecord:firstDataExtents
@@ -227,7 +227,7 @@
 			__block u_int64_t totalRsrcBytesWritten = 0;
 			__block u_int32_t totalRsrcBlocksRead = 0;
 
-			[srcVol forEachExtentInFileWithID:L(fileRec->fileID)
+			[hfsVol forEachExtentInFileWithID:L(fileRec->fileID)
 				fork:ImpForkTypeResource
 				forkLogicalLength:rsrcLogicalLength
 				startingWithExtentsRecord:firstRsrcExtents
@@ -301,7 +301,7 @@
 				struct HFSExtentDescriptor orphanedExtent;
 				S(orphanedExtent.startBlock, (u_int16_t)extent.location);
 				S(orphanedExtent.blockCount, (u_int16_t)extent.length);
-				NSData *_Nonnull const recoveredBlocks = [srcVol readDataFromFileDescriptor:srcVol.fileDescriptor
+				NSData *_Nonnull const recoveredBlocks = [hfsVol readDataFromFileDescriptor:srcVol.fileDescriptor
 					logicalLength:physicalLength
 					extents:&orphanedExtent
 					numExtents:1
