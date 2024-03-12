@@ -20,6 +20,9 @@
 ///For use by HFS-to-HFS+ converter objects to make changes to the HFS+ volume header during conversion.
 - (struct HFSPlusVolumeHeader *_Nonnull const) mutableVolumeHeaderPointer;
 
+///Used by the archiver to signal the volume that enough of the volume header is populated that things like initializing the allocations file can work.
+- (void) volumeHeaderIsMostlyInitialized;
+
 #pragma mark Allocating blocks
 
 ///Set the size of each allocation block, and the total number of them. As allocation blocks in HFS+ span from the boot blocks to the footer, this sets the size of the volume.
@@ -33,6 +36,10 @@
 ///Walks through the in-progress allocations file counting up free blocks, and returns the count. This is used to update the volume header after changes that may allocate or deallocate blocks.
 ///(Note that this is used when *creating* HFS+ volumes, whereas the superclass method with a similar name and purpose is for volumes being *read in*.)
 - (u_int32_t) numberOfBlocksFreeAccordingToWorkingBitmap;
+
+///Walks through the in-progress allocations file counting up free blocks, and returns the block number of the first one that is available. This is used to update the volume header after changes that may allocate or deallocate blocks.
+///(Note that this is used when *creating* HFS+ volumes, whereas the superclass method with a similar name and purpose is for volumes being *read in*.)
+- (u_int32_t) firstUnusedBlockInWorkingBitmap;
 
 /*!Attempt to allocate a contiguous range of available blocks. Writes the range allocated to the given extent.
  * Returns true if a contiguous extent containing this number of blocks was allocated. Returns false (without making any changes to existing allocations) if the request could not be fulfilled because not enough contiguous blocks were available.

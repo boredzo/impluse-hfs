@@ -19,6 +19,13 @@ enum {
 	BTreeNodeLengthHFSPlusAttributesMinimum = kHFSPlusAttrMinNodeSize,
 };
 
+///B*-tree types defined by TN1150, stored in the header node's btreeType field.
+enum {
+	BTreeTypeHFS = 0x00,
+	BTreeTypeUser = 0x80,
+	BTreeTypeReserved = 0xff,
+};
+
 ///Constants identifying various types of B*-trees, to inform how their contents (particularly keys and leaf node record payloads) should be interpreted, and to aid in converting a tree to a different version of the same kind.
 typedef NS_ENUM(NSUInteger, ImpBTreeVersion) {
 	ImpBTreeVersionHFSCatalog = 0x001,

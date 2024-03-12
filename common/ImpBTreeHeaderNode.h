@@ -55,4 +55,10 @@
 	nodeSize:(u_int16_t const)nodeSize
 	maxKeyLength:(u_int16_t)maxKeyLength;
 
+///Used by ImpMutableBTreeFile to make the initial header node of a new volume.
++ (void) writeHeaderNodeForTreeVersion:(ImpBTreeVersion const)destVersion
+	intoData:(NSMutableData *_Nonnull const)mutableBTreeData
+	nodeSize:(u_int16_t const)nodeSize
+	maxKeyLength:(u_int16_t)maxKeyLength;
+
 @end

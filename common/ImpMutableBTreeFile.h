@@ -30,6 +30,11 @@
 	nodeCount:(NSUInteger const)numPotentialNodes
 	convertTree:(ImpBTreeFile *_Nonnull const)sourceTree;
 
+///Create a completely new B*-tree.
+- (instancetype _Nullable )initWithVersion:(const ImpBTreeVersion)version
+	bytesPerNode:(u_int16_t const)nodeSize
+	nodeCount:(NSUInteger const)numPotentialNodes;
+
 ///Allocate one new node of the specified kind, and call the block to populate it with data. If the block is nil, the node will be left blank aside from its node descriptor.
 ///bytes is a pointer to the BTNodeDescriptor at the start of the node, and length is equal to the tree's nodeSize.
 - (ImpBTreeNode *_Nonnull const) allocateNewNodeOfKind:(BTreeNodeKind const)kind populate:(void (^_Nullable const)(void *_Nonnull bytes, NSUInteger length))block;

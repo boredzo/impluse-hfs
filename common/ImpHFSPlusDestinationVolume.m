@@ -94,6 +94,10 @@
 	return _preamble.mutableBytes + kISOStandardBlockSize * 2;
 }
 
+- (void) volumeHeaderIsMostlyInitialized {
+	_hasVolumeHeader = true;
+}
+
 - (off_t) offsetOfFirstAllocationBlock {
 	return 0;
 }
@@ -128,6 +132,11 @@
 	NSAssert(_allocationsBitmap != nil, @"Can't calculate number of free blocks on a volume that hasn't been initialized");
 	CFRange searchRange = { 0, CFBitVectorGetCount(_allocationsBitmap) };
 	return (u_int32_t)CFBitVectorGetCountOfBit(_allocationsBitmap, searchRange, false);
+}
+- (u_int32_t) firstUnusedBlockInWorkingBitmap {
+	NSAssert(_allocationsBitmap != nil, @"Can't calculate number of free blocks on a volume that hasn't been initialized");
+	CFRange searchRange = { 0, CFBitVectorGetCount(_allocationsBitmap) };
+	return (u_int32_t)CFBitVectorGetFirstIndexOfBit(_allocationsBitmap, searchRange, false);
 }
 
 - (u_int32_t) numBlocksForPreambleWithSize:(u_int32_t const)aBlockSize {

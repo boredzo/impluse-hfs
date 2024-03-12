@@ -1,0 +1,951 @@
+//
+//  ImpHydratedItem.m
+//  impluse-hfs
+//
+//  Created by Peter Hosey on 2024-03-10.
+//
+
+#import "ImpHydratedItem.h"
+
+#import <sys/stat.h>
+#import <sys/xattr.h>
+
+#import "ImpTextEncodingConverter.h"
+#import "ImpSizeUtilities.h"
+
+@interface ImpHydratedItem ()
+
+- (instancetype _Nonnull) initWithRealWorldURL:(NSURL *_Nonnull const)fileURL;
+
+@property(readonly, nonatomic, copy) NSString *_Nonnull emojiIcon;
+
+@end
+
+static int64_t hfsEpochTISRD = -3061152000; //1904-01-01T00:00:00Z timeIntervalSinceReferenceDate
+
+static NSUInteger originalItemCount = 0;
+
+@implementation ImpHydratedItem
+
++ (ImpItemClassification) classifyRealWorldURL:(NSURL *_Nonnull const)fileURL error:(out NSError *_Nullable *_Nullable const)outError {
+	struct stat sb;
+	int const stat_result = lstat(fileURL.fileSystemRepresentation, &sb);
+	if (stat_result < 0) {
+		NSError *_Nonnull const statError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: @(strerror(errno)) }];
+		if (outError != NULL) {
+			*outError = statError;
+		}
+		return ImpItemClassificationNonexistent;
+	}
+
+	//See definition of ImpItemClassification in the header.
+	mode_t const itemKind = sb.st_mode & S_IFMT;
+	switch (itemKind) {
+		case S_IFREG:
+		case S_IFDIR:
+			return itemKind;
+		case S_IFLNK: {
+			struct stat orig_sb;
+			int const orig_stat_result = stat(fileURL.fileSystemRepresentation, &sb);
+			if (orig_stat_result < 0) {
+				NSError *_Nonnull const statError = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:@{ NSLocalizedDescriptionKey: @(strerror(errno)) }];
+				if (outError != NULL) {
+					*outError = statError;
+				}
+				return ImpItemClassificationNonexistent;
+			}
+			mode_t const origItemKind = orig_sb.st_mode & S_IFMT;
+			switch (origItemKind) {
+				case S_IFREG:
+				case S_IFDIR:
+					if (orig_sb.st_dev == sb.st_dev) {
+						return origItemKind;
+					} else {
+						return ImpItemClassificationSymbolicLinkDifficult;
+					}
+
+				default:
+					return S_IFMT;
+			}
+		}
+
+		default:
+			return S_IFMT;
+	}
+}
+
++ (instancetype _Nullable) itemWithRealWorldURL:(NSURL *_Nonnull const)fileURL error:(out NSError *_Nullable *_Nullable const)outError {
+	ImpItemClassification const classification = [self classifyRealWorldURL:fileURL error:outError];
+	switch (classification) {
+		case ImpItemClassificationRegularFile:
+			return [[ImpHydratedFile alloc] initWithRealWorldURL:fileURL];
+		case ImpItemClassificationFolder:
+			return [[ImpHydratedFolder alloc] initWithRealWorldURL:fileURL];
+
+		default: {
+			NSError *_Nonnull const unusableItemError = [NSError errorWithDomain:NSPOSIXErrorDomain code:ENOTSUP userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Can't dehydrate item at %@", fileURL.path] }];
+			if (outError != NULL) {
+				*outError = unusableItemError;
+			}
+			return nil;
+		}
+	}
+}
+
+- (instancetype _Nonnull)initWithRealWorldURL:(NSURL *_Nonnull const)fileURL {
+	NSParameterAssert(! [self isMemberOfClass:[ImpHydratedItem class]]);
+
+	if ((self = [super init])) {
+		_fileURL = [fileURL copy];
+		_name = _fileURL.lastPathComponent;
+	}
+	return self;
+}
+
++ (instancetype _Nonnull) itemWithOriginalFolder {
+	return [[ImpHydratedFolder alloc] init];
+}
+
+- (NSString *_Nonnull const) emojiIcon {
+	static NSString *_Nonnull const defaultEmojiIcon = @"📇";
+	return defaultEmojiIcon;
+}
+
+- (NSString *_Nonnull const) description {
+	NSString *_Nonnull const quotedName = self.name ? [NSString stringWithFormat:@"“%@”", self.name] : @"(unnamed)";
+	return [NSString stringWithFormat:@"<%@ %p %@ #%u %@>", self.class, self, self.emojiIcon, self.assignedItemID, quotedName];
+}
+
+#pragma mark Collection necessities
+
+- (id _Nonnull) copyWithZone:(NSZone *_Nullable)zone {
+	return (__bridge id)(__bridge_retained CFTypeRef)self;
+}
+
+- (NSUInteger) hash {
+	bool const isOriginalItem = _originalItemNumber;
+	struct stat sb = { 0 };
+	lstat(self.realWorldURL.fileSystemRepresentation, &sb);
+	NSUInteger const inodeNum = sb.st_ino << 9;
+	NSUInteger const origItemNum = _originalItemNumber << 1;
+	NSUInteger const isOrigItemBit = isOriginalItem << 0;
+	return inodeNum ^ origItemNum ^ isOrigItemBit;
+}
+
+- (BOOL) isEqual:(id _Nonnull)object {
+	ImpHydratedItem *_Nonnull const otherItem = object;
+	//Original items are unique and therefore never equal to any other item.
+	if (self.realWorldURL == nil) {
+		return false;
+	}
+	if (otherItem.realWorldURL == nil) {
+		return false;
+	}
+
+	//Try to determine whether these are the same real file.
+	struct stat selfSB, otherSB;
+	int const selfStatResult = lstat(self.realWorldURL.fileSystemRepresentation, &selfSB);
+	int const selfStatErrno = errno;
+	int const otherStatResult = lstat(otherItem.realWorldURL.fileSystemRepresentation, &otherSB);
+	int const otherStatErrno = errno;
+	if (selfStatResult != otherStatResult) {
+		return false;
+	}
+	if (selfStatErrno != otherStatErrno) {
+		return false;
+	}
+	if (selfStatResult != 0) {
+		return [self.realWorldURL isEqual:otherItem.realWorldURL];
+	}
+
+	return selfSB.st_dev == otherSB.st_dev && selfSB.st_ino == otherSB.st_ino;
+}
+
+#pragma mark Name encoding
+
+- (bool) checkItemName:(out NSError *_Nullable *_Nullable const)outError {
+	Str31 temp;
+	return [self.textEncodingConverter convertString:self.name toHFSItemName:temp error:outError];
+}
+
+- (bool) checkVolumeName:(out NSError *_Nullable *_Nullable const)outError {
+	Str27 temp;
+	return [self.textEncodingConverter convertString:self.name toHFSVolumeName:temp error:outError];
+}
+
+///Note: Implicitly limits to Str31.
+- (void) convertName:(NSString *_Nonnull const)name toHFSItemName:(StringPtr _Nonnull const)pStringBuf {
+	[self.textEncodingConverter convertString:name toHFSItemName:pStringBuf error:NULL];
+}
+
+#pragma mark Date utilities
+
++ (u_int32_t) hfsDateForDate:(NSDate *_Nonnull const)dateToConvert timeZoneOffset:(long)offsetSeconds {
+	return (u_int32_t)((dateToConvert.timeIntervalSinceReferenceDate - hfsEpochTISRD) - offsetSeconds);
+}
+
+- (u_int32_t) hfsDateForTimespec:(struct timespec const *_Nonnull const)dateToConvert {
+	//Converting to NSDate here is problematic because it gets floating-point involved and can lose precision, but we need to do the time zone conversion.
+	int64_t const unixDateSec = dateToConvert->tv_sec;
+	int64_t const unixDateNSec = dateToConvert->tv_nsec;
+	double const unixDate = unixDateSec + ((double)unixDateNSec) / 1e9;
+	NSDate *_Nonnull const date = [NSDate dateWithTimeIntervalSince1970:unixDate];
+	return [[self class] hfsDateForDate:date timeZoneOffset:[[NSTimeZone localTimeZone] secondsFromGMTForDate:date]];
+}
+
+#pragma mark Catalog record writing
+
+- (void) fillOutHFSCatalogKey:(NSMutableData *_Nonnull const)keyData
+	parentID:(HFSCatalogNodeID)parentID
+	nodeName:(NSString *_Nonnull const)nodeName
+{
+	struct HFSCatalogKey *_Nonnull const keyPtr = keyData.mutableBytes;
+	S(keyPtr->parentID, parentID);
+	NSParameterAssert(self.textEncodingConverter != nil);
+	[self convertName:nodeName toHFSItemName:keyPtr->nodeName];
+	u_int8_t const keyLength = sizeof(keyPtr->parentID) + sizeof(keyPtr->nodeName[0]) * (1 + keyPtr->nodeName[0]);
+	S(keyPtr->keyLength, keyLength);
+	keyData.length = keyLength + sizeof(keyPtr->keyLength);
+	NSParameterAssert(keyData.length >= kHFSCatalogKeyMinimumLength);
+	NSParameterAssert(keyData.length <= kHFSCatalogKeyMaximumLength);
+}
+
+///Utility for subclasses to fill out a catalog key for a thread record.
+- (void) fillOutHFSCatalogThreadKey:(NSMutableData *_Nonnull const)keyData
+	ownID:(HFSCatalogNodeID)ownID
+{
+	struct HFSCatalogKey *_Nonnull const keyPtr = keyData.mutableBytes;
+	S(keyPtr->parentID, ownID);
+	keyPtr->nodeName[0] = 0;
+	u_int8_t const keyLength = sizeof(keyPtr->parentID) + sizeof(keyPtr->nodeName[0]) * (1 + keyPtr->nodeName[0]);
+	S(keyPtr->keyLength, keyLength);
+	keyData.length = keyLength + sizeof(keyPtr->keyLength);
+	NSParameterAssert(keyData.length >= kHFSCatalogKeyMinimumLength);
+	NSParameterAssert(keyData.length <= kHFSCatalogKeyMaximumLength);
+}
+
+- (void) fillOutHFSPlusCatalogKey:(NSMutableData *_Nonnull const)keyData
+	parentID:(HFSCatalogNodeID)parentID
+	nodeName:(NSString *_Nonnull const)nodeName
+{
+	struct HFSPlusCatalogKey *_Nonnull const keyPtr = keyData.mutableBytes;
+	S(keyPtr->parentID, parentID);
+	NSParameterAssert(self.textEncodingConverter != nil);
+	[self.textEncodingConverter convertString:nodeName toHFSUniStr255:&keyPtr->nodeName];
+	u_int16_t const keyLength = sizeof(keyPtr->parentID) + sizeof(L(keyPtr->nodeName.length)) * (1 + L(keyPtr->nodeName.length));
+	S(keyPtr->keyLength, keyLength);
+	keyData.length = keyLength + sizeof(keyPtr->keyLength);
+	NSParameterAssert(keyData.length >= kHFSPlusCatalogKeyMinimumLength);
+	NSParameterAssert(keyData.length <= kHFSPlusCatalogKeyMaximumLength);
+}
+
+- (void) fillOutHFSPlusCatalogThreadKey:(NSMutableData *_Nonnull const)keyData
+	ownID:(HFSCatalogNodeID)ownID
+{
+	struct HFSPlusCatalogKey *_Nonnull const keyPtr = keyData.mutableBytes;
+	S(keyPtr->parentID, ownID);
+	keyPtr->nodeName.length = 0;
+	u_int16_t const keyLength = sizeof(keyPtr->parentID) + sizeof(L(keyPtr->nodeName.length)) * (1 + L(keyPtr->nodeName.length));
+	S(keyPtr->keyLength, keyLength);
+	keyData.length = keyLength + sizeof(keyPtr->keyLength);
+	NSParameterAssert(keyData.length >= kHFSPlusCatalogKeyMinimumLength);
+	NSParameterAssert(keyData.length <= kHFSPlusCatalogKeyMaximumLength);
+}
+
+#pragma mark Hierarchy flattening
+
+- (void) recursivelyAddItemsToArray:(NSMutableArray <ImpHydratedItem *> *_Nonnull const)array {
+	NSAssert(false, @"%@ is an instance of an abstract class; it cannot add anything to anything", self);
+}
+
+@end
+
+@implementation ImpHydratedFolder
+{
+	NSArray <ImpHydratedItem *> *_Nullable _contentsCache;
+}
+
+- (instancetype _Nonnull) init {
+	if ((self = [super init])) {
+		++originalItemCount;
+		_originalItemNumber = originalItemCount;
+	}
+	return self;
+}
+
+- (NSString *_Nonnull const) emojiIcon {
+	static NSString *_Nonnull const folderEmojiIcon = @"📁";
+	return folderEmojiIcon;
+}
+
+- (bool) fillOutHFSCatalogKey:(NSMutableData *_Nonnull const)keyData
+	hfsCatalogFolder:(NSMutableData *_Nonnull const)payloadData
+	error:(out NSError *_Nullable *_Nullable const)outError
+{
+	ImpHydratedFolder *_Nullable const parentFolder = self.parentFolder;
+	HFSCatalogNodeID const parentID = parentFolder != nil ? parentFolder.assignedItemID : kHFSRootParentID;
+	[self fillOutHFSCatalogKey:keyData
+		parentID:parentID
+		nodeName:self.name];
+
+	struct HFSCatalogFolder *_Nonnull const folderRecPtr = payloadData.mutableBytes;
+	S(folderRecPtr->recordType, kHFSFolderRecord);
+
+	struct stat dirSB = { 0 };
+
+	if (self.realWorldURL == nil) {
+		//This is an original item—probably the root directory. Populate the stat block as best we can.
+		dirSB.st_flags = 0;
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		memcpy(&dirSB.st_ctimespec, &now, sizeof(dirSB.st_ctimespec));
+		memcpy(&dirSB.st_mtimespec, &now, sizeof(dirSB.st_mtimespec));
+		memcpy(&dirSB.st_atimespec, &now, sizeof(dirSB.st_atimespec));
+	} else {
+		char const *_Nullable const path = self.realWorldURL.fileSystemRepresentation;
+		int const fd = open(path, O_RDONLY | O_DIRECTORY, 0444);
+		if (fd < 0) {
+			int const dirStatErrno = errno;
+			NSError *_Nonnull const dirStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:dirStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Couldn't open folder to catalog it: %@", self.realWorldURL.path] }];
+			self.accessError = dirStatError;
+			if (outError != NULL) {
+				*outError = dirStatError;
+			}
+			return false;
+		}
+
+		int const dirStatResult = fstat(fd, &dirSB);
+		if (dirStatResult < 0) {
+			int const dirStatErrno = errno;
+			NSError *_Nonnull const dirStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:dirStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting vital statistics for folder %@", self.realWorldURL.path] }];
+			self.accessError = dirStatError;
+			if (outError != NULL) {
+				*outError = dirStatError;
+			}
+			close(fd);
+			return false;
+		}
+
+		ssize_t const finderInfoLength = fgetxattr(fd, "com.apple.FinderInfo", &(folderRecPtr->userInfo), sizeof(folderRecPtr->userInfo), /*position*/ 0, /*options*/ 0);
+		if (finderInfoLength < 0) {
+			int const getxattrErrno = errno;
+			NSError *_Nonnull const getxattrError = [NSError errorWithDomain:NSPOSIXErrorDomain code:getxattrErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting Finder info for item %@", self.realWorldURL.path] }];
+			self.accessError = getxattrError;
+			if (outError != NULL) {
+				*outError = getxattrError;
+			}
+			close(fd);
+			return false;
+		}
+
+		close(fd);
+	}
+
+	UInt8 const lockedMask = ((dirSB.st_flags & UF_IMMUTABLE) ? kHFSFileLockedMask : 0);
+	//We always create a thread record, so always set this to true.
+	UInt8 const hasThreadMask = kHFSThreadExistsMask;
+	S(folderRecPtr->flags, lockedMask | hasThreadMask);
+	NSUInteger const numChildren = self.contents.count;
+	if (numChildren > UINT16_MAX) {
+		//TODO: Is this the right error code? Not that it matters, but what does File Manager return when trying to create a 32,768th file inside a folder on HFS? (Or 65,536th given the type, but https://web.archive.org/web/20020803105007/http://docs.info.apple.com/article.html?artnum=8647 says the limit is 32,767.)
+		NSError *_Nonnull const tooManyChildrenError = [NSError errorWithDomain:NSOSStatusErrorDomain code:dirFulErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Folder %@ has more items (%lu) than an HFS folder can hold", self.realWorldURL.path, numChildren] }];
+		self.accessError = tooManyChildrenError;
+		if (outError != NULL) {
+			*outError = tooManyChildrenError;
+		}
+		return false;
+	}
+	S(folderRecPtr->valence, (u_int16_t)numChildren);
+
+	S(folderRecPtr->folderID, self.assignedItemID);
+	S(folderRecPtr->createDate, [self hfsDateForTimespec:&dirSB.st_ctimespec]);
+	S(folderRecPtr->modifyDate, [self hfsDateForTimespec:&dirSB.st_mtimespec]);
+	S(folderRecPtr->backupDate, 0);
+
+	struct DXInfo extInfo = { 0 };
+	ScriptCode script;
+	OSStatus err = RevertTextEncodingToScriptInfo(self.textEncodingConverter.hfsTextEncoding, &script, /*outLanguageID*/ NULL, /*outFontName*/ NULL);
+	if (err != noErr) {
+		NSError *_Nonnull const noScriptCodeError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Can't find script code for encoding %@", [ImpTextEncodingConverter nameOfTextEncoding:self.textEncodingConverter.hfsTextEncoding]] }];
+		self.accessError = noScriptCodeError;
+		if (outError != NULL) {
+			*outError = noScriptCodeError;
+		}
+		return false;
+	}
+	S(extInfo.frScript, (u_int8_t)((script & 0x7f) | 0x80));
+	memcpy(&folderRecPtr->finderInfo, &extInfo, sizeof(folderRecPtr->finderInfo));
+
+	memset(folderRecPtr->reserved, 0, sizeof(folderRecPtr->reserved));
+
+	return true;
+}
+- (void) fillOutHFSCatalogKey:(NSMutableData *_Nonnull const)keyData
+	hfsCatalogFolderThread:(NSMutableData *_Nonnull const)payloadData
+{
+	[self fillOutHFSCatalogThreadKey:keyData ownID:self.assignedItemID];
+
+	struct HFSCatalogThread *_Nonnull const threadRecPtr = payloadData.mutableBytes;
+	S(threadRecPtr->recordType, kHFSFolderThreadRecord);
+	ImpHydratedFolder *_Nullable const parentFolder = self.parentFolder;
+	HFSCatalogNodeID const parentID = parentFolder != nil ? parentFolder.assignedItemID : kHFSRootParentID;
+	S(threadRecPtr->parentID, parentID);
+	[self convertName:self.name toHFSItemName:threadRecPtr->nodeName];
+	memset(threadRecPtr->reserved, 0, sizeof(threadRecPtr->reserved));
+}
+
+- (bool) fillOutHFSPlusCatalogKey:(NSMutableData *_Nonnull const)keyData
+	hfsPlusCatalogFolder:(NSMutableData *_Nonnull const)payloadData
+	error:(out NSError *_Nullable *_Nullable const)outError
+{
+	ImpHydratedFolder *_Nullable const parentFolder = self.parentFolder;
+	HFSCatalogNodeID const parentID = parentFolder != nil ? parentFolder.assignedItemID : kHFSRootParentID;
+	[self fillOutHFSPlusCatalogKey:keyData
+		parentID:parentID
+		nodeName:self.name];
+
+	struct HFSPlusCatalogFolder *_Nonnull const folderRecPtr = payloadData.mutableBytes;
+	S(folderRecPtr->recordType, kHFSPlusFolderRecord);
+
+	struct stat dirSB = { 0 };
+
+	if (self.realWorldURL == nil) {
+		//This is an original item—probably the root directory. Populate the stat block as best we can.
+		dirSB.st_flags = 0;
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		memcpy(&dirSB.st_ctimespec, &now, sizeof(dirSB.st_ctimespec));
+		memcpy(&dirSB.st_mtimespec, &now, sizeof(dirSB.st_mtimespec));
+		memcpy(&dirSB.st_atimespec, &now, sizeof(dirSB.st_atimespec));
+	} else {
+		char const *_Nullable const path = self.realWorldURL.fileSystemRepresentation;
+		int const fd = open(path, O_RDONLY | O_DIRECTORY, 0444);
+		if (fd < 0) {
+			int const dirStatErrno = errno;
+			NSError *_Nonnull const dirStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:dirStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Couldn't open folder to catalog it: %@", self.realWorldURL.path] }];
+			self.accessError = dirStatError;
+			if (outError != NULL) {
+				*outError = dirStatError;
+			}
+			return false;
+		}
+
+		int const dirStatResult = fstat(fd, &dirSB);
+		if (dirStatResult < 0) {
+			int const dirStatErrno = errno;
+			NSError *_Nonnull const dirStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:dirStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting vital statistics for folder %@", self.realWorldURL.path] }];
+			self.accessError = dirStatError;
+			if (outError != NULL) {
+				*outError = dirStatError;
+			}
+			close(fd);
+			return false;
+		}
+
+		ssize_t const finderInfoLength = fgetxattr(fd, "com.apple.FinderInfo", &(folderRecPtr->userInfo), sizeof(folderRecPtr->userInfo), /*position*/ 0, /*options*/ 0);
+		if (finderInfoLength < 0) {
+			int const getxattrErrno = errno;
+			NSError *_Nonnull const getxattrError = [NSError errorWithDomain:NSPOSIXErrorDomain code:getxattrErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting Finder info for item %@", self.realWorldURL.path] }];
+			self.accessError = getxattrError;
+			if (outError != NULL) {
+				*outError = getxattrError;
+			}
+			close(fd);
+			return false;
+	 	}
+
+		close(fd);
+	}
+
+	/*TN1150 says no flags are defined for folders, so this field is reserved and we have to set it to zero.
+	 *TODO: Where does the locked bit get stored for folders, then?
+	UInt8 const lockedMask = ((dirSB.st_flags & UF_IMMUTABLE) ? kHFSFileLockedMask : 0);
+	//We always create a thread record, so always set this to true.
+	UInt8 const hasThreadMask = kHFSThreadExistsMask;
+	S(folderRecPtr->flags, lockedMask | hasThreadMask);
+	 */
+	S(folderRecPtr->flags, 0);
+	NSUInteger const numChildren = self.contents.count;
+	if (numChildren > UINT32_MAX) {
+		//TODO: Is this the right error code? Not that it matters, but what does File Manager return when trying to create a 32,768th file inside a folder on HFS? (Or 65,536th given the type, but https://web.archive.org/web/20020803105007/http://docs.info.apple.com/article.html?artnum=8647 says the limit is 32,767.)
+		NSError *_Nonnull const tooManyChildrenError = [NSError errorWithDomain:NSOSStatusErrorDomain code:dirFulErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Folder %@ has more items (%lu) than an HFS folder can hold", self.realWorldURL.path, numChildren] }];
+		self.accessError = tooManyChildrenError;
+		if (outError != NULL) {
+			*outError = tooManyChildrenError;
+		}
+		return false;
+	}
+	S(folderRecPtr->valence, (u_int32_t)numChildren);
+
+	S(folderRecPtr->folderID, self.assignedItemID);
+	S(folderRecPtr->createDate, [self hfsDateForTimespec:&dirSB.st_ctimespec]);
+	S(folderRecPtr->contentModDate, [self hfsDateForTimespec:&dirSB.st_mtimespec]);
+	S(folderRecPtr->attributeModDate, [self hfsDateForTimespec:&dirSB.st_mtimespec]);
+	S(folderRecPtr->accessDate, [self hfsDateForTimespec:&dirSB.st_atimespec]);
+	S(folderRecPtr->backupDate, 0);
+
+	memset(&folderRecPtr->bsdInfo, 0, sizeof(folderRecPtr->bsdInfo));
+
+	struct DXInfo extInfo = { 0 };
+	ScriptCode script;
+	OSStatus err = RevertTextEncodingToScriptInfo(self.textEncodingConverter.hfsTextEncoding, &script, /*outLanguageID*/ NULL, /*outFontName*/ NULL);
+	if (err != noErr) {
+		NSError *_Nonnull const noScriptCodeError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Can't find script code for encoding %@", [ImpTextEncodingConverter nameOfTextEncoding:self.textEncodingConverter.hfsTextEncoding]] }];
+		self.accessError = noScriptCodeError;
+		if (outError != NULL) {
+			*outError = noScriptCodeError;
+		}
+		return false;
+	}
+	S(extInfo.frScript, (u_int8_t)((script & 0x7f) | 0x80));
+	memcpy(&folderRecPtr->finderInfo, &extInfo, sizeof(folderRecPtr->finderInfo));
+
+	S(folderRecPtr->textEncoding, self.textEncodingConverter.hfsTextEncoding);
+	//hfs_format.h documents the flag bit that indicates whether this is populated as being an HFSX-only feature. So for HFS+, we don't set that flag and this is always zero. (Otherwise we would set it to the number of folders, not files, in self.contents.)
+	S(folderRecPtr->folderCount, 0);
+
+	return true;
+}
+- (void) fillOutHFSPlusCatalogKey:(NSMutableData *_Nonnull const)keyData
+	hfsPlusCatalogFolderThread:(NSMutableData *_Nonnull const)payloadData
+{
+	[self fillOutHFSPlusCatalogThreadKey:keyData ownID:self.assignedItemID];
+
+	struct HFSPlusCatalogThread *_Nonnull const threadRecPtr = payloadData.mutableBytes;
+	S(threadRecPtr->recordType, kHFSPlusFolderThreadRecord);
+	ImpHydratedFolder *_Nullable const parentFolder = self.parentFolder;
+	HFSCatalogNodeID const parentID = parentFolder != nil ? parentFolder.assignedItemID : kHFSRootParentID;
+	S(threadRecPtr->parentID, parentID);
+	[self.textEncodingConverter convertString:self.name toHFSUniStr255:&threadRecPtr->nodeName];
+	S(threadRecPtr->reserved, 0);
+}
+
+#pragma mark Populating arrays
+
+- (void) recursivelyAddItemsToArray:(NSMutableArray <ImpHydratedItem *> *_Nonnull const)array {
+	[array addObject:self];
+	for (ImpHydratedItem *_Nonnull const child in self.contents) {
+		[child recursivelyAddItemsToArray:array];
+	}
+}
+
+#pragma mark Contents
+
+- (NSArray <ImpHydratedItem *> *_Nullable) gatherChildrenOrReturnError:(out NSError *_Nullable *_Nullable const)outError {
+	NSArray <NSURL *> *_Nullable const childURLs = [[NSFileManager defaultManager] contentsOfDirectoryAtURL:self.realWorldURL
+		includingPropertiesForKeys:@[ NSURLNameKey, NSURLContentModificationDateKey, NSURLCreationDateKey, NSURLContentAccessDateKey, ]
+		options:NSDirectoryEnumerationProducesRelativePathURLs
+		error:outError];
+	if (childURLs == nil) {
+		return nil;
+	}
+
+	NSMutableArray <ImpHydratedItem *> *_Nonnull const children = [NSMutableArray arrayWithCapacity:childURLs.count];
+	for (NSURL *_Nonnull const childURL in childURLs) {
+		ImpHydratedItem *_Nullable const childItem = [ImpHydratedItem itemWithRealWorldURL:childURL error:outError];
+		if (childItem == nil) {
+			return nil;
+		}
+		[children addObject:childItem];
+	}
+
+	return children;
+}
+
+@end
+
+@implementation ImpHydratedFile
+{
+	NSURL *_Nonnull _resourceForkURL;
+	HFSExtentRecord hfsDataForkExtents, hfsRsrcForkExtents;
+	HFSPlusExtentRecord hfsPlusDataForkExtents, hfsPlusRsrcForkExtents;
+}
+
+- (instancetype)initWithRealWorldURL:(NSURL *const)fileURL {
+	if ((self = [super initWithRealWorldURL:fileURL])) {
+		_resourceForkURL = [_fileURL URLByAppendingPathComponent:@"..namedfork/rsrc" isDirectory:false];
+
+		_numberOfBytesPerBlock = kISOStandardBlockSize;
+		_numberOfBlocksPerDataClump = 4;
+		_numberOfBlocksPerResourceClump = 1;
+	}
+	return self;
+}
+
+- (NSString *_Nonnull const) emojiIcon {
+	static NSString *_Nonnull const fileEmojiIcon = @"📄";
+	return fileEmojiIcon;
+}
+
+#pragma mark File properties
+
+///Get the extents that have been allocated for this file's data fork. Will be an empty extent record if not previously set with setDataForkHFSExtentRecord:.
+- (void) getDataForkHFSExtentRecord:(struct HFSExtentDescriptor *_Nonnull const)outExtents {
+	memcpy(outExtents, hfsDataForkExtents, sizeof(hfsDataForkExtents));
+}
+///Set the extents that have been allocated for this file's data fork.
+- (void) setDataForkHFSExtentRecord:(struct HFSExtentDescriptor const *_Nonnull const)inExtents {
+	memcpy(hfsDataForkExtents, inExtents, sizeof(hfsDataForkExtents));
+}
+
+///Get the extents that have been allocated for this file's resource fork. Will be an empty extent record if not previously set with setResourceForkHFSExtentRecord:.
+- (void) getResourceForkHFSExtentRecord:(struct HFSExtentDescriptor *_Nonnull const)outExtents {
+	memcpy(outExtents, hfsRsrcForkExtents, sizeof(hfsRsrcForkExtents));
+}
+///Set the extents that have been allocated for this file's resource fork.
+- (void) setResourceForkHFSExtentRecord:(struct HFSExtentDescriptor const *_Nonnull const)inExtents {
+	memcpy(hfsRsrcForkExtents, inExtents, sizeof(hfsRsrcForkExtents));
+}
+
+///Get the extents that have been allocated for this file's data fork. Will be an empty extent record if not previously set with setDataForkHFSPlusExtentRecord:.
+- (void) getDataForkHFSPlusExtentRecord:(struct HFSPlusExtentDescriptor *_Nonnull const)outExtents {
+	memcpy(outExtents, hfsPlusDataForkExtents, sizeof(hfsPlusDataForkExtents));
+}
+///Set the extents that have been allocated for this file's data fork.
+- (void) setDataForkHFSPlusExtentRecord:(struct HFSPlusExtentDescriptor const *_Nonnull const)inExtents {
+	memcpy(hfsPlusDataForkExtents, inExtents, sizeof(hfsPlusDataForkExtents));
+}
+
+///Get the extents that have been allocated for this file's resource fork. Will be an empty extent record if not previously set with setResourceForkHFSPlusExtentRecord:.
+- (void) getResourceForkHFSPlusExtentRecord:(struct HFSPlusExtentDescriptor *_Nonnull const)outExtents {
+	memcpy(outExtents, hfsPlusRsrcForkExtents, sizeof(hfsPlusRsrcForkExtents));
+}
+///Set the extents that have been allocated for this file's resource fork.
+- (void) setResourceForkHFSPlusExtentRecord:(struct HFSPlusExtentDescriptor const *_Nonnull const)inExtents {
+	memcpy(hfsPlusRsrcForkExtents, inExtents, sizeof(hfsPlusRsrcForkExtents));
+}
+
+#pragma mark Filling out catalog records
+
+- (bool) fillOutHFSCatalogKey:(NSMutableData *_Nonnull const)keyData
+	hfsCatalogFile:(NSMutableData *_Nonnull const)payloadData
+	error:(out NSError *_Nullable *_Nullable const)outError
+{
+	ImpHydratedFolder *_Nullable const parentFolder = self.parentFolder;
+	HFSCatalogNodeID const parentID = parentFolder != nil ? parentFolder.assignedItemID : kHFSRootParentID;
+	[self fillOutHFSCatalogKey:keyData
+		parentID:parentID
+		nodeName:self.name];
+
+	char const *_Nullable const path = self.realWorldURL.fileSystemRepresentation;
+	int const fd = open(path, O_RDONLY, 0444);
+	if (fd < 0) {
+		int const dataStatErrno = errno;
+		NSError *_Nonnull const dataStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:dataStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Couldn't open file to catalog it: %@", self.realWorldURL.path] }];
+		self.accessError = dataStatError;
+		if (outError != NULL) {
+			*outError = dataStatError;
+		}
+		return false;
+	}
+
+	struct stat dataSB, rsrcSB;
+
+	int const dataStatResult = fstat(fd, &dataSB);
+	if (dataStatResult < 0) {
+		int const dataStatErrno = errno;
+		NSError *_Nonnull const dataStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:dataStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting vital statistics for data fork of item %@", self.realWorldURL.path] }];
+		self.accessError = dataStatError;
+		if (outError != NULL) {
+			*outError = dataStatError;
+		}
+		close(fd);
+		return false;
+	} else if (dataSB.st_size > INT32_MAX) {
+		NSError *_Nonnull const forkTooBigError = [NSError errorWithDomain:NSOSStatusErrorDomain code:fsDataTooBigErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Data fork is too big in file %@", self.realWorldURL.path] }];
+		self.accessError = forkTooBigError;
+		if (outError != NULL) {
+			*outError = forkTooBigError;
+		}
+		close(fd);
+		return false;
+	}
+
+	int const rsrcStatResult = fstat(fd, &rsrcSB);
+	if (rsrcStatResult < 0) {
+		int const rsrcStatErrno = errno;
+		NSError *_Nonnull const rsrcStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:rsrcStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting vital statistics for resource fork of item %@", self.realWorldURL.path] }];
+		self.accessError = rsrcStatError;
+		if (outError != NULL) {
+			*outError = rsrcStatError;
+		}
+		close(fd);
+		return false;
+	} else if (rsrcSB.st_size > INT32_MAX) {
+		NSError *_Nonnull const forkTooBigError = [NSError errorWithDomain:NSOSStatusErrorDomain code:fsDataTooBigErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Resource fork is too big in file %@", self.realWorldURL.path] }];
+		self.accessError = forkTooBigError;
+		if (outError != NULL) {
+			*outError = forkTooBigError;
+		}
+		close(fd);
+		return false;
+	}
+
+	struct HFSCatalogFile *_Nonnull const fileRecPtr = payloadData.mutableBytes;
+	S(fileRecPtr->recordType, kHFSFileRecord);
+
+	UInt8 const lockedMask = ((dataSB.st_flags & UF_IMMUTABLE) ? kHFSFileLockedMask : 0);
+	//We always create a thread record, so always set this to true.
+	UInt8 const hasThreadMask = kHFSThreadExistsMask;
+	S(fileRecPtr->flags, lockedMask | hasThreadMask);
+	S(fileRecPtr->fileType, 0);
+
+	ssize_t const finderInfoLength = fgetxattr(fd, "com.apple.FinderInfo", &(fileRecPtr->userInfo), sizeof(fileRecPtr->userInfo), /*position*/ 0, /*options*/ 0);
+	if (finderInfoLength < 0) {
+		int const getxattrErrno = errno;
+		NSError *_Nonnull const getxattrError = [NSError errorWithDomain:NSPOSIXErrorDomain code:getxattrErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting Finder info for item %@", self.realWorldURL.path] }];
+		self.accessError = getxattrError;
+		if (outError != NULL) {
+			*outError = getxattrError;
+		}
+		close(fd);
+		return false;
+	}
+	S(fileRecPtr->fileID, self.assignedItemID);
+	S(fileRecPtr->dataStartBlock, 0);
+	S(fileRecPtr->dataLogicalSize, (int32_t)dataSB.st_size);
+	S(fileRecPtr->dataPhysicalSize, 0);
+	S(fileRecPtr->rsrcStartBlock, 0);
+	S(fileRecPtr->rsrcLogicalSize, (int32_t)rsrcSB.st_size);
+	S(fileRecPtr->rsrcPhysicalSize, 0);
+	S(fileRecPtr->createDate, [self hfsDateForTimespec:&dataSB.st_ctimespec]);
+	S(fileRecPtr->modifyDate, [self hfsDateForTimespec:&dataSB.st_mtimespec]);
+	S(fileRecPtr->backupDate, 0);
+	struct FXInfo extInfo = { 0 };
+	ScriptCode script;
+	OSStatus err = RevertTextEncodingToScriptInfo(self.textEncodingConverter.hfsTextEncoding, &script, /*outLanguageID*/ NULL, /*outFontName*/ NULL);
+	if (err != noErr) {
+		NSError *_Nonnull const noScriptCodeError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Can't find script code for encoding %@", [ImpTextEncodingConverter nameOfTextEncoding:self.textEncodingConverter.hfsTextEncoding]] }];
+		self.accessError = noScriptCodeError;
+		if (outError != NULL) {
+			*outError = noScriptCodeError;
+		}
+		close(fd);
+		return false;
+	}
+	S(extInfo.fdScript, (u_int8_t)((script & 0x7f) | 0x80));
+	//TODO: If the resource fork contains a routing resource, we should set kExtendedFlagHasRoutingInfo in extInfo.fdXFlags.
+	memcpy(&fileRecPtr->finderInfo, &extInfo, sizeof(fileRecPtr->finderInfo));
+	S(fileRecPtr->clumpSize, 0x1000);
+	memset(fileRecPtr->dataExtents, 0, sizeof(fileRecPtr->dataExtents));
+	memset(fileRecPtr->rsrcExtents, 0, sizeof(fileRecPtr->rsrcExtents));
+	S(fileRecPtr->reserved, 0);
+
+	close(fd);
+	return true;
+}
+- (void) fillOutHFSCatalogKey:(NSMutableData *_Nonnull const)keyData
+	hfsCatalogFileThread:(NSMutableData *_Nonnull const)payloadData
+{
+	[self fillOutHFSCatalogThreadKey:keyData ownID:self.assignedItemID];
+
+	struct HFSCatalogThread *_Nonnull const threadRecPtr = payloadData.mutableBytes;
+	S(threadRecPtr->recordType, kHFSFileThreadRecord);
+	ImpHydratedFolder *_Nullable const parentFolder = self.parentFolder;
+	HFSCatalogNodeID const parentID = parentFolder != nil ? parentFolder.assignedItemID : kHFSRootParentID;
+	S(threadRecPtr->parentID, parentID);
+	[self convertName:self.name toHFSItemName:threadRecPtr->nodeName];
+	memset(threadRecPtr->reserved, 0, sizeof(threadRecPtr->reserved));
+}
+
+- (bool) fillOutHFSPlusCatalogKey:(NSMutableData *_Nonnull const)keyData
+	hfsPlusCatalogFile:(NSMutableData *_Nonnull const)payloadData
+	error:(out NSError *_Nullable *_Nullable const)outError
+{
+	ImpHydratedFolder *_Nullable const parentFolder = self.parentFolder;
+	HFSCatalogNodeID const parentID = parentFolder != nil ? parentFolder.assignedItemID : kHFSRootParentID;
+	[self fillOutHFSPlusCatalogKey:keyData
+		parentID:parentID
+		nodeName:self.name];
+
+	char const *_Nullable const path = self.realWorldURL.fileSystemRepresentation;
+	int const fd = open(path, O_RDONLY, 0444);
+	if (fd < 0) {
+		int const dataStatErrno = errno;
+		NSError *_Nonnull const dataStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:dataStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Couldn't open file to catalog it: %@", self.realWorldURL.path] }];
+		self.accessError = dataStatError;
+		if (outError != NULL) {
+			*outError = dataStatError;
+		}
+		return false;
+	}
+
+	struct stat dataSB, rsrcSB;
+
+	int const dataStatResult = fstat(fd, &dataSB);
+	if (dataStatResult < 0) {
+		int const dataStatErrno = errno;
+		NSError *_Nonnull const dataStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:dataStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting vital statistics for data fork of item %@", self.realWorldURL.path] }];
+		self.accessError = dataStatError;
+		if (outError != NULL) {
+			*outError = dataStatError;
+		}
+		close(fd);
+		return false;
+	} else if (dataSB.st_size > INT32_MAX) {
+		NSError *_Nonnull const forkTooBigError = [NSError errorWithDomain:NSOSStatusErrorDomain code:fsDataTooBigErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Data fork is too big in file %@", self.realWorldURL.path] }];
+		self.accessError = forkTooBigError;
+		if (outError != NULL) {
+			*outError = forkTooBigError;
+		}
+		close(fd);
+		return false;
+	}
+
+	int const rsrcStatResult = fstat(fd, &rsrcSB);
+	if (rsrcStatResult < 0) {
+		int const rsrcStatErrno = errno;
+		NSError *_Nonnull const rsrcStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:rsrcStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting vital statistics for resource fork of item %@", self.realWorldURL.path] }];
+		self.accessError = rsrcStatError;
+		if (outError != NULL) {
+			*outError = rsrcStatError;
+		}
+		close(fd);
+		return false;
+	} else if (rsrcSB.st_size > INT32_MAX) {
+		NSError *_Nonnull const forkTooBigError = [NSError errorWithDomain:NSOSStatusErrorDomain code:fsDataTooBigErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Resource fork is too big in file %@", self.realWorldURL.path] }];
+		self.accessError = forkTooBigError;
+		if (outError != NULL) {
+			*outError = forkTooBigError;
+		}
+		close(fd);
+		return false;
+	}
+
+	u_int32_t const blockSize = self.numberOfBytesPerBlock;
+
+	struct HFSPlusCatalogFile *_Nonnull const fileRecPtr = payloadData.mutableBytes;
+	S(fileRecPtr->recordType, kHFSPlusFileRecord);
+
+	UInt8 const lockedMask = ((dataSB.st_flags & UF_IMMUTABLE) ? kHFSFileLockedMask : 0);
+	//We always create a thread record, so always set this to true.
+	UInt8 const hasThreadMask = kHFSThreadExistsMask;
+	S(fileRecPtr->flags, lockedMask | hasThreadMask);
+	S(fileRecPtr->reserved1, 0);
+
+	S(fileRecPtr->fileID, self.assignedItemID);
+	S(fileRecPtr->createDate, [self hfsDateForTimespec:&dataSB.st_ctimespec]);
+	S(fileRecPtr->contentModDate, [self hfsDateForTimespec:&dataSB.st_mtimespec]);
+	S(fileRecPtr->attributeModDate, [self hfsDateForTimespec:&dataSB.st_mtimespec]);
+	S(fileRecPtr->accessDate, [self hfsDateForTimespec:&dataSB.st_atimespec]);
+	S(fileRecPtr->backupDate, 0);
+
+	memset(&fileRecPtr->bsdInfo, 0, sizeof(fileRecPtr->bsdInfo));
+
+	ssize_t const finderInfoLength = fgetxattr(fd, "com.apple.FinderInfo", &(fileRecPtr->userInfo), sizeof(fileRecPtr->userInfo), /*position*/ 0, /*options*/ 0);
+	if (finderInfoLength < 0) {
+		int const getxattrErrno = errno;
+		NSError *_Nonnull const getxattrError = [NSError errorWithDomain:NSPOSIXErrorDomain code:getxattrErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting Finder info for item %@", self.realWorldURL.path] }];
+		self.accessError = getxattrError;
+		if (outError != NULL) {
+			*outError = getxattrError;
+		}
+		close(fd);
+		return false;
+	}
+	struct FXInfo extInfo = { 0 };
+	ScriptCode script;
+	OSStatus err = RevertTextEncodingToScriptInfo(self.textEncodingConverter.hfsTextEncoding, &script, /*outLanguageID*/ NULL, /*outFontName*/ NULL);
+	if (err != noErr) {
+		NSError *_Nonnull const noScriptCodeError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Can't find script code for encoding %@", [ImpTextEncodingConverter nameOfTextEncoding:self.textEncodingConverter.hfsTextEncoding]] }];
+		self.accessError = noScriptCodeError;
+		if (outError != NULL) {
+			*outError = noScriptCodeError;
+		}
+		close(fd);
+		return false;
+	}
+	S(extInfo.fdScript, (u_int8_t)((script & 0x7f) | 0x80));
+	//TODO: If the resource fork contains a routing resource, we should set kExtendedFlagHasRoutingInfo in extInfo.fdXFlags.
+	memcpy(&fileRecPtr->finderInfo, &extInfo, sizeof(fileRecPtr->finderInfo));
+
+	S(fileRecPtr->dataFork.logicalSize, (int32_t)dataSB.st_size);
+	memset(fileRecPtr->dataFork.extents, 0, sizeof(fileRecPtr->dataFork.extents));
+	S(fileRecPtr->dataFork.totalBlocks, 0);
+	S(fileRecPtr->dataFork.clumpSize, blockSize * self.numberOfBlocksPerDataClump);
+	S(fileRecPtr->resourceFork.logicalSize, (int32_t)rsrcSB.st_size);
+	memset(fileRecPtr->resourceFork.extents, 0, sizeof(fileRecPtr->resourceFork.extents));
+	S(fileRecPtr->resourceFork.totalBlocks, 0);
+	S(fileRecPtr->resourceFork.clumpSize, blockSize * self.numberOfBlocksPerResourceClump);
+
+	S(fileRecPtr->textEncoding, self.textEncodingConverter.hfsTextEncoding);
+	S(fileRecPtr->reserved2, 0);
+
+	close(fd);
+	return true;
+}
+- (void) fillOutHFSPlusCatalogKey:(NSMutableData *_Nonnull const)keyData
+	hfsPlusCatalogFileThread:(NSMutableData *_Nonnull const)payloadData
+{
+	[self fillOutHFSPlusCatalogThreadKey:keyData ownID:self.assignedItemID];
+
+	struct HFSPlusCatalogThread *_Nonnull const threadRecPtr = payloadData.mutableBytes;
+	S(threadRecPtr->recordType, kHFSFileThreadRecord);
+	ImpHydratedFolder *_Nullable const parentFolder = self.parentFolder;
+	HFSCatalogNodeID const parentID = parentFolder != nil ? parentFolder.assignedItemID : kHFSRootParentID;
+	S(threadRecPtr->parentID, parentID);
+	[self.textEncodingConverter convertString:self.name toHFSUniStr255:&threadRecPtr->nodeName];
+	S(threadRecPtr->reserved, 0);
+}
+
+#pragma mark Populating arrays
+
+- (void) recursivelyAddItemsToArray:(NSMutableArray <ImpHydratedItem *> *_Nonnull const)array {
+	[array addObject:self];
+}
+
+#pragma mark Contents
+
+- (bool) getDataForkLength:(out u_int64_t *_Nonnull const)outLength error:(out NSError *_Nullable *_Nullable const)outError {
+	NSNumber *_Nullable sizeNum = nil;
+	bool const gotLength = [self.realWorldURL getResourceValue:&sizeNum
+		forKey:NSURLFileSizeKey error:outError];
+	if (gotLength && outLength != NULL) {
+		*outLength = sizeNum.unsignedLongLongValue;
+	}
+	return gotLength;
+}
+- (bool) getResourceForkLength:(out u_int64_t *_Nonnull const)outLength error:(out NSError *_Nullable *_Nullable const)outError {
+	NSNumber *_Nullable sizeNum = nil;
+	bool const gotLength = [_resourceForkURL getResourceValue:&sizeNum
+		forKey:NSURLFileSizeKey error:outError];
+	if (gotLength && outLength != NULL) {
+		*outLength = sizeNum.unsignedLongLongValue;
+	}
+	return gotLength;
+}
+
+- (bool) readFromForkURL:(NSURL *_Nonnull const)realWorldForkURL
+	block:(bool (^_Nonnull const)(NSData *_Nonnull const data))block
+	error:(out NSError *_Nullable *_Nullable const)outError
+{
+	NSFileHandle *_Nonnull const readFH = [NSFileHandle fileHandleForReadingFromURL:realWorldForkURL error:outError];
+	if (readFH == nil) {
+		return false;
+	}
+
+	enum { chunkSize = 10485760UL };
+	NSData *_Nullable lastChunkRead = nil;
+	NSError *_Nullable error = nil;
+	bool keepGoing = true;
+	while ((lastChunkRead = [readFH readDataUpToLength:chunkSize error:&error])) {
+		keepGoing = block(lastChunkRead);
+	}
+	if (! keepGoing) {
+		if (outError != NULL) {
+			*outError = error;
+		}
+		return false;
+	}
+
+	return true;
+}
+
+- (bool) readDataFork:(bool (^_Nonnull const)(NSData *_Nonnull const data))block error:(out NSError *_Nullable *_Nullable const)outError {
+	return [self readFromForkURL:self.realWorldURL block:block error:outError];
+}
+- (bool) readResourceFork:(bool (^_Nonnull const)(NSData *_Nonnull const data))block error:(out NSError *_Nullable *_Nullable const)outError {
+	return [self readFromForkURL:_resourceForkURL block:block error:outError];
+}
+
+@end

@@ -54,6 +54,29 @@
 	return self;
 }
 
+- (instancetype _Nullable)initWithVersion:(ImpBTreeVersion const)version
+	bytesPerNode:(u_int16_t const)nodeSize
+	nodeCount:(NSUInteger const)numPotentialNodes
+{
+	NSParameterAssert(version == ImpBTreeVersionHFSCatalog || version == ImpBTreeVersionHFSPlusCatalog || version == ImpBTreeVersionHFSExtentsOverflow || version == ImpBTreeVersionHFSPlusExtentsOverflow);
+
+	u_int16_t const maxKeyLength = [[self class] maxKeyLengthForVersion:version];
+	NSMutableData *_Nonnull const fileData = [NSMutableData dataWithLength:nodeSize * numPotentialNodes];
+
+	//Populate the header node of this data.
+	//Do this before super init in case the superclass initializer needs to consult the header node.
+	[ImpBTreeHeaderNode writeHeaderNodeForTreeVersion:version intoData:fileData nodeSize:nodeSize maxKeyLength:maxKeyLength];
+
+	if ((self = [super initWithVersion:version data:fileData nodeSize:nodeSize copyData:false])) {
+		_mutableBTreeData = fileData;
+
+		_nextIndexNodeIndex = 1;
+		_nextLeafNodeIndex = _nextIndexNodeIndex + 0;
+	}
+
+	return self;
+}
+
 #pragma mark Overrides of superclass methods
 
 - (bool) hasMutableNodes {

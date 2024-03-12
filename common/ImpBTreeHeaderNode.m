@@ -160,6 +160,86 @@
 	S(*fourthRecordIndex, (u_int16_t)(offsetStackStart - mutableBytes));
 }
 
++ (void) writeHeaderNodeForTreeVersion:(ImpBTreeVersion const)destVersion
+	intoData:(NSMutableData *_Nonnull const)mutableBTreeData
+	nodeSize:(u_int16_t const)nodeSize
+	maxKeyLength:(u_int16_t)maxKeyLength
+{
+	void *_Nonnull const mutableBytes = mutableBTreeData.mutableBytes;
+
+	struct BTNodeDescriptor *_Nonnull const nodeDesc = mutableBytes;
+	S(nodeDesc->bLink, 0);
+	S(nodeDesc->fLink, 0);
+	S(nodeDesc->kind, kBTHeaderNode);
+	S(nodeDesc->height, 0);
+	S(nodeDesc->numRecords, 3);
+	S(nodeDesc->reserved, 0);
+
+	void *_Nonnull const headerRecStart = mutableBytes + sizeof(*nodeDesc);
+	struct BTHeaderRec *_Nonnull const headerRec = headerRecStart;
+	S(headerRec->treeDepth, 0);
+	S(headerRec->nodeSize, nodeSize);
+	S(headerRec->maxKeyLength, maxKeyLength);
+	S(headerRec->reserved1, 0);
+	//TN1150: “Ignored for HFS Plus B-trees. The clumpSize field of the HFSPlusForkData record is used instead. For maximum compatibility, an implementation should probably set the clumpSize in the node descriptor to the same value as the clumpSize in the HFSPlusForkData when initializing a volume. Otherwise, it should treat the header records's clumpSize as reserved.”
+	//We set the clump size of the fork data to the node size in both places.
+	//Note that copying the clump size from the original tree doesn't make sense because it's likely an HFS tree. This field didn't exist in HFS. In theory, it *should* be zero because it was reserved; in practice, not every HFS implementation was meticulous about keeping reserved space zeroed.
+	S(headerRec->clumpSize, nodeSize);
+
+	S(headerRec->btreeType, BTreeTypeHFS);
+	//kHFSCaseFolding is only defined for HFSX.
+	S(headerRec->keyCompareType, 0);
+
+	//TN1150 on BigKeys: “If this bit is set, the keyLength field of the keys in index and leaf nodes is UInt16; otherwise, it is a UInt8. This bit must be set for all HFS Plus B-trees.”
+	bool const hasBigKeys = true;
+	bool hasVariableSizeIndexKeys = false;
+	switch (destVersion) {
+		case ImpBTreeVersionHFSCatalog:
+		case ImpBTreeVersionHFSExtentsOverflow:
+			hasVariableSizeIndexKeys = false;
+			break;
+		case ImpBTreeVersionHFSPlusCatalog:
+		case ImpBTreeVersionHFSPlusAttributes:
+			hasVariableSizeIndexKeys = true;
+			break;
+		case ImpBTreeVersionHFSPlusExtentsOverflow:
+			hasVariableSizeIndexKeys = false;
+			break;
+	}
+	S(headerRec->attributes, (hasBigKeys ? kBTBigKeysMask : 0) | (hasVariableSizeIndexKeys ? kBTVariableIndexKeysMask : 0));
+	NSData *_Nonnull const reserved3 = [NSMutableData dataWithLength:sizeof(headerRec->reserved3)];
+	memcpy(headerRec->reserved3, reserved3.bytes, reserved3.length);
+	//All the rest of this is subject to change as the tree gets populated, so set it fresh rather than copying it over.
+	S(headerRec->rootNode, 0);
+	S(headerRec->leafRecords, 0);
+	S(headerRec->firstLeafNode, 0);
+	S(headerRec->lastLeafNode, 0);
+	S(headerRec->totalNodes, 1);
+	S(headerRec->freeNodes, 0);
+
+	void *_Nonnull const userDataRecStart = headerRecStart + sizeof(struct BTHeaderRec);
+	//The user data record is always blank, so we just skip it.
+	enum { userDataRecLength = 128 };
+
+	void *_Nonnull const mapRecStart = userDataRecStart + userDataRecLength;
+	u_int8_t *_Nonnull const mapBytes = mapRecStart;
+	//Mark the header node as used and no others.
+	*mapBytes = 1 << 7;
+
+	void *_Nonnull const theVeryEnd = mutableBytes + nodeSize;
+	u_int16_t *_Nonnull const negativeFirstRecordIndex = theVeryEnd;
+	u_int16_t *_Nonnull const firstRecordIndex = negativeFirstRecordIndex - 1;
+	u_int16_t *_Nonnull const secondRecordIndex = firstRecordIndex - 1;
+	u_int16_t *_Nonnull const thirdRecordIndex = secondRecordIndex - 1;
+	u_int16_t *_Nonnull const fourthRecordIndex = thirdRecordIndex - 1;
+	void *_Nonnull const offsetStackStart = fourthRecordIndex;
+
+	S(*firstRecordIndex, (u_int16_t)(headerRecStart - mutableBytes));
+	S(*secondRecordIndex, (u_int16_t)(userDataRecStart - mutableBytes));
+	S(*thirdRecordIndex, (u_int16_t)(mapRecStart - mutableBytes));
+	S(*fourthRecordIndex, (u_int16_t)(offsetStackStart - mutableBytes));
+}
+
 - (instancetype _Nonnull) initByCloningHeaderNode:(ImpBTreeHeaderNode *_Nonnull const)theOriginal nodeSize:(u_int16_t)nodeSize maxKeyLength:(u_int16_t)maxKeyLength forTree:(ImpBTreeFile *_Nonnull const)tree {
 	NSMutableData *_Nonnull const data = [NSMutableData dataWithLength:nodeSize];
 	void *_Nonnull const mutableBytes = data.mutableBytes;

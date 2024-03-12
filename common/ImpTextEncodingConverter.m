@@ -20,7 +20,10 @@ enum {
 {
 	TextEncoding _hfsTextEncoding, _hfsPlusTextEncoding;
 	TextToUnicodeInfo _ttui;
+	UnicodeToTextInfo _utti;
 }
+
+#pragma mark Text encoding names
 
 + (NSString *_Nullable) nameOfTextEncoding:(TextEncoding const)enc {
 	unsigned char encodingNameBuf[256] = "[no name given]";
@@ -43,6 +46,50 @@ enum {
 		NSString *_Nonnull const encodingName = [NSString stringWithUTF8String:(char const *_Nonnull)encodingNameBuf];
 		return encodingName;
 	}
+}
+
++ (TextEncoding) textEncodingWithName:(NSString *_Nonnull const)name {
+	TextEncoding result = kTextEncodingUnknown;
+	OSStatus err = TECGetTextEncodingFromInternetNameOrMIB(&result, kTECInternetNameTolerantUsageMask, (__bridge CFStringRef)name, kTEC_MIBEnumDontCare);
+	if (err != noErr) {
+		//Not really anything to do here. Maybe add some more fallback lookup options. But absent those, we assume our result is still kTextEncodingUnknown and return that.
+	}
+	return result;
+}
+
++ (TextEncoding) parseTextEncodingSpecification:(NSString *_Nonnull const)encodingSpec error:(out NSError *_Nullable *_Nullable const)outError {
+	TextEncoding result = [self textEncodingWithName:encodingSpec];
+	if (result != kTextEncodingUnknown) {
+		return result;
+	}
+
+	static NSRegularExpression *_Nullable numberExp = nil;
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+		numberExp = [NSRegularExpression regularExpressionWithPattern:@"^\\s*(?:0x)?([0-9a-f]+)\\s*$" options:NSRegularExpressionCaseInsensitive error:NULL];
+	});
+	NSTextCheckingResult *_Nullable const regexpResult = [numberExp firstMatchInString:encodingSpec options:NSMatchingAnchored range:(NSRange){ 0, encodingSpec.length }];
+	if (regexpResult == nil) {
+		NSError *_Nonnull const nanErr = [NSError errorWithDomain:NSOSStatusErrorDomain code:numberFormattingNotANumberErr userInfo:@{ NSLocalizedDescriptionKey: @"Text encoding was not a known name or an integer" }];
+		if (outError != NULL) {
+			*outError = nanErr;
+		}
+		return kTextEncodingUnknown;
+	}
+
+	NSString *_Nonnull const matchedGroup = [encodingSpec substringWithRange:[regexpResult rangeAtIndex:1]];
+	char const *_Nonnull const cStringPtr = [matchedGroup UTF8String];
+	unsigned long parsedNumber = strtoul(cStringPtr, NULL, 0);
+	if (parsedNumber > UINT32_MAX) {
+		NSError *_Nonnull const tooBigErr = [NSError errorWithDomain:NSOSStatusErrorDomain code:numberFormattingOverflowInDestinationErr userInfo:@{ NSLocalizedDescriptionKey: @"Text encoding integer too big to be a real text encoding" }];
+		if (outError != NULL) {
+			*outError = tooBigErr;
+		}
+		return kTextEncodingUnknown;
+	}
+
+	///This effectively returns kTextEncodingMacRoman if the string isn't sufficiently numeric, which is desirable behavior.
+	return (TextEncoding)parsedNumber;
 }
 
 #pragma mark Finder flags parsing
@@ -131,9 +178,13 @@ enum {
 			.otherEncoding = _hfsTextEncoding,
 			.mappingVersion = kUnicodeUseHFSPlusMapping,
 		};
-		OSStatus const err = CreateTextToUnicodeInfo(&mapping, &_ttui);
+		OSStatus err = CreateTextToUnicodeInfo(&mapping, &_ttui);
 		if (err != noErr) {
-			ImpPrintf(@"Failed to initialize Unicode conversion from %x to %x: error %d/%s", _hfsTextEncoding, _hfsPlusTextEncoding, err, ImpExplainOSStatus(err));
+			ImpPrintf(@"Failed to initialize Unicode conversion from HFS encoding %x to HFS Plus encoding %x: error %d/%s", _hfsTextEncoding, _hfsPlusTextEncoding, err, ImpExplainOSStatus(err));
+		}
+		err = CreateUnicodeToTextInfo(&mapping, &_utti);
+		if (err != noErr) {
+			ImpPrintf(@"Failed to initialize Unicode conversion from HFS Plus encoding %x to HFS encoding %x: error %d/%s", _hfsPlusTextEncoding, _hfsTextEncoding, err, ImpExplainOSStatus(err));
 		}
 	}
 	return self;
@@ -146,9 +197,26 @@ enum {
 
 - (void)dealloc {
 	DisposeTextToUnicodeInfo(&_ttui);
+	DisposeUnicodeToTextInfo(&_utti);
 }
 
 #pragma mark Size estimation
+
+- (size_t) lengthOfEncodedString:(NSString *_Nonnull const)string {
+	ByteCount numBytes = 0;
+	OSStatus err = ConvertFromUnicodeToText(_utti,
+		string.length, /*inBuffer*/ NULL,
+		/*controlFlags*/ 0,
+		/*inOffsetCount*/ 0, /*inOffsets*/ NULL,
+		/*outOffsetCount*/ NULL, /*outOffsets*/ NULL,
+		/*outCapacity*/ 0,
+		/*outInputBytesConsumed*/ NULL,
+		/*outLen*/ &numBytes, /*outBuffer*/ NULL);
+	if (err != noErr) {
+		fprintf(stderr, "Couldn't estimate length of encoded string: %s\n", string.UTF8String);
+	}
+	return numBytes;
+}
 
 - (ByteCount) estimateSizeOfHFSUniStr255NeededForPascalString:(ConstStr31Param _Nonnull const)pascalString maxLength:(u_int8_t const)maxLength {
 	u_int8_t const srcLength = *pascalString;
@@ -291,6 +359,49 @@ enum {
 	memcpy(outUnicodeName->unicode, nativeEndianCharacters, numBytes);
 	S(outUnicodeName->length, cappedStringLength);
 	return cappedStringLength == actualStringLength;
+}
+
+///maxLength is the maximum number of characters in the string, not counting the length byte. So for a Str27, this should be 27, which is sizeof(Str27) (= 28) - 1.
+- (bool) convertString:(NSString *_Nonnull const)inStr
+	toPascalString:(StringPtr _Nonnull const)outPString
+	maxLength:(ByteCount const)maxLength
+	error:(out NSError *_Nullable *_Nullable const)outError
+{
+	NSParameterAssert(maxLength <= 255);
+	struct HFSUniStr255 unicodeName;
+	bool const could255 = [self convertString:inStr toHFSUniStr255:&unicodeName];
+	if (! could255) {
+		return could255;
+	}
+	ByteCount numBytesProduced = 0;
+	OSStatus err = ConvertFromUnicodeToText(_utti, unicodeName.length * sizeof(UniChar), unicodeName.unicode, /*controlFlags*/ 0, /*offsetCount*/ 0, /*offsetArray*/ NULL, /*outOffsetCount*/ 0, /*outOffsetArray*/ NULL, /*outputBufLen*/ maxLength, /*outNumBytesRead*/ NULL, &numBytesProduced, outPString + 1);
+	if (err != noErr) {
+		NSError *_Nonnull const conversionError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Couldn't convert string to encoding %@ in max length %lu because of an error %d/%s", [[self class] nameOfTextEncoding:_hfsTextEncoding], maxLength, err, GetMacOSStatusCommentString(err)] }];
+		if (outError != NULL) {
+			*outError = conversionError;
+		}
+	}
+	outPString[0] = (UInt8)numBytesProduced;
+	return err == noErr;
+}
+
+- (bool) convertString:(NSString *_Nonnull const)inStr
+	toHFSVolumeName:(StringPtr _Nonnull const)outStr27
+	error:(out NSError *_Nullable *_Nullable const)outError
+{
+	return [self convertString:inStr
+		toPascalString:outStr27
+		maxLength:sizeof(Str27) - 1
+		error:outError];
+}
+- (bool) convertString:(NSString *_Nonnull const)inStr
+	toHFSItemName:(StringPtr _Nonnull const)outStr31
+	error:(out NSError *_Nullable *_Nullable const)outError
+{
+	return [self convertString:inStr
+		toPascalString:outStr31
+		maxLength:sizeof(Str31) - 1
+		error:outError];
 }
 
 #pragma mark String escaping

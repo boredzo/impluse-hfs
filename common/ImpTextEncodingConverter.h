@@ -14,6 +14,12 @@
 ///Given a text encoding in the type used by the Text Encoding Converter, return its name. Returns nil if TEC does not return a name for this encoding.
 + (NSString *_Nullable) nameOfTextEncoding:(TextEncoding const)hfsTextEncoding;
 
+///Return a text encoding as identified by name.
++ (TextEncoding) textEncodingWithName:(NSString *_Nonnull const)name;
+
+///Given a string identifying a text encoding, return that encoding. Tries textEncodingWithName: first, then tries parsing the string as a number.
++ (TextEncoding) parseTextEncodingSpecification:(NSString *_Nonnull const)encodingSpec error:(out NSError *_Nullable *_Nullable const)outError;
+
 #pragma mark Finder flags parsing
 
 ///Given the extended flags from an ExtendedFileInfo or ExtendedFileInfo structure, return the script code embedded there if it has one, or the supplied default if not.
@@ -48,6 +54,9 @@
 
 #pragma mark Size estimation
 
+///Obtain an estimate of how many bytes might be needed to encode this string in the encoder's HFS text encoding.
+- (size_t) lengthOfEncodedString:(NSString *_Nonnull const)string;
+
 ///Obtain an estimate of how many bytes might be needed to hold the Unicode conversion of this string, including 2 bytes for the length.
 - (ByteCount) estimateSizeOfHFSUniStr255NeededForPascalString:(ConstStr31Param _Nonnull const)pascalString;
 ///Obtain an estimate of how many bytes might be needed to hold the Unicode conversion of this string, including 2 bytes for the length. If length is not 0, it is the maximum length of the string in source bytes (i.e., if the string's length is greater than this limit, the limit should be used instead).
@@ -75,6 +84,15 @@
 
 ///Convert a string to an HFSUniStr255 Pascal-style string. Returns whether the string was completely copied.
 - (bool) convertString:(NSString *_Nonnull const)inStr toHFSUniStr255:(struct HFSUniStr255 *_Nonnull const)outUnicodeName;
+
+///Attempt to convert a string to the converter's selected encoding, respecting the 27-byte limit of an HFS volume name. Returns whether the converter was able to encode the string in its HFS text encoding within the length limit.
+- (bool) convertString:(NSString *_Nonnull const)inStr
+	toHFSVolumeName:(StringPtr _Nonnull const)outStr27
+	error:(out NSError *_Nullable *_Nullable const)outError;
+///Attempt to convert a string to the converter's selected encoding, respecting the 31-byte limit of an HFS item name. Returns whether the converter was able to encode the string in its HFS text encoding within the length limit.
+- (bool) convertString:(NSString *_Nonnull const)inStr
+	toHFSItemName:(StringPtr _Nonnull const)outStr31
+	error:(out NSError *_Nullable *_Nullable const)outError;
 
 #pragma mark String escaping
 
