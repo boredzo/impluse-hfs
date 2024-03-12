@@ -374,18 +374,18 @@
 				//avbstclinmedz (order used by GetFileInfo(1))
 				return [NSString stringWithFormat:@"%c%c%c%c%c%c%c%c%c%c%c%c%c",
 					finderFlags & kIsAlias ? 'A' : 'a',
-						finderFlags & kIsInvisible ? 'V' : 'v',
-						finderFlags & kHasBundle ? 'B' : 'b',
-						finderFlags & kNameLocked ? 'S' : 's',
-						finderFlags & kIsStationery ? 'T' : 't',
-						finderFlags & kHasCustomIcon ? 'C' : 'c',
-						itemFlags & kHFSFileLockedMask  ? 'L' : 'l',
-						finderFlags & kHasBeenInited ? 'I' : 'i',
-						finderFlags & kHasNoINITs ? 'N' : 'n',
-						finderFlags & kIsShared ? 'M' : 'm',
-						'.', //extension hidden—not sure how to get this
-						finderFlags & kIsOnDesk ? 'D' : 'd',
-						extFinderFlags & kExtendedFlagObjectIsBusy ? 'Z' : 'z'
+					finderFlags & kIsInvisible ? 'V' : 'v',
+					finderFlags & kHasBundle ? 'B' : 'b',
+					finderFlags & kNameLocked ? 'S' : 's',
+					finderFlags & kIsStationery ? 'T' : 't',
+					finderFlags & kHasCustomIcon ? 'C' : 'c',
+					itemFlags & kHFSFileLockedMask  ? 'L' : 'l',
+					finderFlags & kHasBeenInited ? 'I' : 'i',
+					finderFlags & kHasNoINITs ? 'N' : 'n',
+					finderFlags & kIsShared ? 'M' : 'm',
+					'.', //extension hidden—not sure how to get this
+					finderFlags & kIsOnDesk ? 'D' : 'd',
+					extFinderFlags & kExtendedFlagObjectIsBusy ? 'Z' : 'z'
 				];
 			};
 			[node forEachHFSPlusCatalogRecord_file:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSPlusCatalogFile *const _Nonnull fileRec) {
