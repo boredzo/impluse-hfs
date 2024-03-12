@@ -123,7 +123,9 @@
 		ImpPrintf(@"Failed to read extents overflow file: %@", (*outError).localizedDescription);
 		return false;
 	}
-	ImpPrintf(@"Extents file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", srcVol.extentsOverflowBTree.numberOfLiveNodes, srcVol.extentsOverflowBTree.numberOfPotentialNodes, srcVol.extentsOverflowBTree.numberOfPotentialNodes > 0 ? (srcVol.extentsOverflowBTree.numberOfLiveNodes / (double)srcVol.extentsOverflowBTree.numberOfPotentialNodes) * 100.0 : 1.0);
+	ImpBTreeFile *_Nonnull const extTree = srcVol.extentsOverflowBTree;
+	ImpPrintf(@"Extents file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", extTree.numberOfLiveNodes, extTree.numberOfPotentialNodes, extTree.numberOfPotentialNodes > 0 ? (extTree.numberOfLiveNodes / (double)extTree.numberOfPotentialNodes) * 100.0 : 1.0);
+	ImpPrintf(@"Extents file has a max depth of %u; its root node is at height %u while its first leaf is at height %u and its last leaf is at height %u (those three may all be the same node)", extTree.headerNode.treeDepth, extTree.headerNode.rootNode.nodeHeight, extTree.headerNode.firstLeafNode.nodeHeight, extTree.headerNode.lastLeafNode.nodeHeight);
 
 	if (! [srcVol readCatalogFileFromFileDescriptor:srcVol.fileDescriptor error:outError]) {
 		ImpPrintf(@"Failed to read catalog file: %@", (*outError).localizedDescription);
@@ -133,7 +135,9 @@
 		ImpPrintf(@"Faults detected in catalog file: %@", (*outError).localizedDescription);
 		return false;
 	}
-	ImpPrintf(@"Catalog file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", srcVol.catalogBTree.numberOfLiveNodes, srcVol.catalogBTree.numberOfPotentialNodes, srcVol.catalogBTree.numberOfPotentialNodes > 0 ? (srcVol.catalogBTree.numberOfLiveNodes / (double)srcVol.catalogBTree.numberOfPotentialNodes) * 100.0 : 1.0);
+	ImpBTreeFile *_Nonnull const catTree = srcVol.catalogBTree;
+	ImpPrintf(@"Catalog file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", catTree.numberOfLiveNodes, catTree.numberOfPotentialNodes, catTree.numberOfPotentialNodes > 0 ? (catTree.numberOfLiveNodes / (double)catTree.numberOfPotentialNodes) * 100.0 : 1.0);
+	ImpPrintf(@"Catalog file has a max depth of %u; its root node is at height %u while its first leaf is at height %u and its last leaf is at height %u (those three may all be the same node)", catTree.headerNode.treeDepth, catTree.headerNode.rootNode.nodeHeight, catTree.headerNode.firstLeafNode.nodeHeight, catTree.headerNode.lastLeafNode.nodeHeight);
 
 	u_int32_t const blockSize = (u_int32_t)srcVol.numberOfBytesPerBlock;
 	void (^_Nonnull const logFork)(char const *_Nonnull const indentString, char const *_Nonnull const forkName, HFSPlusForkData const *_Nonnull const forkPtr) = ^(char const *_Nonnull const indentString, char const *_Nonnull const forkName, HFSPlusForkData const *_Nonnull const forkPtr) {
@@ -163,6 +167,7 @@
 	[hfsPlusVol peekAtHFSPlusVolumeHeader:^(NS_NOESCAPE const struct HFSPlusVolumeHeader *const vhPtr) {
 		ImpPrintf(@"Volume attributes: 0x%08x", L(vhPtr->attributes));
 		ImpPrintf(@"Creation date: %u", L(vhPtr->createDate));
+		ImpPrintf(@"Modification date: %u", L(vhPtr->modifyDate));
 		ImpPrintf(@"Space remaining (from volume header): %u blocks (0x%llx bytes)", L(vhPtr->freeBlocks), L(vhPtr->freeBlocks) * (u_int64_t)hfsPlusVol.numberOfBytesPerBlock);
 		u_int32_t const numBitsFreeInBitmap = [srcVol numberOfBlocksFreeAccordingToBitmap];
 		ImpPrintf(@"Space remaining (from allocations bitmap): %u blocks (0x%llx bytes)", numBitsFreeInBitmap, numBitsFreeInBitmap * (u_int64_t)hfsPlusVol.numberOfBytesPerBlock);
