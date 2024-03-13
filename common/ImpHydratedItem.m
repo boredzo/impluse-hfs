@@ -548,6 +548,7 @@ static NSUInteger originalItemCount = 0;
 	NSMutableArray <ImpHydratedItem *> *_Nonnull const children = [NSMutableArray arrayWithCapacity:childURLs.count];
 	for (NSURL *_Nonnull const childURL in childURLs) {
 		ImpHydratedItem *_Nullable const childItem = [ImpHydratedItem itemWithRealWorldURL:childURL error:outError];
+		childItem.parentFolder = self;
 		if (childItem == nil) {
 			return nil;
 		}
