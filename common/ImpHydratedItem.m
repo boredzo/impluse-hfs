@@ -532,6 +532,11 @@ static NSUInteger originalItemCount = 0;
 #pragma mark Contents
 
 - (NSArray <ImpHydratedItem *> *_Nullable) gatherChildrenOrReturnError:(out NSError *_Nullable *_Nullable const)outError {
+	if (self.realWorldURL == nil) {
+		//An original folder successfully has no real-world children.
+		return @[];
+	}
+
 	NSArray <NSURL *> *_Nullable const childURLs = [[NSFileManager defaultManager] contentsOfDirectoryAtURL:self.realWorldURL
 		includingPropertiesForKeys:@[ NSURLNameKey, NSURLContentModificationDateKey, NSURLCreationDateKey, NSURLContentAccessDateKey, ]
 		options:NSDirectoryEnumerationProducesRelativePathURLs
