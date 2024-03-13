@@ -25,7 +25,6 @@ typedef NS_ENUM(NSUInteger, ImpItemClassification) {
 ///A hydrated item is the opposite a dehydrated item (ImpDehydratedItem). A dehydrated item is an item stored within a source volume, represented to be rehydrated into the real world; a hydrated item is one that exists in the real world, represented to be dehydrated into a destination volume.
 @interface ImpHydratedItem : NSObject <NSCopying>
 {
-	NSURL *_Nonnull _fileURL;
 	NSUInteger _originalItemNumber;
 }
 
@@ -52,6 +51,22 @@ typedef NS_ENUM(NSUInteger, ImpItemClassification) {
 
 ///If an error occurred while accessing any aspect of the file (from metadata such as its length to fork contents), this property will contain that error.
 @property(strong) NSError *_Nullable accessError;
+
+#pragma mark Real-world access
+
+///An existing file handle to use for reading, fstat, etc. openReadingFileHandle will return this file handle if it exists. closeReadingFileHandle will close and destroy it.
+@property(weak) NSFileHandle *_Nullable readingFileHandle;
+
+///Permissions for openReadingFileHandle to use. Subclasses must override this (e.g., for opening directories vs. files). The abstract implementation throws an exception.
+@property(nonatomic) int permissionsForOpening;
+
+///Open the reading file handle if it isn't already, and return it.
+- (NSFileHandle *_Nonnull const) openReadingFileHandle;
+
+///Close the reading file handle if it exists, and destroy it.
+- (void) closeReadingFileHandle;
+
+#pragma mark Hierarchy flattening
 
 ///Adds the receiver, followed by any sub-items, to the given array. If the receiver is a file, then it will add itself only.
 ///The method is allowed but not required to use a fully breadth-first order.

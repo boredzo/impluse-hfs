@@ -96,8 +96,8 @@ static NSUInteger originalItemCount = 0;
 	NSParameterAssert(! [self isMemberOfClass:[ImpHydratedItem class]]);
 
 	if ((self = [super init])) {
-		_fileURL = [fileURL copy];
-		_name = _fileURL.lastPathComponent;
+		_realWorldURL = [fileURL copy];
+		_name = _realWorldURL.lastPathComponent;
 	}
 	return self;
 }
@@ -252,6 +252,33 @@ static NSUInteger originalItemCount = 0;
 	NSParameterAssert(keyData.length <= kHFSPlusCatalogKeyMaximumLength);
 }
 
+#pragma mark Real-world access
+
+- (int) permissionsForOpening {
+	NSAssert(false, @"Method %s not implemented by subclass", sel_getName(_cmd));
+	return 0;
+}
+
+///Open the reading file handle if it isn't already, and return it.
+- (NSFileHandle *_Nonnull const) openReadingFileHandle {
+	NSFileHandle *_Nullable readFH = self.readingFileHandle;
+	if (readFH == nil) {
+		int const readFD = open(self.realWorldURL.fileSystemRepresentation, self.permissionsForOpening, 0444);
+		readFH = [[NSFileHandle alloc] initWithFileDescriptor:readFD closeOnDealloc:true];
+		self.readingFileHandle = readFH;
+	}
+	return readFH;
+}
+
+///Close the reading file handle if it exists, and destroy it.
+- (void) closeReadingFileHandle {
+	NSFileHandle *_Nullable readFH = self.readingFileHandle;
+	if (readFH != nil) {
+		[readFH closeFile];
+		readFH = nil;
+	}
+}
+
 #pragma mark Hierarchy flattening
 
 - (void) recursivelyAddItemsToArray:(NSMutableArray <ImpHydratedItem *> *_Nonnull const)array {
@@ -278,6 +305,14 @@ static NSUInteger originalItemCount = 0;
 	return folderEmojiIcon;
 }
 
+#pragma mark Real-world access
+
+- (int) permissionsForOpening {
+	return O_RDONLY | O_DIRECTORY;
+}
+
+#pragma mark Catalog records
+
 - (bool) fillOutHFSCatalogKey:(NSMutableData *_Nonnull const)keyData
 	hfsCatalogFolder:(NSMutableData *_Nonnull const)payloadData
 	error:(out NSError *_Nullable *_Nullable const)outError
@@ -292,6 +327,7 @@ static NSUInteger originalItemCount = 0;
 	S(folderRecPtr->recordType, kHFSFolderRecord);
 
 	struct stat dirSB = { 0 };
+	struct DXInfo extInfo = { 0 };
 
 	if (self.realWorldURL == nil) {
 		//This is an original item—probably the root directory. Populate the stat block as best we can.
@@ -302,8 +338,8 @@ static NSUInteger originalItemCount = 0;
 		memcpy(&dirSB.st_mtimespec, &now, sizeof(dirSB.st_mtimespec));
 		memcpy(&dirSB.st_atimespec, &now, sizeof(dirSB.st_atimespec));
 	} else {
-		char const *_Nullable const path = self.realWorldURL.fileSystemRepresentation;
-		int const fd = open(path, O_RDONLY | O_DIRECTORY, 0444);
+		NSFileHandle *_Nonnull const readFH = [self openReadingFileHandle];
+		int const fd = readFH.fileDescriptor;
 		if (fd < 0) {
 			int const dirStatErrno = errno;
 			NSError *_Nonnull const dirStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:dirStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Couldn't open folder to catalog it: %@", self.realWorldURL.path] }];
@@ -322,11 +358,11 @@ static NSUInteger originalItemCount = 0;
 			if (outError != NULL) {
 				*outError = dirStatError;
 			}
-			close(fd);
 			return false;
 		}
 
-		ssize_t const finderInfoLength = fgetxattr(fd, "com.apple.FinderInfo", &(folderRecPtr->userInfo), sizeof(folderRecPtr->userInfo), /*position*/ 0, /*options*/ 0);
+		NSMutableData *_Nonnull const finderInfoData = [NSMutableData dataWithLength:sizeof(folderRecPtr->userInfo) + sizeof(folderRecPtr->finderInfo)];
+		ssize_t const finderInfoLength = fgetxattr(fd, "com.apple.FinderInfo", finderInfoData.mutableBytes, finderInfoData.length, /*position*/ 0, /*options*/ 0);
 		if (finderInfoLength < 0) {
 			int const getxattrErrno = errno;
 			NSError *_Nonnull const getxattrError = [NSError errorWithDomain:NSPOSIXErrorDomain code:getxattrErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting Finder info for item %@", self.realWorldURL.path] }];
@@ -334,11 +370,10 @@ static NSUInteger originalItemCount = 0;
 			if (outError != NULL) {
 				*outError = getxattrError;
 			}
-			close(fd);
 			return false;
 		}
-
-		close(fd);
+		[finderInfoData getBytes:&(folderRecPtr->userInfo) range:(NSRange){ 0, sizeof(folderRecPtr->userInfo) }];
+		[finderInfoData getBytes:&(extInfo) range:(NSRange){ sizeof(folderRecPtr->userInfo), sizeof(extInfo) }];
 	}
 
 	UInt8 const lockedMask = ((dirSB.st_flags & UF_IMMUTABLE) ? kHFSFileLockedMask : 0);
@@ -362,7 +397,6 @@ static NSUInteger originalItemCount = 0;
 	S(folderRecPtr->modifyDate, [self hfsDateForTimespec:&dirSB.st_mtimespec]);
 	S(folderRecPtr->backupDate, 0);
 
-	struct DXInfo extInfo = { 0 };
 	ScriptCode script;
 	OSStatus err = RevertTextEncodingToScriptInfo(self.textEncodingConverter.hfsTextEncoding, &script, /*outLanguageID*/ NULL, /*outFontName*/ NULL);
 	if (err != noErr) {
@@ -408,6 +442,7 @@ static NSUInteger originalItemCount = 0;
 	S(folderRecPtr->recordType, kHFSPlusFolderRecord);
 
 	struct stat dirSB = { 0 };
+	struct DXInfo extInfo = { 0 };
 
 	if (self.realWorldURL == nil) {
 		//This is an original item—probably the root directory. Populate the stat block as best we can.
@@ -418,8 +453,8 @@ static NSUInteger originalItemCount = 0;
 		memcpy(&dirSB.st_mtimespec, &now, sizeof(dirSB.st_mtimespec));
 		memcpy(&dirSB.st_atimespec, &now, sizeof(dirSB.st_atimespec));
 	} else {
-		char const *_Nullable const path = self.realWorldURL.fileSystemRepresentation;
-		int const fd = open(path, O_RDONLY | O_DIRECTORY, 0444);
+		NSFileHandle *_Nonnull const readFH = [self openReadingFileHandle];
+		int const fd = readFH.fileDescriptor;
 		if (fd < 0) {
 			int const dirStatErrno = errno;
 			NSError *_Nonnull const dirStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:dirStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Couldn't open folder to catalog it: %@", self.realWorldURL.path] }];
@@ -438,11 +473,11 @@ static NSUInteger originalItemCount = 0;
 			if (outError != NULL) {
 				*outError = dirStatError;
 			}
-			close(fd);
 			return false;
 		}
 
-		ssize_t const finderInfoLength = fgetxattr(fd, "com.apple.FinderInfo", &(folderRecPtr->userInfo), sizeof(folderRecPtr->userInfo), /*position*/ 0, /*options*/ 0);
+		NSMutableData *_Nonnull const finderInfoData = [NSMutableData dataWithLength:sizeof(folderRecPtr->userInfo) + sizeof(folderRecPtr->finderInfo)];
+		ssize_t const finderInfoLength = fgetxattr(fd, "com.apple.FinderInfo", finderInfoData.mutableBytes, finderInfoData.length, /*position*/ 0, /*options*/ 0);
 		if (finderInfoLength < 0) {
 			int const getxattrErrno = errno;
 			NSError *_Nonnull const getxattrError = [NSError errorWithDomain:NSPOSIXErrorDomain code:getxattrErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting Finder info for item %@", self.realWorldURL.path] }];
@@ -450,11 +485,10 @@ static NSUInteger originalItemCount = 0;
 			if (outError != NULL) {
 				*outError = getxattrError;
 			}
-			close(fd);
 			return false;
 	 	}
-
-		close(fd);
+		[finderInfoData getBytes:&(folderRecPtr->userInfo) range:(NSRange){ 0, sizeof(folderRecPtr->userInfo) }];
+		[finderInfoData getBytes:&extInfo range:(NSRange){ sizeof(folderRecPtr->userInfo), sizeof(extInfo) }];
 	}
 
 	/*TN1150 says no flags are defined for folders, so this field is reserved and we have to set it to zero.
@@ -486,7 +520,6 @@ static NSUInteger originalItemCount = 0;
 
 	memset(&folderRecPtr->bsdInfo, 0, sizeof(folderRecPtr->bsdInfo));
 
-	struct DXInfo extInfo = { 0 };
 	ScriptCode script;
 	OSStatus err = RevertTextEncodingToScriptInfo(self.textEncodingConverter.hfsTextEncoding, &script, /*outLanguageID*/ NULL, /*outFontName*/ NULL);
 	if (err != noErr) {
@@ -569,7 +602,7 @@ static NSUInteger originalItemCount = 0;
 
 - (instancetype)initWithRealWorldURL:(NSURL *const)fileURL {
 	if ((self = [super initWithRealWorldURL:fileURL])) {
-		_resourceForkURL = [_fileURL URLByAppendingPathComponent:@"..namedfork/rsrc" isDirectory:false];
+		_resourceForkURL = [self.realWorldURL URLByAppendingPathComponent:@"..namedfork/rsrc" isDirectory:false];
 
 		_numberOfBytesPerBlock = kISOStandardBlockSize;
 		_numberOfBlocksPerDataClump = 4;
@@ -581,6 +614,19 @@ static NSUInteger originalItemCount = 0;
 - (NSString *_Nonnull const) emojiIcon {
 	static NSString *_Nonnull const fileEmojiIcon = @"📄";
 	return fileEmojiIcon;
+}
+
+#pragma mark Real-world access
+
+- (int) permissionsForOpening {
+	return O_RDONLY;
+}
+
+///Like openReadingFileHandle, but for the resource fork. Note: Unlike that method, does not hold onto the file handle anywhere, not even in a weak property.
+- (NSFileHandle *_Nonnull const) openResourceForkReadingFileHandle {
+	int const readFD = open(_resourceForkURL.fileSystemRepresentation, self.permissionsForOpening, 0444);
+	NSFileHandle *_Nonnull const readFH = [[NSFileHandle alloc] initWithFileDescriptor:readFD closeOnDealloc:true];
+	return readFH;
 }
 
 #pragma mark File properties
@@ -633,8 +679,8 @@ static NSUInteger originalItemCount = 0;
 		parentID:parentID
 		nodeName:self.name];
 
-	char const *_Nullable const path = self.realWorldURL.fileSystemRepresentation;
-	int const fd = open(path, O_RDONLY, 0444);
+	NSFileHandle *_Nonnull const readFH = [self openReadingFileHandle];
+	int const fd = readFH.fileDescriptor;
 	if (fd < 0) {
 		int const dataStatErrno = errno;
 		NSError *_Nonnull const dataStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:dataStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Couldn't open file to catalog it: %@", self.realWorldURL.path] }];
@@ -655,7 +701,6 @@ static NSUInteger originalItemCount = 0;
 		if (outError != NULL) {
 			*outError = dataStatError;
 		}
-		close(fd);
 		return false;
 	} else if (dataSB.st_size > INT32_MAX) {
 		NSError *_Nonnull const forkTooBigError = [NSError errorWithDomain:NSOSStatusErrorDomain code:fsDataTooBigErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Data fork is too big in file %@", self.realWorldURL.path] }];
@@ -663,7 +708,6 @@ static NSUInteger originalItemCount = 0;
 		if (outError != NULL) {
 			*outError = forkTooBigError;
 		}
-		close(fd);
 		return false;
 	}
 
@@ -675,7 +719,6 @@ static NSUInteger originalItemCount = 0;
 		if (outError != NULL) {
 			*outError = rsrcStatError;
 		}
-		close(fd);
 		return false;
 	} else if (rsrcSB.st_size > INT32_MAX) {
 		NSError *_Nonnull const forkTooBigError = [NSError errorWithDomain:NSOSStatusErrorDomain code:fsDataTooBigErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Resource fork is too big in file %@", self.realWorldURL.path] }];
@@ -683,7 +726,6 @@ static NSUInteger originalItemCount = 0;
 		if (outError != NULL) {
 			*outError = forkTooBigError;
 		}
-		close(fd);
 		return false;
 	}
 
@@ -696,7 +738,8 @@ static NSUInteger originalItemCount = 0;
 	S(fileRecPtr->flags, lockedMask | hasThreadMask);
 	S(fileRecPtr->fileType, 0);
 
-	ssize_t const finderInfoLength = fgetxattr(fd, "com.apple.FinderInfo", &(fileRecPtr->userInfo), sizeof(fileRecPtr->userInfo), /*position*/ 0, /*options*/ 0);
+	NSMutableData *_Nonnull const finderInfoData = [NSMutableData dataWithLength:sizeof(fileRecPtr->userInfo) + sizeof(fileRecPtr->finderInfo)];
+	ssize_t const finderInfoLength = fgetxattr(fd, "com.apple.FinderInfo", finderInfoData.mutableBytes, finderInfoData.length, /*position*/ 0, /*options*/ 0);
 	if (finderInfoLength < 0) {
 		int const getxattrErrno = errno;
 		NSError *_Nonnull const getxattrError = [NSError errorWithDomain:NSPOSIXErrorDomain code:getxattrErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting Finder info for item %@", self.realWorldURL.path] }];
@@ -704,9 +747,12 @@ static NSUInteger originalItemCount = 0;
 		if (outError != NULL) {
 			*outError = getxattrError;
 		}
-		close(fd);
 		return false;
 	}
+	[finderInfoData getBytes:&(fileRecPtr->userInfo) range:(NSRange){ 0, sizeof(fileRecPtr->userInfo) }];
+	struct FXInfo extInfo = { 0 };
+	[finderInfoData getBytes:&extInfo range:(NSRange){ sizeof(fileRecPtr->userInfo), sizeof(extInfo) }];
+
 	S(fileRecPtr->fileID, self.assignedItemID);
 	S(fileRecPtr->dataStartBlock, 0);
 	S(fileRecPtr->dataLogicalSize, (int32_t)dataSB.st_size);
@@ -717,7 +763,7 @@ static NSUInteger originalItemCount = 0;
 	S(fileRecPtr->createDate, [self hfsDateForTimespec:&dataSB.st_ctimespec]);
 	S(fileRecPtr->modifyDate, [self hfsDateForTimespec:&dataSB.st_mtimespec]);
 	S(fileRecPtr->backupDate, 0);
-	struct FXInfo extInfo = { 0 };
+
 	ScriptCode script;
 	OSStatus err = RevertTextEncodingToScriptInfo(self.textEncodingConverter.hfsTextEncoding, &script, /*outLanguageID*/ NULL, /*outFontName*/ NULL);
 	if (err != noErr) {
@@ -726,7 +772,6 @@ static NSUInteger originalItemCount = 0;
 		if (outError != NULL) {
 			*outError = noScriptCodeError;
 		}
-		close(fd);
 		return false;
 	}
 	S(extInfo.fdScript, (u_int8_t)((script & 0x7f) | 0x80));
@@ -737,7 +782,6 @@ static NSUInteger originalItemCount = 0;
 	memset(fileRecPtr->rsrcExtents, 0, sizeof(fileRecPtr->rsrcExtents));
 	S(fileRecPtr->reserved, 0);
 
-	close(fd);
 	return true;
 }
 - (void) fillOutHFSCatalogKey:(NSMutableData *_Nonnull const)keyData
@@ -764,8 +808,8 @@ static NSUInteger originalItemCount = 0;
 		parentID:parentID
 		nodeName:self.name];
 
-	char const *_Nullable const path = self.realWorldURL.fileSystemRepresentation;
-	int const fd = open(path, O_RDONLY, 0444);
+	NSFileHandle *_Nonnull const readFH = [self openReadingFileHandle];
+	int const fd = readFH.fileDescriptor;
 	if (fd < 0) {
 		int const dataStatErrno = errno;
 		NSError *_Nonnull const dataStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:dataStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Couldn't open file to catalog it: %@", self.realWorldURL.path] }];
@@ -786,7 +830,6 @@ static NSUInteger originalItemCount = 0;
 		if (outError != NULL) {
 			*outError = dataStatError;
 		}
-		close(fd);
 		return false;
 	} else if (dataSB.st_size > INT32_MAX) {
 		NSError *_Nonnull const forkTooBigError = [NSError errorWithDomain:NSOSStatusErrorDomain code:fsDataTooBigErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Data fork is too big in file %@", self.realWorldURL.path] }];
@@ -794,7 +837,6 @@ static NSUInteger originalItemCount = 0;
 		if (outError != NULL) {
 			*outError = forkTooBigError;
 		}
-		close(fd);
 		return false;
 	}
 
@@ -806,7 +848,6 @@ static NSUInteger originalItemCount = 0;
 		if (outError != NULL) {
 			*outError = rsrcStatError;
 		}
-		close(fd);
 		return false;
 	} else if (rsrcSB.st_size > INT32_MAX) {
 		NSError *_Nonnull const forkTooBigError = [NSError errorWithDomain:NSOSStatusErrorDomain code:fsDataTooBigErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Resource fork is too big in file %@", self.realWorldURL.path] }];
@@ -814,7 +855,6 @@ static NSUInteger originalItemCount = 0;
 		if (outError != NULL) {
 			*outError = forkTooBigError;
 		}
-		close(fd);
 		return false;
 	}
 
@@ -838,7 +878,8 @@ static NSUInteger originalItemCount = 0;
 
 	memset(&fileRecPtr->bsdInfo, 0, sizeof(fileRecPtr->bsdInfo));
 
-	ssize_t const finderInfoLength = fgetxattr(fd, "com.apple.FinderInfo", &(fileRecPtr->userInfo), sizeof(fileRecPtr->userInfo), /*position*/ 0, /*options*/ 0);
+	NSMutableData *_Nonnull const finderInfoData = [NSMutableData dataWithLength:sizeof(fileRecPtr->userInfo) + sizeof(fileRecPtr->finderInfo)];
+	ssize_t const finderInfoLength = fgetxattr(fd, "com.apple.FinderInfo", finderInfoData.mutableBytes, finderInfoData.length, /*position*/ 0, /*options*/ 0);
 	if (finderInfoLength < 0) {
 		int const getxattrErrno = errno;
 		NSError *_Nonnull const getxattrError = [NSError errorWithDomain:NSPOSIXErrorDomain code:getxattrErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting Finder info for item %@", self.realWorldURL.path] }];
@@ -846,10 +887,11 @@ static NSUInteger originalItemCount = 0;
 		if (outError != NULL) {
 			*outError = getxattrError;
 		}
-		close(fd);
 		return false;
 	}
+	[finderInfoData getBytes:&(fileRecPtr->userInfo) range:(NSRange){ 0, sizeof(fileRecPtr->userInfo) }];
 	struct FXInfo extInfo = { 0 };
+	[finderInfoData getBytes:&extInfo range:(NSRange){ sizeof(fileRecPtr->userInfo), sizeof(extInfo) }];
 	ScriptCode script;
 	OSStatus err = RevertTextEncodingToScriptInfo(self.textEncodingConverter.hfsTextEncoding, &script, /*outLanguageID*/ NULL, /*outFontName*/ NULL);
 	if (err != noErr) {
@@ -858,7 +900,6 @@ static NSUInteger originalItemCount = 0;
 		if (outError != NULL) {
 			*outError = noScriptCodeError;
 		}
-		close(fd);
 		return false;
 	}
 	S(extInfo.fdScript, (u_int8_t)((script & 0x7f) | 0x80));
@@ -877,7 +918,6 @@ static NSUInteger originalItemCount = 0;
 	S(fileRecPtr->textEncoding, self.textEncodingConverter.hfsTextEncoding);
 	S(fileRecPtr->reserved2, 0);
 
-	close(fd);
 	return true;
 }
 - (void) fillOutHFSPlusCatalogKey:(NSMutableData *_Nonnull const)keyData
@@ -902,39 +942,64 @@ static NSUInteger originalItemCount = 0;
 
 #pragma mark Contents
 
-- (bool) getDataForkLength:(out u_int64_t *_Nonnull const)outLength error:(out NSError *_Nullable *_Nullable const)outError {
-	NSNumber *_Nullable sizeNum = nil;
-	bool const gotLength = [self.realWorldURL getResourceValue:&sizeNum
-		forKey:NSURLFileSizeKey error:outError];
-	if (gotLength && outLength != NULL) {
-		*outLength = sizeNum.unsignedLongLongValue;
+- (bool) getLength:(out u_int64_t *_Nonnull const)outLength
+	fromFileHandle:(NSFileHandle *_Nonnull const)fh
+	path:(NSString *_Nonnull const)path
+	forkName:(NSString *_Nonnull const)forkName
+	error:(out NSError *_Nullable *_Nullable const)outError
+{
+	int const fd = fh.fileDescriptor;
+	struct stat sb;
+	int const statResult = fstat(fd, &sb);
+	if (statResult < 0) {
+		int const statErrno = errno;
+		NSError *_Nonnull const statError = [NSError errorWithDomain:NSPOSIXErrorDomain code:statErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to get %@ fork length for %@: %s", forkName, path, strerror(statErrno)] }];
+		if (outError != NULL) {
+			*outError = statError;
+		}
+		return false;
 	}
-	return gotLength;
+	*outLength = sb.st_size;
+	return true;
+}
+- (bool) getDataForkLength:(out u_int64_t *_Nonnull const)outLength error:(out NSError *_Nullable *_Nullable const)outError {
+	NSFileHandle *_Nonnull const fh = [self openReadingFileHandle];
+	return [self getLength:outLength
+		fromFileHandle:fh
+		path:self.realWorldURL.path
+		forkName:@"data"
+		error:outError];
 }
 - (bool) getResourceForkLength:(out u_int64_t *_Nonnull const)outLength error:(out NSError *_Nullable *_Nullable const)outError {
-	NSNumber *_Nullable sizeNum = nil;
-	bool const gotLength = [_resourceForkURL getResourceValue:&sizeNum
-		forKey:NSURLFileSizeKey error:outError];
-	if (gotLength && outLength != NULL) {
-		*outLength = sizeNum.unsignedLongLongValue;
-	}
-	return gotLength;
+	NSFileHandle *_Nonnull const fh = [self openResourceForkReadingFileHandle];
+	return [self getLength:outLength
+		fromFileHandle:fh
+		path:_resourceForkURL.path
+		forkName:@"resource"
+		error:outError];
 }
 
 - (bool) readFromForkURL:(NSURL *_Nonnull const)realWorldForkURL
 	block:(bool (^_Nonnull const)(NSData *_Nonnull const data))block
+	openFailuresAreFatal:(bool const)openFailuresAreFatal
 	error:(out NSError *_Nullable *_Nullable const)outError
 {
 	NSFileHandle *_Nonnull const readFH = [NSFileHandle fileHandleForReadingFromURL:realWorldForkURL error:outError];
 	if (readFH == nil) {
-		return false;
+		if (openFailuresAreFatal) {
+			return false;
+		} else {
+			//When openFailuresAreFatal is false, if the (presumably resource) fork isn't there, we successfully copy nothing.
+			//Note that *reading* failures (e.g., I/O errors) can still be fatal.
+			return true;
+		}
 	}
 
 	enum { chunkSize = 10485760UL };
 	NSData *_Nullable lastChunkRead = nil;
 	NSError *_Nullable error = nil;
 	bool keepGoing = true;
-	while ((lastChunkRead = [readFH readDataUpToLength:chunkSize error:&error])) {
+	while ((lastChunkRead = [readFH readDataUpToLength:chunkSize error:&error]) && lastChunkRead.length > 0) {
 		keepGoing = block(lastChunkRead);
 	}
 	if (! keepGoing) {
@@ -948,10 +1013,10 @@ static NSUInteger originalItemCount = 0;
 }
 
 - (bool) readDataFork:(bool (^_Nonnull const)(NSData *_Nonnull const data))block error:(out NSError *_Nullable *_Nullable const)outError {
-	return [self readFromForkURL:self.realWorldURL block:block error:outError];
+	return [self readFromForkURL:self.realWorldURL block:block openFailuresAreFatal:true error:outError];
 }
 - (bool) readResourceFork:(bool (^_Nonnull const)(NSData *_Nonnull const data))block error:(out NSError *_Nullable *_Nullable const)outError {
-	return [self readFromForkURL:_resourceForkURL block:block error:outError];
+	return [self readFromForkURL:_resourceForkURL block:block openFailuresAreFatal:false error:outError];
 }
 
 @end
