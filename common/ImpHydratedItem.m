@@ -886,7 +886,7 @@ static NSUInteger originalItemCount = 0;
 	[self fillOutHFSPlusCatalogThreadKey:keyData ownID:self.assignedItemID];
 
 	struct HFSPlusCatalogThread *_Nonnull const threadRecPtr = payloadData.mutableBytes;
-	S(threadRecPtr->recordType, kHFSFileThreadRecord);
+	S(threadRecPtr->recordType, kHFSPlusFileThreadRecord);
 	ImpHydratedFolder *_Nullable const parentFolder = self.parentFolder;
 	HFSCatalogNodeID const parentID = parentFolder != nil ? parentFolder.assignedItemID : kHFSRootParentID;
 	S(threadRecPtr->parentID, parentID);
