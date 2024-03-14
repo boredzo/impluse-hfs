@@ -25,7 +25,15 @@ static int64_t hfsEpochTISRD = -3061152000; //1904-01-01T00:00:00Z timeIntervalS
 
 static NSUInteger originalItemCount = 0;
 
+static struct HFSUniStr255 dataForkName = { .length = 0 };
+static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', 'E', 'S', 'O', 'U', 'R', 'C', 'E' } };
+
 @implementation ImpHydratedItem
+
++ (void) initialize {
+	FSGetDataForkName(&dataForkName);
+	FSGetResourceForkName(&resourceForkName);
+}
 
 + (ImpItemClassification) classifyRealWorldURL:(NSURL *_Nonnull const)fileURL error:(out NSError *_Nullable *_Nullable const)outError {
 	struct stat sb;
@@ -595,14 +603,16 @@ static NSUInteger originalItemCount = 0;
 
 @implementation ImpHydratedFile
 {
-	NSURL *_Nonnull _resourceForkURL;
+	FSRef _ref;
 	HFSExtentRecord _hfsDataForkExtents, _hfsRsrcForkExtents;
 	HFSPlusExtentRecord _hfsPlusDataForkExtents, _hfsPlusRsrcForkExtents;
 }
 
 - (instancetype _Nullable)initWithRealWorldURL:(NSURL *_Nonnull const)fileURL {
 	if ((self = [super initWithRealWorldURL:fileURL])) {
-		_resourceForkURL = [self.realWorldURL URLByAppendingPathComponent:@"..namedfork/rsrc" isDirectory:false];
+		if (! CFURLGetFSRef((__bridge CFURLRef)self.realWorldURL, &_ref)) {
+			self = nil;
+		}
 
 		_numberOfBytesPerBlock = kISOStandardBlockSize;
 		_numberOfBlocksPerDataClump = 4;
@@ -620,13 +630,6 @@ static NSUInteger originalItemCount = 0;
 
 - (int) permissionsForOpening {
 	return O_RDONLY;
-}
-
-///Like openReadingFileHandle, but for the resource fork. Note: Unlike that method, does not hold onto the file handle anywhere, not even in a weak property.
-- (NSFileHandle *_Nonnull const) openResourceForkReadingFileHandle {
-	int const readFD = open(_resourceForkURL.fileSystemRepresentation, self.permissionsForOpening, 0444);
-	NSFileHandle *_Nonnull const readFH = [[NSFileHandle alloc] initWithFileDescriptor:readFD closeOnDealloc:true];
-	return readFH;
 }
 
 #pragma mark File properties
@@ -798,6 +801,10 @@ static NSUInteger originalItemCount = 0;
 	memset(threadRecPtr->reserved, 0, sizeof(threadRecPtr->reserved));
 }
 
+- (u_int32_t) hfsTimestampFromUTCDateTime:(struct UTCDateTime const *_Nonnull const)utcDateTime {
+	return utcDateTime->lowSeconds;
+}
+
 - (bool) fillOutHFSPlusCatalogKey:(NSMutableData *_Nonnull const)keyData
 	hfsPlusCatalogFile:(NSMutableData *_Nonnull const)payloadData
 	error:(out NSError *_Nullable *_Nullable const)outError
@@ -808,96 +815,43 @@ static NSUInteger originalItemCount = 0;
 		parentID:parentID
 		nodeName:self.name];
 
-	NSFileHandle *_Nonnull const readFH = [self openReadingFileHandle];
-	int const fd = readFH.fileDescriptor;
-	if (fd < 0) {
-		int const dataStatErrno = errno;
-		NSError *_Nonnull const dataStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:dataStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Couldn't open file to catalog it: %@", self.realWorldURL.path] }];
-		self.accessError = dataStatError;
-		if (outError != NULL) {
-			*outError = dataStatError;
-		}
-		return false;
-	}
-
-	struct stat dataSB = { 0 }, rsrcSB = { 0 };
-
-	int const dataStatResult = fstat(fd, &dataSB);
-	if (dataStatResult < 0) {
-		int const dataStatErrno = errno;
-		NSError *_Nonnull const dataStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:dataStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting vital statistics for data fork of item %@", self.realWorldURL.path] }];
-		self.accessError = dataStatError;
-		if (outError != NULL) {
-			*outError = dataStatError;
-		}
-		return false;
-	} else if (dataSB.st_size > INT32_MAX) {
-		NSError *_Nonnull const forkTooBigError = [NSError errorWithDomain:NSOSStatusErrorDomain code:fsDataTooBigErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Data fork is too big in file %@", self.realWorldURL.path] }];
-		self.accessError = forkTooBigError;
-		if (outError != NULL) {
-			*outError = forkTooBigError;
-		}
-		return false;
-	}
-
-	int const rsrcStatResult = stat(_resourceForkURL.fileSystemRepresentation, &rsrcSB);
-	//fstat(fdRF, &rsrcSB);
-	if (rsrcStatResult < 0) {
-		int const rsrcStatErrno = errno;
-		//Some files just don't have a resource fork, in which case this fails with ENOENT. Ignore it and consider the resource fork empty.
-		if (rsrcStatErrno != ENOENT) {
-			NSError *_Nonnull const rsrcStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:rsrcStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting vital statistics for resource fork of item %@: %s", self.realWorldURL.path, strerror(errno)] }];
-			self.accessError = rsrcStatError;
-			if (outError != NULL) {
-				*outError = rsrcStatError;
-			}
-			return false;
-		}
-	} else if (rsrcSB.st_size > INT32_MAX) {
-		NSError *_Nonnull const forkTooBigError = [NSError errorWithDomain:NSOSStatusErrorDomain code:fsDataTooBigErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Resource fork is too big in file %@", self.realWorldURL.path] }];
-		self.accessError = forkTooBigError;
-		if (outError != NULL) {
-			*outError = forkTooBigError;
-		}
-		return false;
-	}
+	struct FSCatalogInfo catInfo = { 0 };
+	OSStatus err = FSGetCatalogInfo(&_ref, kFSCatInfoAllDates | kFSCatInfoNodeFlags | kFSCatInfoFinderInfo | kFSCatInfoFinderXInfo | kFSCatInfoTextEncoding | kFSCatInfoDataSizes | kFSCatInfoRsrcSizes | kFSCatInfoPermissions, &catInfo, /*outUnicodeName*/ NULL, /*outFSSpec*/ NULL, /*outParentRef*/ NULL);
 
 	u_int32_t const blockSize = self.numberOfBytesPerBlock;
 
 	struct HFSPlusCatalogFile *_Nonnull const fileRecPtr = payloadData.mutableBytes;
 	S(fileRecPtr->recordType, kHFSPlusFileRecord);
 
-	UInt8 const lockedMask = ((dataSB.st_flags & UF_IMMUTABLE) ? kHFSFileLockedMask : 0);
+	UInt8 const lockedMask = (
+		catInfo.nodeFlags & kFSNodeLockedMask
+		? kHFSFileLockedMask
+		: 0
+	);
 	//We always create a thread record, so always set this to true.
 	UInt8 const hasThreadMask = kHFSThreadExistsMask;
 	S(fileRecPtr->flags, lockedMask | hasThreadMask);
 	S(fileRecPtr->reserved1, 0);
 
 	S(fileRecPtr->fileID, self.assignedItemID);
-	S(fileRecPtr->createDate, [self hfsDateForTimespec:&dataSB.st_ctimespec]);
-	S(fileRecPtr->contentModDate, [self hfsDateForTimespec:&dataSB.st_mtimespec]);
-	S(fileRecPtr->attributeModDate, [self hfsDateForTimespec:&dataSB.st_mtimespec]);
-	S(fileRecPtr->accessDate, [self hfsDateForTimespec:&dataSB.st_atimespec]);
-	S(fileRecPtr->backupDate, 0);
+	S(fileRecPtr->createDate, [self hfsTimestampFromUTCDateTime:&catInfo.createDate]);
+	S(fileRecPtr->contentModDate, [self hfsTimestampFromUTCDateTime:&catInfo.contentModDate]);
+	S(fileRecPtr->attributeModDate, [self hfsTimestampFromUTCDateTime:&catInfo.attributeModDate]);
+	S(fileRecPtr->accessDate, [self hfsTimestampFromUTCDateTime:&catInfo.accessDate]);
+	S(fileRecPtr->backupDate, [self hfsTimestampFromUTCDateTime:&catInfo.backupDate]);
 
-	memset(&fileRecPtr->bsdInfo, 0, sizeof(fileRecPtr->bsdInfo));
+	S(fileRecPtr->bsdInfo.ownerID, catInfo.permissions.userID);
+	S(fileRecPtr->bsdInfo.groupID, catInfo.permissions.groupID);
+	S(fileRecPtr->bsdInfo.fileMode, catInfo.permissions.mode);
+	S(fileRecPtr->bsdInfo.ownerFlags, 0);
+	S(fileRecPtr->bsdInfo.adminFlags, 0);
+	S(fileRecPtr->bsdInfo.special.linkCount, 0);
 
-	NSMutableData *_Nonnull const finderInfoData = [NSMutableData dataWithLength:sizeof(fileRecPtr->userInfo) + sizeof(fileRecPtr->finderInfo)];
-	ssize_t const finderInfoLength = fgetxattr(fd, "com.apple.FinderInfo", finderInfoData.mutableBytes, finderInfoData.length, /*position*/ 0, /*options*/ 0);
-	if (finderInfoLength < 0) {
-		int const getxattrErrno = errno;
-		NSError *_Nonnull const getxattrError = [NSError errorWithDomain:NSPOSIXErrorDomain code:getxattrErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting Finder info for item %@", self.realWorldURL.path] }];
-		self.accessError = getxattrError;
-		if (outError != NULL) {
-			*outError = getxattrError;
-		}
-		return false;
-	}
-	[finderInfoData getBytes:&(fileRecPtr->userInfo) range:(NSRange){ 0, sizeof(fileRecPtr->userInfo) }];
+	memcpy(&(fileRecPtr->userInfo), &(catInfo.finderInfo), sizeof(fileRecPtr->userInfo));
 	struct FXInfo extInfo = { 0 };
-	[finderInfoData getBytes:&extInfo range:(NSRange){ sizeof(fileRecPtr->userInfo), sizeof(extInfo) }];
+	memcpy(&extInfo, &(catInfo.extFinderInfo), sizeof(extInfo));
 	ScriptCode script;
-	OSStatus err = RevertTextEncodingToScriptInfo(self.textEncodingConverter.hfsTextEncoding, &script, /*outLanguageID*/ NULL, /*outFontName*/ NULL);
+	err = RevertTextEncodingToScriptInfo(self.textEncodingConverter.hfsTextEncoding, &script, /*outLanguageID*/ NULL, /*outFontName*/ NULL);
 	if (err != noErr) {
 		NSError *_Nonnull const noScriptCodeError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Can't find script code for encoding %@", [ImpTextEncodingConverter nameOfTextEncoding:self.textEncodingConverter.hfsTextEncoding]] }];
 		self.accessError = noScriptCodeError;
@@ -910,20 +864,17 @@ static NSUInteger originalItemCount = 0;
 	//TODO: If the resource fork contains a routing resource, we should set kExtendedFlagHasRoutingInfo in extInfo.fdXFlags.
 	memcpy(&fileRecPtr->finderInfo, &extInfo, sizeof(fileRecPtr->finderInfo));
 
-	S(fileRecPtr->dataFork.logicalSize, (int32_t)dataSB.st_size);
+	S(fileRecPtr->dataFork.logicalSize, catInfo.dataLogicalSize);
 	memset(fileRecPtr->dataFork.extents, 0, sizeof(fileRecPtr->dataFork.extents));
 	S(fileRecPtr->dataFork.totalBlocks, 0);
 	S(fileRecPtr->dataFork.clumpSize, blockSize * self.numberOfBlocksPerDataClump);
-	S(fileRecPtr->resourceFork.logicalSize, (int32_t)rsrcSB.st_size);
+	S(fileRecPtr->resourceFork.logicalSize, catInfo.rsrcLogicalSize);
 	memset(fileRecPtr->resourceFork.extents, 0, sizeof(fileRecPtr->resourceFork.extents));
 	S(fileRecPtr->resourceFork.totalBlocks, 0);
 	S(fileRecPtr->resourceFork.clumpSize, blockSize * self.numberOfBlocksPerResourceClump);
 
-	S(fileRecPtr->textEncoding, self.textEncodingConverter.hfsTextEncoding);
+	S(fileRecPtr->textEncoding, catInfo.textEncodingHint);
 	S(fileRecPtr->reserved2, 0);
-	if (self.assignedItemID == 40) {
-		ImpPrintf(@"Beep boop!");
-	}
 
 	return true;
 }
@@ -990,66 +941,71 @@ static NSUInteger originalItemCount = 0;
 	return true;
 }
 - (bool) getDataForkLength:(out u_int64_t *_Nonnull const)outLength error:(out NSError *_Nullable *_Nullable const)outError {
-	NSNumber *_Nullable lengthNum = nil;
-	bool const gotLength = [self.realWorldURL getResourceValue:&lengthNum forKey:NSURLFileSizeKey error:outError];
-	if (gotLength) {
-		*outLength = lengthNum.unsignedLongLongValue;
+	struct FSCatalogInfo catInfo = { 0 };
+	OSStatus const err = FSGetCatalogInfo(&_ref, kFSCatInfoDataSizes, &catInfo, /*outUnicodeName*/ NULL, /*outFSSpec*/ NULL, /*outParentRef*/ NULL);
+	bool const success = (err == noErr);
+	if (success) {
+		*outLength = catInfo.dataLogicalSize;
+	} else {
+		NSError *_Nonnull const getCatInfoError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Couldn't get data fork logical length for %@: %d/%s", self.realWorldURL.path, err, GetMacOSStatusCommentString(err)] }];
+		if (outError != NULL) {
+			*outError = getCatInfoError;
+		}
 	}
-	return gotLength;
-
-	NSFileHandle *_Nonnull const fh = [self openReadingFileHandle];
-	return [self getLength:outLength
-		fromFileHandle:fh
-		path:self.realWorldURL.path
-		forkName:@"data"
-		error:outError];
+	return success;
 }
 - (bool) getResourceForkLength:(out u_int64_t *_Nonnull const)outLength error:(out NSError *_Nullable *_Nullable const)outError {
-	/*
-	NSNumber *_Nullable lengthNum = nil;
-	bool const gotLength = [self.realWorldURL getResourceValue:&lengthNum forKey:NSURLFileSizeKey error:outError];
-	if (gotLength) {
-		*outLength = lengthNum.unsignedLongLongValue;
+	struct FSCatalogInfo catInfo = { 0 };
+	OSStatus const err = FSGetCatalogInfo(&_ref, kFSCatInfoRsrcSizes, &catInfo, /*outUnicodeName*/ NULL, /*outFSSpec*/ NULL, /*outParentRef*/ NULL);
+	bool const success = (err == noErr);
+	if (success) {
+		*outLength = catInfo.rsrcLogicalSize;
 	} else {
-		*outLength = 0;
+		NSError *_Nonnull const getCatInfoError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Couldn't get resource fork logical length for %@: %d/%s", self.realWorldURL.path, err, GetMacOSStatusCommentString(err)] }];
+		if (outError != NULL) {
+			*outError = getCatInfoError;
+		}
 	}
-	return true;
-	 */
-
-	NSFileHandle *_Nonnull const fh = [self openResourceForkReadingFileHandle];
-	return [self getLength:outLength
-		fromFileHandle:fh
-		path:_resourceForkURL.path
-		forkName:@"resource"
-		error:outError];
+	return success;
 }
 
-- (bool) readFromForkURL:(NSURL *_Nonnull const)realWorldForkURL
+- (bool) readFromForkNamed:(ConstHFSUniStr255Param _Nonnull const)forkName
 	block:(bool (^_Nonnull const)(NSData *_Nonnull const data))block
 	openFailuresAreFatal:(bool const)openFailuresAreFatal
 	error:(out NSError *_Nullable *_Nullable const)outError
 {
-	NSFileHandle *_Nonnull const readFH = [NSFileHandle fileHandleForReadingFromURL:realWorldForkURL error:outError];
-	if (readFH == nil) {
-		if (openFailuresAreFatal) {
-			return false;
-		} else {
-			//When openFailuresAreFatal is false, if the (presumably resource) fork isn't there, we successfully copy nothing.
-			//Note that *reading* failures (e.g., I/O errors) can still be fatal.
-			return true;
+	FSIORefNum fileRefNum = -1;
+	OSStatus err = FSOpenFork(&_ref, forkName->length, forkName->unicode, fsRdPerm, &fileRefNum);
+	if (err == eofErr) {
+		//No/empty resource fork. This is an immediate success condition.
+		return true;
+	}
+	if (err != noErr) {
+		NSError *_Nonnull const openFailError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to open %@ fork of %@: %d/%s", forkName == &dataForkName ? @"data" : @"resource", self.realWorldURL.path, err, GetMacOSStatusCommentString(err) ] }];
+		if (outError != NULL) {
+			*outError = openFailError;
 		}
+		return false;
 	}
 
 	enum { chunkSize = 10485760UL };
-	NSData *_Nullable lastChunkRead = nil;
-	NSError *_Nullable error = nil;
+	NSMutableData *_Nonnull const chunkData = [NSMutableData dataWithLength:chunkSize];
 	bool keepGoing = true;
-	while ((lastChunkRead = [readFH readDataUpToLength:chunkSize error:&error]) && lastChunkRead.length > 0) {
-		keepGoing = block(lastChunkRead);
+	ByteCount amtRead = 0;
+	while ((err = FSReadFork(fileRefNum, fsAtMark, /*offset*/ +0, /*requestCount*/ chunkSize, chunkData.mutableBytes, &amtRead)) == noErr && amtRead > 0) {
+		chunkData.length = amtRead;
+		keepGoing = block(chunkData);
+		chunkData.length = chunkSize;
 	}
+	FSCloseFork(fileRefNum);
 	if (! keepGoing) {
+		return false;
+	} else if (err == eofErr) {
+		//We successfully read everything.
+	} else if (err != noErr) {
+		NSError *_Nonnull const readFailError = [NSError errorWithDomain:NSOSStatusErrorDomain code:err userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to read from %@ fork of %@: %d/%s", forkName == &dataForkName ? @"data" : @"resource", self.realWorldURL.path, err, GetMacOSStatusCommentString(err) ] }];
 		if (outError != NULL) {
-			*outError = error;
+			*outError = readFailError;
 		}
 		return false;
 	}
@@ -1058,10 +1014,10 @@ static NSUInteger originalItemCount = 0;
 }
 
 - (bool) readDataFork:(bool (^_Nonnull const)(NSData *_Nonnull const data))block error:(out NSError *_Nullable *_Nullable const)outError {
-	return [self readFromForkURL:self.realWorldURL block:block openFailuresAreFatal:true error:outError];
+	return [self readFromForkNamed:&dataForkName block:block openFailuresAreFatal:true error:outError];
 }
 - (bool) readResourceFork:(bool (^_Nonnull const)(NSData *_Nonnull const data))block error:(out NSError *_Nullable *_Nullable const)outError {
-	return [self readFromForkURL:_resourceForkURL block:block openFailuresAreFatal:false error:outError];
+	return [self readFromForkNamed:&resourceForkName block:block openFailuresAreFatal:false error:outError];
 }
 
 @end
