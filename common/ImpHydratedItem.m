@@ -820,7 +820,7 @@ static NSUInteger originalItemCount = 0;
 		return false;
 	}
 
-	struct stat dataSB, rsrcSB;
+	struct stat dataSB = { 0 }, rsrcSB = { 0 };
 
 	int const dataStatResult = fstat(fd, &dataSB);
 	if (dataStatResult < 0) {
@@ -840,15 +840,19 @@ static NSUInteger originalItemCount = 0;
 		return false;
 	}
 
-	int const rsrcStatResult = fstat(fd, &rsrcSB);
+	int const rsrcStatResult = stat(_resourceForkURL.fileSystemRepresentation, &rsrcSB);
+	//fstat(fdRF, &rsrcSB);
 	if (rsrcStatResult < 0) {
 		int const rsrcStatErrno = errno;
-		NSError *_Nonnull const rsrcStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:rsrcStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting vital statistics for resource fork of item %@", self.realWorldURL.path] }];
-		self.accessError = rsrcStatError;
-		if (outError != NULL) {
-			*outError = rsrcStatError;
+		//Some files just don't have a resource fork, in which case this fails with ENOENT. Ignore it and consider the resource fork empty.
+		if (rsrcStatErrno != ENOENT) {
+			NSError *_Nonnull const rsrcStatError = [NSError errorWithDomain:NSPOSIXErrorDomain code:rsrcStatErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failure getting vital statistics for resource fork of item %@: %s", self.realWorldURL.path, strerror(errno)] }];
+			self.accessError = rsrcStatError;
+			if (outError != NULL) {
+				*outError = rsrcStatError;
+			}
+			return false;
 		}
-		return false;
 	} else if (rsrcSB.st_size > INT32_MAX) {
 		NSError *_Nonnull const forkTooBigError = [NSError errorWithDomain:NSOSStatusErrorDomain code:fsDataTooBigErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Resource fork is too big in file %@", self.realWorldURL.path] }];
 		self.accessError = forkTooBigError;
@@ -917,6 +921,9 @@ static NSUInteger originalItemCount = 0;
 
 	S(fileRecPtr->textEncoding, self.textEncodingConverter.hfsTextEncoding);
 	S(fileRecPtr->reserved2, 0);
+	if (self.assignedItemID == 40) {
+		ImpPrintf(@"Beep boop!");
+	}
 
 	return true;
 }
@@ -949,6 +956,26 @@ static NSUInteger originalItemCount = 0;
 	error:(out NSError *_Nullable *_Nullable const)outError
 {
 	int const fd = fh.fileDescriptor;
+	off_t const whereWeLeftOff = lseek(fd, 0, SEEK_CUR);
+	off_t const theEnd = lseek(fd, 0, SEEK_END);
+	if (theEnd >= 0) {
+		*outLength = theEnd;
+	} else {
+		int const seekErrno = errno;
+		NSError *_Nonnull const seekError = [NSError errorWithDomain:NSPOSIXErrorDomain code:seekErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to get %@ fork length for %@: %s", forkName, path, strerror(seekErrno)] }];
+		if (outError != NULL) {
+			*outError = seekError;
+		}
+		return false;
+	}
+	if (whereWeLeftOff >= 0) {
+		lseek(fd, whereWeLeftOff, SEEK_SET);
+	}
+	if ([path.lastPathComponent isEqualToString:@"Desktop"] || [path.stringByDeletingLastPathComponent.stringByDeletingLastPathComponent.lastPathComponent isEqualToString:@"Desktop"]) {
+		ImpPrintf(@"Weighing the %@ fork of the Desktop: %llu", forkName, theEnd);
+	}
+	return true;
+
 	struct stat sb;
 	int const statResult = fstat(fd, &sb);
 	if (statResult < 0) {
@@ -963,6 +990,13 @@ static NSUInteger originalItemCount = 0;
 	return true;
 }
 - (bool) getDataForkLength:(out u_int64_t *_Nonnull const)outLength error:(out NSError *_Nullable *_Nullable const)outError {
+	NSNumber *_Nullable lengthNum = nil;
+	bool const gotLength = [self.realWorldURL getResourceValue:&lengthNum forKey:NSURLFileSizeKey error:outError];
+	if (gotLength) {
+		*outLength = lengthNum.unsignedLongLongValue;
+	}
+	return gotLength;
+
 	NSFileHandle *_Nonnull const fh = [self openReadingFileHandle];
 	return [self getLength:outLength
 		fromFileHandle:fh
@@ -971,6 +1005,17 @@ static NSUInteger originalItemCount = 0;
 		error:outError];
 }
 - (bool) getResourceForkLength:(out u_int64_t *_Nonnull const)outLength error:(out NSError *_Nullable *_Nullable const)outError {
+	/*
+	NSNumber *_Nullable lengthNum = nil;
+	bool const gotLength = [self.realWorldURL getResourceValue:&lengthNum forKey:NSURLFileSizeKey error:outError];
+	if (gotLength) {
+		*outLength = lengthNum.unsignedLongLongValue;
+	} else {
+		*outLength = 0;
+	}
+	return true;
+	 */
+
 	NSFileHandle *_Nonnull const fh = [self openResourceForkReadingFileHandle];
 	return [self getLength:outLength
 		fromFileHandle:fh

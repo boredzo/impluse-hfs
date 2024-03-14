@@ -21,6 +21,7 @@ typedef NS_ENUM(NSUInteger, ImpItemClassification) {
 
 @class ImpTextEncodingConverter;
 @class ImpHydratedFolder;
+@class ImpCatalogItem;
 
 ///A hydrated item is the opposite a dehydrated item (ImpDehydratedItem). A dehydrated item is an item stored within a source volume, represented to be rehydrated into the real world; a hydrated item is one that exists in the real world, represented to be dehydrated into a destination volume.
 @interface ImpHydratedItem : NSObject <NSCopying>
@@ -48,6 +49,9 @@ typedef NS_ENUM(NSUInteger, ImpItemClassification) {
 
 ///The folder that the item resides in. If nil, catalog records will be written with the parent folder ID being the parent of the volume root (i.e., the receiver is the root folder).
 @property(weak) ImpHydratedFolder *_Nullable parentFolder;
+
+///Stash the catalog item from a catalog builder here for when the catalog item needs to be updated to pick up changes to the hydrated item's catalog records.
+@property(weak) ImpCatalogItem *_Nullable catalogItem;
 
 ///If an error occurred while accessing any aspect of the file (from metadata such as its length to fork contents), this property will contain that error.
 @property(strong) NSError *_Nullable accessError;

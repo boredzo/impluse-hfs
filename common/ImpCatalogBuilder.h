@@ -44,6 +44,9 @@
 @property(readonly) HFSCatalogNodeID nextCatalogNodeID;
 @property(readonly) bool hasReusedCatalogNodeIDs;
 
+///Flag that previously-exported catalog items are now dirty. This will cause the catalog to be rebuilt.
+- (void) catalogItemsAreDirty;
+
 ///Populate a real tree with the records added so far. Note that this method does not work incrementally, so it should only be used on a real tree. Create the tree with a number of nodes equal to or greater than totalNodeCount.
 - (void) populateTree:(ImpMutableBTreeFile *_Nonnull const)tree;
 

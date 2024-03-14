@@ -106,8 +106,14 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 	NSParameterAssert(rootDirItem.name != nil);
 	rootDirItem.assignedItemID = kHFSRootFolderID;
 
+	NSArray <ImpHydratedItem *> *_Nullable rootChildItems = [rootDirItem gatherChildrenOrReturnError:outError];
+	if (! rootChildItems) {
+		return false;
+	}
+
 	NSMutableSet <ImpHydratedItem *> *_Nonnull const itemsInsideTheRootFolder = [NSMutableSet setWithCapacity:rootDirItem.contents.count + self.sourceItems.count];
-	for (ImpHydratedItem *_Nonnull const item in rootDirItem.contents) {
+	rootDirItem.contents = rootChildItems;
+	for (ImpHydratedItem *_Nonnull const item in rootChildItems) {
 		[itemsInsideTheRootFolder addObject:item];
 	}
 	for (ImpHydratedItem *_Nonnull const item in self.sourceItems) {
@@ -121,9 +127,17 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 	for (ImpHydratedItem *_Nonnull const item in itemsInsideTheRootFolder) {
 		if ([item isKindOfClass:[ImpHydratedFolder class]]) {
 			++numFolders;
+
+			ImpHydratedFolder *_Nonnull const folder = (ImpHydratedFolder *)item;
+			NSArray <ImpHydratedItem *> *_Nonnull const children = [folder gatherChildrenOrReturnError:outError];
+			if (! children) {
+				return false;
+			}
+			folder.contents = children;
 		} else {
 			++numFiles;
 		}
+
 		[item recursivelyAddItemsToArray:allItems];
 	}
 
@@ -152,6 +166,7 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 	HFSCatalogNodeID cnidCounter = kHFSFirstUserCatalogNodeID;
 
 	NSMutableDictionary <ImpHydratedFile *, ImpCatalogItem *> *_Nonnull const catalogItemsForFiles = [NSMutableDictionary dictionaryWithCapacity:allItems.count];
+	NSMutableArray <ImpHydratedFile *> *_Nonnull const allFiles = [NSMutableArray arrayWithCapacity:numFiles];
 	for (ImpHydratedItem *_Nonnull const item in allItems) {
 		item.textEncodingConverter = tec;
 		//This has to be conditional because the root item already has a CNID.
@@ -182,6 +197,7 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 			ImpCatalogItem *_Nonnull const catItemForFolderRecord = [catBuilder addKey:folderKey folderRecord:folderRec];
 			ImpCatalogItem *_Nonnull const catItemForThreadRecord = [catBuilder addKey:folderThreadKey threadRecord:folderThreadRec];
 			NSAssert(catItemForFolderRecord == catItemForThreadRecord, @"Catalog builder didn't recognize these folder and thread records as belonging to the same item!");
+			folder.catalogItem = catItemForFolderRecord;
 		} else {
 #pragma mark — File catalog records
 			ImpHydratedFile *_Nonnull const file = (ImpHydratedFile *)item;
@@ -189,8 +205,11 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 			u_int64_t dataForkLogicalLength = 0, rsrcForkLogicalLength = 0;
 			bool const gotDFLength = [file getDataForkLength:&dataForkLogicalLength error:outError];
 			bool const gotRFLength = [file getResourceForkLength:&rsrcForkLogicalLength error:outError];
-			if (! (gotDFLength && gotRFLength)) {
+			if (! gotDFLength) {
 				return false;
+			}
+			if (! gotRFLength) {
+				//Yeah, that can fail. Some files simply don't have a resource fork at all. We treat this as having a length of zero.
 			}
 
 			if (needsBlocksCounted) {
@@ -219,11 +238,13 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 			ImpCatalogItem *_Nonnull const catItemForThreadRecord = [catBuilder addKey:fileThreadKey threadRecord:fileThreadRec];
 			NSAssert(catItemForFileRecord == catItemForThreadRecord, @"Catalog builder didn't recognize these file and thread records as belonging to the same item!");
 			catalogItemsForFiles[file] = catItemForFileRecord;
+			file.catalogItem = catItemForFileRecord;
+			[allFiles addObject:file];
 		}
 	}
 
 	ImpMutableBTreeFile *_Nonnull const catTree = [[ImpMutableBTreeFile alloc] initWithVersion:catalogVersion bytesPerNode:catBytesPerNode nodeCount:catBuilder.totalNodeCount];
-	[catBuilder populateTree:catTree];
+//	[catBuilder populateTree:catTree];
 	u_int32_t const catalogBlockCount = (u_int32_t)ImpCeilingDivide([catTree lengthInBytes], (u_int64_t)blockSize);
 
 	ImpMutableBTreeFile *_Nonnull const extentsOverflowTree = [[ImpMutableBTreeFile alloc] initWithVersion:extentsOverflowVersion bytesPerNode:extBytesPerNode nodeCount:2];
@@ -363,6 +384,19 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 		}
 		return false;
 	}
+
+	HFSPlusExtentRecord extentsOverflowExtents = { { 0, 0 }, { 0, 0 } };
+	struct HFSPlusExtentDescriptor const *_Nonnull const extExtentsPtr = extentsOverflowExtents;
+	bool const allocatedExtentsOverflow = [hfsPlusVol allocateBlocks:extentsOverflowBlockCount forFork:ImpForkTypeSpecialFileContents getExtent:extentsOverflowExtents];
+	if (! allocatedExtentsOverflow) {
+		NSError *_Nonnull const noSpaceForExtError = [NSError errorWithDomain:NSOSStatusErrorDomain code:dskFulErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Could not allocate %llu bytes for extents overflow tree in new volume", extentsOverflowTree.lengthInBytes] }];
+		if (outError != NULL) {
+			*outError = noSpaceForExtError;
+		}
+		return false;
+	}
+
+#if 0
 	__block bool wroteCatalog = false;
 	__block NSError *_Nullable catWriteError = nil;
 	[catTree serializeToData:^(NSData *const  _Nonnull data) {
@@ -372,17 +406,6 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 	if (! wroteCatalog) {
 		if (outError != NULL) {
 			*outError = catWriteError;
-		}
-		return false;
-	}
-
-	HFSPlusExtentRecord extentsOverflowExtents = { { 0, 0 }, { 0, 0 } };
-	struct HFSPlusExtentDescriptor const *_Nonnull const extExtentsPtr = extentsOverflowExtents;
-	bool const allocatedExtentsOverflow = [hfsPlusVol allocateBlocks:extentsOverflowBlockCount forFork:ImpForkTypeSpecialFileContents getExtent:extentsOverflowExtents];
-	if (! allocatedExtentsOverflow) {
-		NSError *_Nonnull const noSpaceForExtError = [NSError errorWithDomain:NSOSStatusErrorDomain code:dskFulErr userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Could not allocate %llu bytes for extents overflow tree in new volume", extentsOverflowTree.lengthInBytes] }];
-		if (outError != NULL) {
-			*outError = noSpaceForExtError;
 		}
 		return false;
 	}
@@ -398,6 +421,7 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 		}
 		return false;
 	}
+#endif
 
 #pragma mark Allocating the destination files' forks
 
@@ -405,15 +429,21 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 	__block ImpHydratedFile *_Nullable fileThatCouldNotBeAllocated = nil;
 	__block u_int64_t allocationShortfall = 0;
 	__block NSError *_Nullable allocationError = nil;
-	[catalogItemsForFiles enumerateKeysAndObjectsUsingBlock:^(ImpHydratedFile *_Nonnull const file, ImpCatalogItem *_Nonnull const catItem, BOOL *_Nonnull const stop) {
+//	[catalogItemsForFiles enumerateKeysAndObjectsUsingBlock:^(ImpHydratedFile *_Nonnull const file, ImpCatalogItem *_Nonnull const catItem, BOOL *_Nonnull const stop) {
+	[allFiles enumerateObjectsUsingBlock:^(ImpHydratedFile *_Nonnull const file, NSUInteger const idx, BOOL *_Nonnull const stop) {
+		ImpCatalogItem *_Nonnull const catItem = file.catalogItem;
+
 		HFSPlusExtentRecord dataExtents = { { 0 } };
 		HFSPlusExtentRecord rsrcExtents = { { 0 } };
 		u_int64_t dataForkLogicalLength = 0, rsrcForkLogicalLength = 0;
 		bool const gotDFLength = [file getDataForkLength:&dataForkLogicalLength error:&allocationError];
 		bool const gotRFLength = [file getResourceForkLength:&rsrcForkLogicalLength error:&allocationError];
-		if (! (gotDFLength && gotRFLength)) {
+		if (! gotDFLength) {
 			allocatedAllForks = false;
 			*stop = true;
+		}
+		if (! gotRFLength) {
+			//As above, this can fail even on an extant file, so we consider it non-fatal.
 		}
 		u_int64_t const unallocatedDataBytes = [hfsPlusVol allocateBytes:dataForkLogicalLength forFork:ImpForkTypeData populateExtentRecord:dataExtents];
 		u_int64_t const unallocatedRsrcBytes = [hfsPlusVol allocateBytes:rsrcForkLogicalLength forFork:ImpForkTypeResource populateExtentRecord:rsrcExtents];
@@ -435,6 +465,9 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 		S(fileRecPtr->dataFork.totalBlocks, (u_int32_t)ImpNumberOfBlocksInHFSPlusExtentRecord(dataExtents));
 		memcpy(fileRecPtr->resourceFork.extents, rsrcExtents, sizeof(fileRecPtr->resourceFork.extents));
 		S(fileRecPtr->resourceFork.totalBlocks, (u_int32_t)ImpNumberOfBlocksInHFSPlusExtentRecord(rsrcExtents));
+		if (file.assignedItemID == 41) {
+			ImpPrintf(@"Beep boop!");
+		}
 	}];
 
 	if (! allocatedAllForks) {
@@ -450,9 +483,13 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 	for (ImpHydratedItem *_Nonnull const item in allItems) {
 		if ([item isKindOfClass:[ImpHydratedFile class]]) {
 			ImpHydratedFile *_Nonnull const file = (ImpHydratedFile *)item;
+			[self deliverProgressUpdate:0.0 operationDescription:[NSString stringWithFormat:@"Copying %@…", file.realWorldURL.relativePath]];
+
 			HFSPlusExtentRecord extents;
 			__block NSError *_Nullable copyError = nil;
 			ImpVirtualFileHandle *_Nullable writeFH = nil;
+			NSMutableData *_Nonnull const fileRecData = [catalogItemsForFiles[file] destinationRecord];
+			struct HFSPlusCatalogFile *_Nonnull const fileRecPtr = fileRecData.mutableBytes;
 
 			[file getDataForkHFSPlusExtentRecord:extents];
 			writeFH = [hfsPlusVol fileHandleForWritingToExtents:extents];
@@ -475,6 +512,8 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 				}
 				return false;
 			}
+//			memcpy(fileRecPtr->dataFork.extents, extents, sizeof(fileRecPtr->dataFork.extents));
+//			S(fileRecPtr->dataFork.totalBlocks, (u_int32_t)ImpNumberOfBlocksInHFSPlusExtentRecord(extents));
 
 			[file getResourceForkHFSPlusExtentRecord:extents];
 			writeFH = [hfsPlusVol fileHandleForWritingToExtents:extents];
@@ -482,6 +521,9 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 				NSUInteger remaining = data.length;
 				NSInteger written;
 				do {
+					if (file.assignedItemID == 41) {
+						ImpPrintf(@"Beep boop!");
+					}
 					written = [writeFH writeData:data error:&copyError];
 					if (written > 0) {
 						remaining -= written;
@@ -497,7 +539,44 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 				}
 				return false;
 			}
+			memcpy(fileRecPtr->resourceFork.extents, extents, sizeof(fileRecPtr->resourceFork.extents));
+			S(fileRecPtr->resourceFork.totalBlocks, (u_int32_t)ImpNumberOfBlocksInHFSPlusExtentRecord(extents));
+			if (file.assignedItemID == 41) {
+				ImpPrintf(@"Beep boop!");
+			}
+			sleep(0);
 		}
+	}
+
+#pragma mark Writing the special files
+
+	//We need to repopulate the tree since we've just been changing files' catalog records.
+	[catBuilder catalogItemsAreDirty];
+	[catBuilder populateTree:catTree];
+
+	__block bool wroteCatalog = false;
+	__block NSError *_Nullable catWriteError = nil;
+	[catTree serializeToData:^(NSData *const  _Nonnull data) {
+		ImpVirtualFileHandle *_Nonnull const catFH = [dstVol fileHandleForWritingToExtents:catExtentsPtr];
+		wroteCatalog = [catFH writeData:data error:&catWriteError];
+	}];
+	if (! wroteCatalog) {
+		if (outError != NULL) {
+			*outError = catWriteError;
+		}
+		return false;
+	}
+	__block bool wroteExtentsOverflow = false;
+	__block NSError *_Nullable extWriteError = nil;
+	[extentsOverflowTree serializeToData:^(NSData *const  _Nonnull data) {
+		ImpVirtualFileHandle *_Nonnull const extFH = [dstVol fileHandleForWritingToExtents:extExtentsPtr];
+		wroteExtentsOverflow = [extFH writeData:data error:&extWriteError];
+	}];
+	if (! wroteExtentsOverflow) {
+		if (outError != NULL) {
+			*outError = extWriteError;
+		}
+		return false;
 	}
 
 #pragma mark Filling out the volume header, part 2

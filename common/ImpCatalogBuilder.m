@@ -488,6 +488,10 @@ static ImpBTreeVersion ImpGetCatalogKeyVersion(NSData *_Nonnull const keyData) {
 	_treeIsBuilt = false;
 }
 
+- (void) catalogItemsAreDirty {
+	[self invalidateMockTree];
+}
+
 - (NSUInteger) totalNodeCount {
 	[self buildMockTree];
 
