@@ -596,8 +596,8 @@ static NSUInteger originalItemCount = 0;
 @implementation ImpHydratedFile
 {
 	NSURL *_Nonnull _resourceForkURL;
-	HFSExtentRecord hfsDataForkExtents, hfsRsrcForkExtents;
-	HFSPlusExtentRecord hfsPlusDataForkExtents, hfsPlusRsrcForkExtents;
+	HFSExtentRecord _hfsDataForkExtents, _hfsRsrcForkExtents;
+	HFSPlusExtentRecord _hfsPlusDataForkExtents, _hfsPlusRsrcForkExtents;
 }
 
 - (instancetype)initWithRealWorldURL:(NSURL *const)fileURL {
@@ -633,38 +633,38 @@ static NSUInteger originalItemCount = 0;
 
 ///Get the extents that have been allocated for this file's data fork. Will be an empty extent record if not previously set with setDataForkHFSExtentRecord:.
 - (void) getDataForkHFSExtentRecord:(struct HFSExtentDescriptor *_Nonnull const)outExtents {
-	memcpy(outExtents, hfsDataForkExtents, sizeof(hfsDataForkExtents));
+	memcpy(outExtents, _hfsDataForkExtents, sizeof(_hfsDataForkExtents));
 }
 ///Set the extents that have been allocated for this file's data fork.
 - (void) setDataForkHFSExtentRecord:(struct HFSExtentDescriptor const *_Nonnull const)inExtents {
-	memcpy(hfsDataForkExtents, inExtents, sizeof(hfsDataForkExtents));
+	memcpy(_hfsDataForkExtents, inExtents, sizeof(_hfsDataForkExtents));
 }
 
 ///Get the extents that have been allocated for this file's resource fork. Will be an empty extent record if not previously set with setResourceForkHFSExtentRecord:.
 - (void) getResourceForkHFSExtentRecord:(struct HFSExtentDescriptor *_Nonnull const)outExtents {
-	memcpy(outExtents, hfsRsrcForkExtents, sizeof(hfsRsrcForkExtents));
+	memcpy(outExtents, _hfsRsrcForkExtents, sizeof(_hfsRsrcForkExtents));
 }
 ///Set the extents that have been allocated for this file's resource fork.
 - (void) setResourceForkHFSExtentRecord:(struct HFSExtentDescriptor const *_Nonnull const)inExtents {
-	memcpy(hfsRsrcForkExtents, inExtents, sizeof(hfsRsrcForkExtents));
+	memcpy(_hfsRsrcForkExtents, inExtents, sizeof(_hfsRsrcForkExtents));
 }
 
 ///Get the extents that have been allocated for this file's data fork. Will be an empty extent record if not previously set with setDataForkHFSPlusExtentRecord:.
 - (void) getDataForkHFSPlusExtentRecord:(struct HFSPlusExtentDescriptor *_Nonnull const)outExtents {
-	memcpy(outExtents, hfsPlusDataForkExtents, sizeof(hfsPlusDataForkExtents));
+	memcpy(outExtents, _hfsPlusDataForkExtents, sizeof(_hfsPlusDataForkExtents));
 }
 ///Set the extents that have been allocated for this file's data fork.
 - (void) setDataForkHFSPlusExtentRecord:(struct HFSPlusExtentDescriptor const *_Nonnull const)inExtents {
-	memcpy(hfsPlusDataForkExtents, inExtents, sizeof(hfsPlusDataForkExtents));
+	memcpy(_hfsPlusDataForkExtents, inExtents, sizeof(_hfsPlusDataForkExtents));
 }
 
 ///Get the extents that have been allocated for this file's resource fork. Will be an empty extent record if not previously set with setResourceForkHFSPlusExtentRecord:.
 - (void) getResourceForkHFSPlusExtentRecord:(struct HFSPlusExtentDescriptor *_Nonnull const)outExtents {
-	memcpy(outExtents, hfsPlusRsrcForkExtents, sizeof(hfsPlusRsrcForkExtents));
+	memcpy(outExtents, _hfsPlusRsrcForkExtents, sizeof(_hfsPlusRsrcForkExtents));
 }
 ///Set the extents that have been allocated for this file's resource fork.
 - (void) setResourceForkHFSPlusExtentRecord:(struct HFSPlusExtentDescriptor const *_Nonnull const)inExtents {
-	memcpy(hfsPlusRsrcForkExtents, inExtents, sizeof(hfsPlusRsrcForkExtents));
+	memcpy(_hfsPlusRsrcForkExtents, inExtents, sizeof(_hfsPlusRsrcForkExtents));
 }
 
 #pragma mark Filling out catalog records
