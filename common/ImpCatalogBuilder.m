@@ -21,6 +21,9 @@
 @interface ImpCatalogItemIdentifier : NSObject <NSCopying>
 
 + (instancetype) identifierWithParentCNID:(HFSCatalogNodeID const)parentID ownCNID:(HFSCatalogNodeID const)ownID nodeName:(NSString *_Nonnull const)nodeName;
++ (instancetype) identifierWithHFSCatalogKeyData:(NSData *_Nonnull const)keyData fileRecordData:(NSData *_Nonnull const)fileRecData;
++ (instancetype) identifierWithHFSCatalogKeyData:(NSData *_Nonnull const)keyData folderRecordData:(NSData *_Nonnull const)folderRecData;
++ (instancetype) identifierWithHFSCatalogKeyData:(NSData *_Nonnull const)keyData threadRecordData:(NSData *_Nonnull const)threadRecData;
 + (instancetype) identifierWithHFSPlusCatalogKeyData:(NSData *_Nonnull const)keyData fileRecordData:(NSData *_Nonnull const)fileRecData;
 + (instancetype) identifierWithHFSPlusCatalogKeyData:(NSData *_Nonnull const)keyData folderRecordData:(NSData *_Nonnull const)folderRecData;
 + (instancetype) identifierWithHFSPlusCatalogKeyData:(NSData *_Nonnull const)keyData threadRecordData:(NSData *_Nonnull const)threadRecData;
@@ -82,11 +85,34 @@
 
 @end
 
+static u_int16_t ImpGetCatalogKeyType(NSData *_Nonnull const keyData) {
+	if (keyData.length < sizeof(u_int16_t)) {
+		return 0;
+	}
+
+	u_int16_t const *_Nonnull const keyTypePtr = keyData.bytes;
+	return L(*keyTypePtr);
+}
+
+static ImpBTreeVersion ImpGetCatalogKeyVersion(NSData *_Nonnull const keyData) {
+	enum {
+		ImpHFSCatalogKeyTypesMask = 0xff00,
+		ImpHFSPlusCatalogKeyTypesMask = 0xff,
+	};
+	if (ImpGetCatalogKeyType(keyData) & ImpHFSCatalogKeyTypesMask) {
+		return ImpBTreeVersionHFSCatalog;
+	} else if (ImpGetCatalogKeyType(keyData) & ImpHFSPlusCatalogKeyTypesMask) {
+		return ImpBTreeVersionHFSPlusCatalog;
+	}
+	return 0;
+}
+
 #pragma mark -
 #pragma mark And now, the actual implementation
 
 @interface ImpCatalogBuilder ()
 
+@property(readonly) ImpBTreeVersion version;
 @property(readwrite) HFSCatalogNodeID nextCatalogNodeID;
 @property(readwrite) bool hasReusedCatalogNodeIDs;
 
@@ -105,6 +131,7 @@
 	NSMutableArray <ImpMockIndexNode *> *_Nonnull _allMockIndexNodes;
 	NSMutableArray <ImpCatalogKeyValuePair *> *_Nonnull _allKeyValuePairs;
 
+	ImpBTreeVersion _version;
 	__block HFSCatalogNodeID _largestCNIDYet;
 	__block HFSCatalogNodeID _firstUnusedCNID;
 	u_int32_t _numLiveNodes;
@@ -116,7 +143,7 @@
 	bytesPerNode:(u_int16_t const)nodeSize
 	expectedNumberOfItems:(NSUInteger const)numItems
 {
-	if (version != ImpBTreeVersionHFSPlusCatalog) {
+	if (version != ImpBTreeVersionHFSCatalog && version != ImpBTreeVersionHFSPlusCatalog) {
 		self = nil;
 	} else if ((self = [super init])) {
 		_sourceItemsByIdentifier = [NSMutableDictionary dictionaryWithCapacity:numItems];
@@ -125,26 +152,33 @@
 
 		//_mockRows, _allMockIndexNodes, and _allKeyValuePairs are created during buildMockTree.
 
+		_version = version;
 		_nodeSize = nodeSize;
 		_largestCNIDYet = 0;
 		_firstUnusedCNID = 0;
-
 	}
 	return self;
+}
+
+- (void) updateCNIDBoundaries:(HFSCatalogNodeID)foundCNID {
+	if (foundCNID > _largestCNIDYet) {
+		_largestCNIDYet = foundCNID;
+		if (_firstUnusedCNID == 0 && foundCNID - 1 > _largestCNIDYet) {
+			_firstUnusedCNID = _largestCNIDYet + 1;
+		}
+	}
 }
 
 - (ImpCatalogItem *_Nonnull const) addKey:(NSMutableData *_Nonnull const)keyData fileRecord:(NSMutableData *_Nonnull const)payloadData {
 	[self invalidateMockTree];
 
 	void const *_Nonnull const payloadPtr = payloadData.bytes;
-	struct HFSPlusCatalogFile const *_Nonnull const fileRecPtr = payloadPtr;
-
-	HFSCatalogNodeID const cnid = L(fileRecPtr->fileID);
-	if (cnid > _largestCNIDYet) {
-		_largestCNIDYet = cnid;
-		if (_firstUnusedCNID == 0 && cnid - 1 > _largestCNIDYet) {
-			_firstUnusedCNID = _largestCNIDYet + 1;
-		}
+	if (self.version == ImpBTreeVersionHFSCatalog) {
+		struct HFSCatalogFile const *_Nonnull const fileRecPtr = payloadPtr;
+		[self updateCNIDBoundaries:L(fileRecPtr->fileID)];
+	} else if (self.version == ImpBTreeVersionHFSPlusCatalog) {
+		struct HFSPlusCatalogFile const *_Nonnull const fileRecPtr = payloadPtr;
+		[self updateCNIDBoundaries:L(fileRecPtr->fileID)];
 	}
 
 	ImpCatalogItemIdentifier *_Nonnull const identifier = [ImpCatalogItemIdentifier identifierWithHFSPlusCatalogKeyData:keyData fileRecordData:payloadData];
@@ -171,14 +205,12 @@
 	[self invalidateMockTree];
 
 	void const *_Nonnull const payloadPtr = payloadData.bytes;
-	struct HFSPlusCatalogFolder const *_Nonnull const folderRecPtr = payloadPtr;
-
-	HFSCatalogNodeID const cnid = L(folderRecPtr->folderID);
-	if (cnid > _largestCNIDYet) {
-		_largestCNIDYet = cnid;
-		if (_firstUnusedCNID == 0 && cnid - 1 > _largestCNIDYet) {
-			_firstUnusedCNID = _largestCNIDYet + 1;
-		}
+	if (self.version == ImpBTreeVersionHFSCatalog) {
+		struct HFSCatalogFolder const *_Nonnull const folderRecPtr = payloadPtr;
+		[self updateCNIDBoundaries:L(folderRecPtr->folderID)];
+	} else if (self.version == ImpBTreeVersionHFSPlusCatalog) {
+		struct HFSPlusCatalogFolder const *_Nonnull const folderRecPtr = payloadPtr;
+		[self updateCNIDBoundaries:L(folderRecPtr->folderID)];
 	}
 
 	ImpCatalogItemIdentifier *_Nonnull const identifier = [ImpCatalogItemIdentifier identifierWithHFSPlusCatalogKeyData:keyData folderRecordData:payloadData];
@@ -205,10 +237,15 @@
 	[self invalidateMockTree];
 
 	void const *_Nonnull const keyPtr = keyData.bytes;
-	struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr = keyPtr;
-
-	HFSCatalogNodeID const cnid = L(catalogKeyPtr->parentID);
-	if (cnid > _largestCNIDYet) _largestCNIDYet = cnid;
+	if (self.version == ImpBTreeVersionHFSCatalog) {
+		struct HFSCatalogKey const *_Nonnull const catalogKeyPtr = keyPtr;
+		HFSCatalogNodeID const cnid = L(catalogKeyPtr->parentID);
+		if (cnid > _largestCNIDYet) _largestCNIDYet = cnid;
+	} else if (self.version == ImpBTreeVersionHFSPlusCatalog) {
+		struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr = keyPtr;
+		HFSCatalogNodeID const cnid = L(catalogKeyPtr->parentID);
+		if (cnid > _largestCNIDYet) _largestCNIDYet = cnid;
+	}
 
 	ImpCatalogItemIdentifier *_Nonnull const identifier = [ImpCatalogItemIdentifier identifierWithHFSPlusCatalogKeyData:keyData threadRecordData:payloadData];
 
@@ -231,6 +268,112 @@
 	return item;
 }
 
+- (void) fillInHFSThreadRecords {
+	//For archiving to HFS: The archiver is feeding in file and folder records, so no thread records at all exist, so we need to create all of them here.
+	for (ImpCatalogItem *_Nonnull const item in _sourceItemsThatNeedThreadRecords) {
+		NSData *_Nonnull const keyData = item.destinationKey;
+		struct HFSCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
+//		ImpPrintf(@"Item %p “%@” needs thread record: %@", item, [ImpBTreeNode describeHFSCatalogKeyWithData:keyData], item.needsThreadRecord ? @"YES" : @"NO");
+		if (item.needsThreadRecord) {
+			NSMutableData *_Nonnull const threadKeyData = [NSMutableData dataWithLength:sizeof(struct HFSCatalogKey)];
+			struct HFSCatalogKey *_Nonnull const threadKeyPtr = threadKeyData.mutableBytes;
+			NSMutableData *_Nonnull const threadRecData = [NSMutableData dataWithLength:sizeof(struct HFSCatalogThread)];
+			struct HFSCatalogThread *_Nonnull const threadRecPtr = threadRecData.mutableBytes;
+
+			NSMutableData *_Nonnull const recData = item.destinationRecord;
+			void *_Nonnull const recPtr = recData.mutableBytes;
+			int16_t const *_Nonnull const recTypePtr = recPtr;
+			struct HFSCatalogFile *_Nonnull const filePtr = recPtr;
+			struct HFSCatalogFolder *_Nonnull const folderPtr = recPtr;
+
+			//In a thread record, the key holds the item's *own* ID (despite being called “parentID”) and an empty name, while the thread record holds the item's *parent*'s ID and the item's own name.
+			switch (L(*recTypePtr)) {
+				case kHFSFileRecord:
+					threadKeyPtr->parentID = filePtr->fileID;
+					S(threadRecPtr->recordType, kHFSFileThreadRecord);
+					S(filePtr->flags, L(filePtr->flags) | kHFSThreadExistsMask);
+					break;
+				case kHFSFolderRecord:
+					//Technically we shouldn't get here, either, as thread records were required for folders under HFS.
+					threadKeyPtr->parentID = folderPtr->folderID;
+					S(threadRecPtr->recordType, kHFSFolderThreadRecord);
+					S(folderPtr->flags, L(folderPtr->flags) | kHFSThreadExistsMask);
+					break;
+				default:
+					__builtin_unreachable();
+			}
+			threadRecPtr->parentID = keyPtr->parentID;
+			memcpy(&threadRecPtr->nodeName, &keyPtr->nodeName, sizeof(threadRecPtr->nodeName));
+			//DiskWarrior complains about “oversized thread records” if the thread payload contains empty space. Plus, shrinking these down frees up space in the node for more records.
+			u_int32_t const threadRecSize = sizeof(threadRecPtr->recordType) + sizeof(threadRecPtr->reserved) + sizeof(threadRecPtr->parentID) + sizeof(threadRecPtr->nodeName[0]) + sizeof(unsigned char) * L(threadRecPtr->nodeName[0]);
+			[threadRecData setLength:threadRecSize];
+
+			//A thread key has a CNID and an empty node name (so, length 0). keyLength doesn't include itself.
+			u_int16_t const threadKeySize = sizeof(threadKeyPtr->keyLength) + sizeof(threadKeyPtr->parentID) + sizeof(threadKeyPtr->nodeName[0]);
+			u_int16_t const threadKeyLength = threadKeySize - sizeof(threadKeyPtr->keyLength);
+			S(threadKeyPtr->keyLength, threadKeyLength);
+			[threadKeyData setLength:threadKeySize];
+
+			item.destinationThreadKey = threadKeyData;
+			item.destinationThreadRecord = threadRecData;
+			item.needsThreadRecord = false;
+		}
+	}
+
+}
+- (void) fillInHFSPlusThreadRecords {
+	//For conversion from HFS to HFS+: HFS requires folders to have thread records, so those should all have them, but files having thread records was optional (but is required under HFS+), so we may need to create those.
+	for (ImpCatalogItem *_Nonnull const item in _sourceItemsThatNeedThreadRecords) {
+		NSData *_Nonnull const keyData = item.destinationKey;
+		struct HFSPlusCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
+//			ImpPrintf(@"Item %p “%@” needs thread record: %@", item, [ImpBTreeNode describeHFSPlusCatalogKeyWithData:keyData], item.needsThreadRecord ? @"YES" : @"NO");
+		if (item.needsThreadRecord) {
+			NSMutableData *_Nonnull const threadKeyData = [NSMutableData dataWithLength:sizeof(struct HFSPlusCatalogKey)];
+			struct HFSPlusCatalogKey *_Nonnull const threadKeyPtr = threadKeyData.mutableBytes;
+			NSMutableData *_Nonnull const threadRecData = [NSMutableData dataWithLength:sizeof(struct HFSPlusCatalogThread)];
+			struct HFSPlusCatalogThread *_Nonnull const threadRecPtr = threadRecData.mutableBytes;
+
+			NSMutableData *_Nonnull const recData = item.destinationRecord;
+			void *_Nonnull const recPtr = recData.mutableBytes;
+			int16_t const *_Nonnull const recTypePtr = recPtr;
+			struct HFSPlusCatalogFile *_Nonnull const filePtr = recPtr;
+			struct HFSPlusCatalogFolder *_Nonnull const folderPtr = recPtr;
+
+			//In a thread record, the key holds the item's *own* ID (despite being called “parentID”) and an empty name, while the thread record holds the item's *parent*'s ID and the item's own name.
+			switch (L(*recTypePtr)) {
+				case kHFSPlusFileRecord:
+					threadKeyPtr->parentID = filePtr->fileID;
+					S(threadRecPtr->recordType, kHFSPlusFileThreadRecord);
+					S(filePtr->flags, L(filePtr->flags) | kHFSThreadExistsMask);
+					break;
+				case kHFSPlusFolderRecord:
+					//Technically we shouldn't get here, either, as thread records were required for folders under HFS.
+					threadKeyPtr->parentID = folderPtr->folderID;
+					S(threadRecPtr->recordType, kHFSPlusFolderThreadRecord);
+					S(folderPtr->flags, L(folderPtr->flags) | kHFSThreadExistsMask);
+					break;
+				default:
+					__builtin_unreachable();
+			}
+			threadRecPtr->parentID = keyPtr->parentID;
+			memcpy(&threadRecPtr->nodeName, &keyPtr->nodeName, sizeof(threadRecPtr->nodeName));
+			//DiskWarrior complains about “oversized thread records” if the thread payload contains empty space. Plus, shrinking these down frees up space in the node for more records.
+			u_int32_t const threadRecSize = sizeof(threadRecPtr->recordType) + sizeof(threadRecPtr->reserved) + sizeof(threadRecPtr->parentID) + sizeof(threadRecPtr->nodeName.length) + sizeof(UniChar) * L(threadRecPtr->nodeName.length);
+			[threadRecData setLength:threadRecSize];
+
+			//A thread key has a CNID and an empty node name (so, length 0). keyLength doesn't include itself.
+			u_int16_t const threadKeySize = sizeof(threadKeyPtr->keyLength) + sizeof(threadKeyPtr->parentID) + sizeof(threadKeyPtr->nodeName.length);
+			u_int16_t const threadKeyLength = threadKeySize - sizeof(threadKeyPtr->keyLength);
+			S(threadKeyPtr->keyLength, threadKeyLength);
+			[threadKeyData setLength:threadKeySize];
+
+			item.destinationThreadKey = threadKeyData;
+			item.destinationThreadRecord = threadRecData;
+			item.needsThreadRecord = false;
+		}
+	}
+}
+
 - (void) buildMockTree {
 	if (! _treeIsBuilt) {
 		/*We can't just convert leaf records straight across in the same order, for three reasons:
@@ -243,55 +386,11 @@
 		 *The list of items is built up by calls to the addKey:____Record: methods. By this point, all of those should have already happened.
 		 */
 
-		//Now we have all the items. HFS requires folders to have thread records, so those should all have them, but files having thread records was optional (but is required under HFS+), so we may need to create those.
-		for (ImpCatalogItem *_Nonnull const item in _sourceItemsThatNeedThreadRecords) {
-			NSData *_Nonnull const keyData = item.destinationKey;
-			struct HFSPlusCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
-//			ImpPrintf(@"Item %p “%@” needs thread record: %@", item, [ImpBTreeNode describeHFSPlusCatalogKeyWithData:keyData], item.needsThreadRecord ? @"YES" : @"NO");
-			if (item.needsThreadRecord) {
-				NSMutableData *_Nonnull const threadKeyData = [NSMutableData dataWithLength:sizeof(struct HFSPlusCatalogKey)];
-				struct HFSPlusCatalogKey *_Nonnull const threadKeyPtr = threadKeyData.mutableBytes;
-				NSMutableData *_Nonnull const threadRecData = [NSMutableData dataWithLength:sizeof(struct HFSPlusCatalogThread)];
-				struct HFSPlusCatalogThread *_Nonnull const threadRecPtr = threadRecData.mutableBytes;
-
-				NSMutableData *_Nonnull const recData = item.destinationRecord;
-				void *_Nonnull const recPtr = recData.mutableBytes;
-				int16_t const *_Nonnull const recTypePtr = recPtr;
-				struct HFSPlusCatalogFile *_Nonnull const filePtr = recPtr;
-				struct HFSPlusCatalogFolder *_Nonnull const folderPtr = recPtr;
-
-				//In a thread record, the key holds the item's *own* ID (despite being called “parentID”) and an empty name, while the thread record holds the item's *parent*'s ID and the item's own name.
-				switch (L(*recTypePtr)) {
-					case kHFSPlusFileRecord:
-						threadKeyPtr->parentID = filePtr->fileID;
-						S(threadRecPtr->recordType, kHFSPlusFileThreadRecord);
-						S(filePtr->flags, L(filePtr->flags) | kHFSThreadExistsMask);
-						break;
-					case kHFSPlusFolderRecord:
-						//Technically we shouldn't get here, either, as thread records were required for folders under HFS.
-						threadKeyPtr->parentID = folderPtr->folderID;
-						S(threadRecPtr->recordType, kHFSPlusFolderThreadRecord);
-						S(folderPtr->flags, L(folderPtr->flags) | kHFSThreadExistsMask);
-						break;
-					default:
-						__builtin_unreachable();
-				}
-				threadRecPtr->parentID = keyPtr->parentID;
-				memcpy(&threadRecPtr->nodeName, &keyPtr->nodeName, sizeof(threadRecPtr->nodeName));
-				//DiskWarrior complains about “oversized thread records” if the thread payload contains empty space. Plus, shrinking these down frees up space in the node for more records.
-				u_int32_t const threadRecSize = sizeof(threadRecPtr->recordType) + sizeof(threadRecPtr->reserved) + sizeof(threadRecPtr->parentID) + sizeof(threadRecPtr->nodeName.length) + sizeof(UniChar) * L(threadRecPtr->nodeName.length);
-				[threadRecData setLength:threadRecSize];
-
-				//A thread key has a CNID and an empty node name (so, length 0). keyLength doesn't include itself.
-				u_int16_t const threadKeySize = sizeof(threadKeyPtr->keyLength) + sizeof(threadKeyPtr->parentID) + sizeof(threadKeyPtr->nodeName.length);
-				u_int16_t const threadKeyLength = threadKeySize - sizeof(threadKeyPtr->keyLength);
-				S(threadKeyPtr->keyLength, threadKeyLength);
-				[threadKeyData setLength:threadKeySize];
-
-				item.destinationThreadKey = threadKeyData;
-				item.destinationThreadRecord = threadRecData;
-				item.needsThreadRecord = false;
-			}
+		//Now we have all the items.
+		if (self.version == ImpBTreeVersionHFSCatalog) {
+			[self fillInHFSThreadRecords];
+		} else if (self.version == ImpBTreeVersionHFSPlusCatalog) {
+			[self fillInHFSPlusThreadRecords];
 		}
 
 		//Now all of our items have both a file or folder record and a thread record. Each of these is filed under a different key in the catalog file, due to their different purposes. (File and folder records are stored under a key containing their parent item's CNID; thread records are stored under a key containing the item's own CNID, for the purpose of finding the parent ID stored in the thread record.) So turn our list of n items into n * 2 key-value pairs, half of them being file or folder records and half being thread records. These will be the contents of the leaf row.
@@ -455,7 +554,7 @@
 
 #pragma mark Creation of original files
 
-- (HFSCatalogNodeID) createFileInParent:(HFSCatalogNodeID)parentID
+- (HFSCatalogNodeID) _HFSPlus_createFileInParent:(HFSCatalogNodeID)parentID
 	name:(NSString *_Nonnull const)nodeName
 	type:(OSType const)fileType
 	creator:(OSType const)creator
@@ -555,6 +654,23 @@
 
 	return cnid;
 }
+- (HFSCatalogNodeID) createFileInParent:(HFSCatalogNodeID)parentID
+	name:(NSString *_Nonnull const)nodeName
+	type:(OSType const)fileType
+	creator:(OSType const)creator
+	finderFlags:(UInt16)finderFlags
+{
+	if (self.version == ImpBTreeVersionHFSPlusCatalog) {
+		return [self _HFSPlus_createFileInParent:parentID
+			name:nodeName
+			type:fileType
+			creator:creator
+			finderFlags:finderFlags];
+	} else {
+		__builtin_unreachable();
+		return 0;
+	}
+}
 
 @end
 
@@ -583,6 +699,33 @@
 + (instancetype) identifierWithParentCNID:(HFSCatalogNodeID const)parentID ownCNID:(HFSCatalogNodeID const)ownID nodeName:(NSString *_Nonnull const)nodeName {
 	return [[self alloc] initWithParentCNID:parentID ownCNID:ownID nodeName:nodeName];
 }
+
+#pragma mark Creating identifiers from HFS catalog entries
+
++ (instancetype) identifierWithHFSCatalogKeyData:(NSData *_Nonnull const)keyData fileRecordData:(NSData *_Nonnull const)fileRecData {
+	struct HFSCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
+	struct HFSCatalogFile const *_Nonnull const fileRecPtr = fileRecData.bytes;
+	ImpCatalogItemIdentifier *_Nonnull const identifier = [self identifierWithParentCNID:L(keyPtr->parentID) ownCNID:L(fileRecPtr->fileID) nodeName:[[self reusableTextEncodingConverter] stringForPascalString:keyPtr->nodeName fromHFSCatalogKey:keyPtr]];
+	identifier.typeEmoji = @"📄";
+	return identifier;
+}
++ (instancetype) identifierWithHFSCatalogKeyData:(NSData *_Nonnull const)keyData folderRecordData:(NSData *_Nonnull const)folderRecData {
+	struct HFSCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
+	struct HFSCatalogFolder const *_Nonnull const folderRecPtr = folderRecData.bytes;
+	ImpCatalogItemIdentifier *_Nonnull const identifier = [self identifierWithParentCNID:L(keyPtr->parentID) ownCNID:L(folderRecPtr->folderID) nodeName:[[self reusableTextEncodingConverter] stringForPascalString:keyPtr->nodeName fromHFSCatalogKey:keyPtr]];
+	identifier.typeEmoji = @"📁";
+	return identifier;
+}
++ (instancetype) identifierWithHFSCatalogKeyData:(NSData *_Nonnull const)keyData threadRecordData:(NSData *_Nonnull const)threadRecData {
+	struct HFSCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
+	struct HFSCatalogThread const *_Nonnull const threadRecPtr = threadRecData.bytes;
+	ImpCatalogItemIdentifier *_Nonnull const identifier = [self identifierWithParentCNID:L(threadRecPtr->parentID) ownCNID:L(keyPtr->parentID) nodeName:[[self reusableTextEncodingConverter] stringForPascalString:threadRecPtr->nodeName]];
+	identifier.typeEmoji = (L(threadRecPtr->recordType) == kHFSFileThreadRecord) ? @"📄" : @"📁";
+	return identifier;
+}
+
+#pragma mark Creating identifiers from HFS Plus catalog entries
+
 + (instancetype) identifierWithHFSPlusCatalogKeyData:(NSData *_Nonnull const)keyData fileRecordData:(NSData *_Nonnull const)fileRecData {
 	struct HFSPlusCatalogKey const *_Nonnull const keyPtr = keyData.bytes;
 	struct HFSPlusCatalogFile const *_Nonnull const fileRecPtr = fileRecData.bytes;
@@ -604,6 +747,8 @@
 	identifier.typeEmoji = (L(threadRecPtr->recordType) == kHFSPlusFileThreadRecord) ? @"📄" : @"📁";
 	return identifier;
 }
+
+#pragma mark Instance methods
 
 - (id _Nonnull)copyWithZone:(NSZone *_Nullable)zone {
 	return self;
@@ -686,8 +831,15 @@
 @implementation ImpCatalogKeyValuePair
 
 - (instancetype _Nonnull)initWithKey:(NSData *_Nonnull const)keyData value:(NSData *_Nonnull const)valueData {
-	NSParameterAssert(keyData.length >= kHFSPlusCatalogKeyMinimumLength);
-	NSParameterAssert(keyData.length <= kHFSPlusCatalogKeyMaximumLength);
+	ImpBTreeVersion const version = ImpGetCatalogKeyVersion(keyData);
+	if (version == ImpBTreeVersionHFSCatalog) {
+		NSParameterAssert(keyData.length >= kHFSCatalogKeyMinimumLength);
+		NSParameterAssert(keyData.length <= kHFSCatalogKeyMaximumLength);
+	} else if (version == ImpBTreeVersionHFSPlusCatalog) {
+		NSParameterAssert(keyData.length >= kHFSPlusCatalogKeyMinimumLength);
+		NSParameterAssert(keyData.length <= kHFSPlusCatalogKeyMaximumLength);
+	}
+
 	if ((self = [super init])) {
 		_key = keyData;
 		_value = valueData;
@@ -734,7 +886,19 @@
 
 - (NSComparisonResult) caseInsensitiveCompare:(id)other {
 	ImpCatalogKeyValuePair *_Nonnull const otherPair = other;
-	return (NSComparisonResult)ImpBTreeCompareHFSPlusCatalogKeys(self.key.bytes, otherPair.key.bytes);
+	ImpBTreeVersion const thisVersion = ImpGetCatalogKeyVersion(self.key);
+	ImpBTreeVersion const otherVersion = ImpGetCatalogKeyVersion(otherPair.key);
+	if (thisVersion == ImpBTreeVersionHFSCatalog && otherVersion == ImpBTreeVersionHFSPlusCatalog) {
+		return NSOrderedAscending;
+	} else if (thisVersion == ImpBTreeVersionHFSPlusCatalog && otherVersion == ImpBTreeVersionHFSCatalog) {
+		return NSOrderedDescending;
+	} else if (thisVersion == ImpBTreeVersionHFSPlusCatalog) {
+		return (NSComparisonResult)ImpBTreeCompareHFSPlusCatalogKeys(self.key.bytes, otherPair.key.bytes);
+	} else if (thisVersion == ImpBTreeVersionHFSCatalog) {
+		return (NSComparisonResult)ImpBTreeCompareHFSCatalogKeys(self.key.bytes, otherPair.key.bytes);
+	} else {
+		return NSOrderedSame;
+	}
 }
 
 @end

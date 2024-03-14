@@ -31,11 +31,43 @@ u_int32_t ImpNumberOfBlocksInHFSExtent(struct HFSExtentDescriptor const *_Nonnul
 	return L(extRec->blockCount);
 }
 
+u_int32_t ImpFirstBlockInHFSPlusExtent(struct HFSPlusExtentDescriptor const *_Nonnull const extRec) {
+	return L(extRec->startBlock);
+}
+u_int32_t ImpLastBlockInHFSPlusExtent(struct HFSPlusExtentDescriptor const *_Nonnull const extRec) {
+	u_int32_t const blockCount = ImpNumberOfBlocksInHFSPlusExtent(extRec);
+	if (blockCount > 0) {
+		return ImpFirstBlockInHFSPlusExtent(extRec) + (blockCount - 1);
+	} else {
+		//There's kind of no valid answer here.
+		return ImpFirstBlockInHFSPlusExtent(extRec);
+	}
+}
+
+u_int32_t ImpNumberOfBlocksInHFSPlusExtent(struct HFSPlusExtentDescriptor const *_Nonnull const extRec) {
+	return L(extRec->blockCount);
+}
+
+#pragma mark Descriptions
+
 NSString *_Nonnull ImpDescribeHFSExtent(struct HFSExtentDescriptor const *_Nonnull const extRec) {
 	u_int32_t const startBlock = ImpFirstBlockInHFSExtent(extRec);
 	u_int32_t const blockCount = ImpNumberOfBlocksInHFSExtent(extRec);
 	if (blockCount > 0) {
 		return [NSString stringWithFormat:@"extent starting at block #%u, for %u blocks, ending at block %u", startBlock, blockCount, ImpLastBlockInHFSExtent(extRec)];
+	} else if (startBlock > 0) {
+		return [NSString stringWithFormat:@"empty extent starting at block #%u", startBlock];
+	} else {
+		return @"empty extent";
+	}
+}
+
+///Returns a string concisely describing one extent.
+NSString *_Nonnull ImpDescribeHFSPlusExtent(struct HFSPlusExtentDescriptor const *_Nonnull const extRec) {
+	u_int32_t const startBlock = ImpFirstBlockInHFSPlusExtent(extRec);
+	u_int32_t const blockCount = ImpNumberOfBlocksInHFSPlusExtent(extRec);
+	if (blockCount > 0) {
+		return [NSString stringWithFormat:@"extent starting at block #%u, for %u blocks, ending at block %u", startBlock, blockCount, ImpLastBlockInHFSPlusExtent(extRec)];
 	} else if (startBlock > 0) {
 		return [NSString stringWithFormat:@"empty extent starting at block #%u", startBlock];
 	} else {

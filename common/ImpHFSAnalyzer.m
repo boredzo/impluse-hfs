@@ -10,9 +10,11 @@
 #import "ImpSizeUtilities.h"
 #import "ImpTextEncodingConverter.h"
 
-#import "ImpHFSVolume.h"
-#import "ImpHFSVolume+ConsistencyChecking.h"
-#import "ImpHFSPlusVolume.h"
+#import "ImpSourceVolume.h"
+#import "ImpSourceVolume+ConsistencyChecking.h"
+#import "ImpHFSSourceVolume.h"
+#import "ImpHFSPlusSourceVolume.h"
+#import "ImpDestinationVolume.h"
 #import "ImpVolumeProbe.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
@@ -21,7 +23,7 @@
 
 @interface ImpHFSAnalyzer ()
 
-- (bool) analyzeVolume:(ImpHFSVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError;
+- (bool) analyzeVolume:(ImpSourceVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError;
 
 @end
 @implementation ImpHFSAnalyzer
@@ -41,7 +43,7 @@
 	ImpVolumeProbe *_Nonnull const probe = [[ImpVolumeProbe alloc] initWithFileDescriptor:readFD];
 	probe.verbose = true;
 	[probe findVolumes:^(const u_int64_t startOffsetInBytes, const u_int64_t lengthInBytes, Class  _Nullable const __unsafe_unretained volumeClass) {
-		ImpHFSVolume *_Nonnull const srcVol = [[volumeClass alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
+		ImpSourceVolume *_Nonnull const srcVol = [[volumeClass alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
 		analyzed = [self analyzeVolume:srcVol error:&analysisError] || analyzed;
 	}];
 
@@ -53,7 +55,7 @@
 
 	return analyzed;
 }
-- (bool) analyzeVolume:(ImpHFSVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError {
+- (bool) analyzeVolume:(ImpSourceVolume *_Nonnull const)srcVol error:(NSError *_Nullable *_Nonnull) outError {
 	NSByteCountFormatter *_Nonnull const bcf = [NSByteCountFormatter new];
 
 	int const readFD = srcVol.fileDescriptor;
@@ -64,54 +66,54 @@
 		return false;
 	}
 
-	if ([srcVol isKindOfClass:[ImpHFSPlusVolume class]]) {
-		ImpHFSPlusVolume *_Nonnull const srcVolPlus = (ImpHFSPlusVolume *_Nonnull const)srcVol;
-		[srcVolPlus peekAtHFSPlusVolumeHeader:^(NS_NOESCAPE const struct HFSPlusVolumeHeader *const vhPtr) {
-			ImpPrintf(@"Found HFS+ volume");
+	ImpHFSSourceVolume *_Nullable const hfsVol = [srcVol isKindOfClass:[ImpHFSSourceVolume class]] ? (ImpHFSSourceVolume *)srcVol : nil;
+	ImpHFSPlusSourceVolume *_Nullable const hfsPlusVol = [srcVol isKindOfClass:[ImpHFSPlusSourceVolume class]] ? (ImpHFSPlusSourceVolume *)srcVol : nil;
 
-			NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
-			fmtr.numberStyle = NSNumberFormatterDecimalStyle;
-			fmtr.hasThousandSeparators = true;
+	[hfsPlusVol peekAtHFSPlusVolumeHeader:^(NS_NOESCAPE const struct HFSPlusVolumeHeader *const vhPtr) {
+		ImpPrintf(@"Found HFS+ volume");
 
-			u_int64_t const catNumBytes = L(vhPtr->catalogFile.logicalSize);
-			ImpPrintf(@"Catalog file logical length: 0x%llx bytes (%@)", catNumBytes, [bcf stringFromByteCount:catNumBytes]);
-			struct HFSPlusExtentDescriptor const *_Nonnull const catExtDescs = vhPtr->catalogFile.extents;
-			for (NSUInteger i = 0; i < kHFSPlusExtentDensity && catExtDescs[i].blockCount > 0; ++i) {
-				ImpPrintf(@"Catalog extent #%lu: start block #%@, length %@ blocks", i, [fmtr stringFromNumber:@(L(catExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[0].blockCount))]);
-			}
+		NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
+		fmtr.numberStyle = NSNumberFormatterDecimalStyle;
+		fmtr.hasThousandSeparators = true;
 
-			u_int64_t const eoNumBytes = L(vhPtr->extentsFile.logicalSize);
-			ImpPrintf(@"Extents overflow file logical length: 0x%llx bytes (%@)", eoNumBytes, [bcf stringFromByteCount:eoNumBytes]);
-			struct HFSPlusExtentDescriptor const *_Nonnull const eoExtDescs = vhPtr->extentsFile.extents;
-			for (NSUInteger i = 0; i < kHFSPlusExtentDensity && eoExtDescs[i].blockCount > 0; ++i) {
-				ImpPrintf(@"Extents overflow extent #%lu: start block #%@, length %@ blocks", i, [fmtr stringFromNumber:@(L(eoExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[0].blockCount))]);
-			}
-		}];
-	} else {
-		[srcVol peekAtHFSVolumeHeader:^(NS_NOESCAPE const struct HFSMasterDirectoryBlock *const mdbPtr) {
-			ImpPrintf(@"Found HFS volume with name: %@", [srcVol.textEncodingConverter stringForPascalString:mdbPtr->drVN]);
+		u_int64_t const catNumBytes = L(vhPtr->catalogFile.logicalSize);
+		ImpPrintf(@"Catalog file logical length: 0x%llx bytes (%@)", catNumBytes, [bcf stringFromByteCount:catNumBytes]);
+		struct HFSPlusExtentDescriptor const *_Nonnull const catExtDescs = vhPtr->catalogFile.extents;
+		for (NSUInteger i = 0; i < kHFSPlusExtentDensity && catExtDescs[i].blockCount > 0; ++i) {
+			ImpPrintf(@"Catalog extent #%lu: start block #%@, length %@ blocks", i, [fmtr stringFromNumber:@(L(catExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[0].blockCount))]);
+		}
 
-			NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
-			fmtr.numberStyle = NSNumberFormatterDecimalStyle;
-			fmtr.hasThousandSeparators = true;
+		u_int64_t const eoNumBytes = L(vhPtr->extentsFile.logicalSize);
+		ImpPrintf(@"Extents overflow file logical length: 0x%llx bytes (%@)", eoNumBytes, [bcf stringFromByteCount:eoNumBytes]);
+		struct HFSPlusExtentDescriptor const *_Nonnull const eoExtDescs = vhPtr->extentsFile.extents;
+		for (NSUInteger i = 0; i < kHFSPlusExtentDensity && eoExtDescs[i].blockCount > 0; ++i) {
+			ImpPrintf(@"Extents overflow extent #%lu: start block #%@, length %@ blocks", i, [fmtr stringFromNumber:@(L(eoExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[0].blockCount))]);
+		}
+	}];
+	[hfsVol peekAtHFSVolumeHeader:^(NS_NOESCAPE const struct HFSMasterDirectoryBlock *const mdbPtr) {
+		ImpPrintf(@"Found HFS volume with name: %@", [srcVol.textEncodingConverter stringForPascalString:mdbPtr->drVN]);
 
-			u_int32_t const catNumBytes = L(mdbPtr->drCTFlSize);
-			ImpPrintf(@"Catalog file logical length: 0x%x bytes (%@)", catNumBytes, [bcf stringFromByteCount:catNumBytes]);
+		NSNumberFormatter *_Nonnull const fmtr = [NSNumberFormatter new];
+		fmtr.numberStyle = NSNumberFormatterDecimalStyle;
+		fmtr.hasThousandSeparators = true;
 
-			struct HFSExtentDescriptor const *_Nonnull const catExtDescs = mdbPtr->drCTExtRec;
-			ImpPrintf(@"Catalog extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[0].blockCount))]);
-			ImpPrintf(@"Catalog extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[1].blockCount))]);
-			ImpPrintf(@"Catalog extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[2].blockCount))]);
+		u_int32_t const catNumBytes = L(mdbPtr->drCTFlSize);
+		ImpPrintf(@"Catalog file logical length: 0x%x bytes (%@)", catNumBytes, [bcf stringFromByteCount:catNumBytes]);
 
-			u_int32_t const eoNumBytes = L(mdbPtr->drXTFlSize);
-			ImpPrintf(@"Extents overflow file logical length: 0x%x bytes (%@)", eoNumBytes, [bcf stringFromByteCount:eoNumBytes]);
+		struct HFSExtentDescriptor const *_Nonnull const catExtDescs = mdbPtr->drCTExtRec;
+		ImpPrintf(@"Catalog extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[0].blockCount))]);
+		ImpPrintf(@"Catalog extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[1].blockCount))]);
+		ImpPrintf(@"Catalog extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(catExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(catExtDescs[2].blockCount))]);
 
-			struct HFSExtentDescriptor const *_Nonnull const eoExtDescs = mdbPtr->drXTExtRec;
-			ImpPrintf(@"Extents overflow extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[0].blockCount))]);
-			ImpPrintf(@"Extents overflow extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[1].blockCount))]);
-			ImpPrintf(@"Extents overflow extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[2].blockCount))]);
-		}];
-	}
+		u_int32_t const eoNumBytes = L(mdbPtr->drXTFlSize);
+		ImpPrintf(@"Extents overflow file logical length: 0x%x bytes (%@)", eoNumBytes, [bcf stringFromByteCount:eoNumBytes]);
+
+		struct HFSExtentDescriptor const *_Nonnull const eoExtDescs = mdbPtr->drXTExtRec;
+		ImpPrintf(@"Extents overflow extent the first: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[0].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[0].blockCount))]);
+		ImpPrintf(@"Extents overflow extent the second: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[1].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[1].blockCount))]);
+		ImpPrintf(@"Extents overflow extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[2].blockCount))]);
+	}];
+
 	if (! [srcVol readAllocationBitmapFromFileDescriptor:srcVol.fileDescriptor error:outError]) {
 		ImpPrintf(@"Failed to read allocation bitmap: %@", (*outError).localizedDescription);
 		return false;
@@ -121,7 +123,9 @@
 		ImpPrintf(@"Failed to read extents overflow file: %@", (*outError).localizedDescription);
 		return false;
 	}
-	ImpPrintf(@"Extents file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", srcVol.extentsOverflowBTree.numberOfLiveNodes, srcVol.extentsOverflowBTree.numberOfPotentialNodes, srcVol.extentsOverflowBTree.numberOfPotentialNodes > 0 ? (srcVol.extentsOverflowBTree.numberOfLiveNodes / (double)srcVol.extentsOverflowBTree.numberOfPotentialNodes) * 100.0 : 1.0);
+	ImpBTreeFile *_Nonnull const extTree = srcVol.extentsOverflowBTree;
+	ImpPrintf(@"Extents file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", extTree.numberOfLiveNodes, extTree.numberOfPotentialNodes, extTree.numberOfPotentialNodes > 0 ? (extTree.numberOfLiveNodes / (double)extTree.numberOfPotentialNodes) * 100.0 : 1.0);
+	ImpPrintf(@"Extents file has a max depth of %u; its root node is at height %u while its first leaf is at height %u and its last leaf is at height %u (those three may all be the same node)", extTree.headerNode.treeDepth, extTree.headerNode.rootNode.nodeHeight, extTree.headerNode.firstLeafNode.nodeHeight, extTree.headerNode.lastLeafNode.nodeHeight);
 
 	if (! [srcVol readCatalogFileFromFileDescriptor:srcVol.fileDescriptor error:outError]) {
 		ImpPrintf(@"Failed to read catalog file: %@", (*outError).localizedDescription);
@@ -131,7 +135,9 @@
 		ImpPrintf(@"Faults detected in catalog file: %@", (*outError).localizedDescription);
 		return false;
 	}
-	ImpPrintf(@"Catalog file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", srcVol.catalogBTree.numberOfLiveNodes, srcVol.catalogBTree.numberOfPotentialNodes, srcVol.catalogBTree.numberOfPotentialNodes > 0 ? (srcVol.catalogBTree.numberOfLiveNodes / (double)srcVol.catalogBTree.numberOfPotentialNodes) * 100.0 : 1.0);
+	ImpBTreeFile *_Nonnull const catTree = srcVol.catalogBTree;
+	ImpPrintf(@"Catalog file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", catTree.numberOfLiveNodes, catTree.numberOfPotentialNodes, catTree.numberOfPotentialNodes > 0 ? (catTree.numberOfLiveNodes / (double)catTree.numberOfPotentialNodes) * 100.0 : 1.0);
+	ImpPrintf(@"Catalog file has a max depth of %u; its root node is at height %u while its first leaf is at height %u and its last leaf is at height %u (those three may all be the same node)", catTree.headerNode.treeDepth, catTree.headerNode.rootNode.nodeHeight, catTree.headerNode.firstLeafNode.nodeHeight, catTree.headerNode.lastLeafNode.nodeHeight);
 
 	u_int32_t const blockSize = (u_int32_t)srcVol.numberOfBytesPerBlock;
 	void (^_Nonnull const logFork)(char const *_Nonnull const indentString, char const *_Nonnull const forkName, HFSPlusForkData const *_Nonnull const forkPtr) = ^(char const *_Nonnull const indentString, char const *_Nonnull const forkName, HFSPlusForkData const *_Nonnull const forkPtr) {
@@ -139,9 +145,9 @@
 		u_int64_t const lsize = L(forkPtr->logicalSize);
 		u_int64_t const psize = L(forkPtr->totalBlocks) * blockSize;
 		u_int64_t const esize = numBlocksFromExtentRec * blockSize;
-		ImpPrintf(@"%s%s: lsize %llu, psize %u blocks (%llu bytes), extent sum %llu blocks (%llu bytes)",
+		ImpPrintf(@"%s%s: lsize %llu (mod blocksize = %llu), psize %u blocks (%llu bytes), extent sum %llu blocks (%llu bytes)",
 			indentString, forkName,
-			lsize,
+			lsize, lsize % blockSize,
 			L(forkPtr->totalBlocks), psize,
 			numBlocksFromExtentRec, esize
 		);
@@ -156,29 +162,28 @@
 
 	ImpPrintf(@"Volume's name is “%@”", srcVol.volumeName);
 	ImpPrintf(@"“%@” contains %lu files and %lu folders", srcVol.volumeName, srcVol.numberOfFiles, srcVol.numberOfFolders);
-	ImpPrintf(@"Allocation block size is %lu (%lx) bytes; volume has %lu blocks in use, %lu free, for a total of %lu total", srcVol.numberOfBytesPerBlock, srcVol.numberOfBytesPerBlock, srcVol.numberOfBlocksUsed, srcVol.numberOfBlocksFree, srcVol.numberOfBlocksTotal);
-	if ([srcVol isKindOfClass:[ImpHFSPlusVolume class]]) {
-		ImpHFSPlusVolume *_Nonnull const srcVolPlus = (ImpHFSPlusVolume *_Nonnull const)srcVol;
-		[srcVolPlus peekAtHFSPlusVolumeHeader:^(NS_NOESCAPE const struct HFSPlusVolumeHeader *const vhPtr) {
-			ImpPrintf(@"Volume attributes: 0x%08x", L(vhPtr->attributes));
-			ImpPrintf(@"Creation date: %u", L(vhPtr->createDate));
-			ImpPrintf(@"Space remaining (from volume header): %u blocks (0x%llx bytes)", L(vhPtr->freeBlocks), L(vhPtr->freeBlocks) * (u_int64_t)srcVolPlus.numberOfBytesPerBlock);
-			u_int32_t const numBitsFreeInBitmap = [srcVol numberOfBlocksFreeAccordingToBitmap];
-			ImpPrintf(@"Space remaining (from allocations bitmap): %u blocks (0x%llx bytes)", numBitsFreeInBitmap, numBitsFreeInBitmap * (u_int64_t)srcVolPlus.numberOfBytesPerBlock);
-			ImpPrintf(@"Clump size for data forks is 0x%llx (0x200 * %.1f; ABS * %.1f)", (u_int64_t)L(vhPtr->dataClumpSize), L(vhPtr->dataClumpSize) / (double)kISOStandardBlockSize, L(vhPtr->dataClumpSize) / (double)srcVolPlus.numberOfBytesPerBlock);
-			ImpPrintf(@"Clump size for resource forks is 0x%llx (0x200 * %.1f; ABS * %.1f)", (u_int64_t)L(vhPtr->dataClumpSize), L(vhPtr->dataClumpSize) / (double)kISOStandardBlockSize, L(vhPtr->dataClumpSize) / (double)srcVolPlus.numberOfBytesPerBlock);
-			logFork("", "Allocations file", &(vhPtr->allocationFile));
-			logFork("", "Extents overflow file", &(vhPtr->extentsFile));
-			logFork("", "Catalog file", &(vhPtr->catalogFile));
-		}];
-	} else {
-		[srcVol peekAtHFSVolumeHeader:^(NS_NOESCAPE struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr) {
-			ImpPrintf(@"Creation date: %u", L(mdbPtr->drCrDate));
-			ImpPrintf(@"First allocation block: 0x%llx", (u_int64_t)(L(mdbPtr->drAlBlSt) * kISOStandardBlockSize));
-			ImpPrintf(@"Space remaining: %u blocks (0x%llx bytes)", L(mdbPtr->drFreeBks), (u_int64_t)(L(mdbPtr->drFreeBks) * L(mdbPtr->drAlBlkSiz)));
-			ImpPrintf(@"Clump size is 0x%llx (0x200 * %.1f; ABS * %.1f)", (u_int64_t)L(mdbPtr->drClpSiz), L(mdbPtr->drClpSiz) / (double)kISOStandardBlockSize, L(mdbPtr->drClpSiz) / (double)L(mdbPtr->drAlBlkSiz));
-		}];
-	}
+	ImpPrintf(@"Allocation block size is %u (%x) bytes; volume has %lu blocks in use, %lu free, for a total of %lu total", srcVol.numberOfBytesPerBlock, srcVol.numberOfBytesPerBlock, srcVol.numberOfBlocksUsed, srcVol.numberOfBlocksFree, srcVol.numberOfBlocksTotal);
+
+	[hfsPlusVol peekAtHFSPlusVolumeHeader:^(NS_NOESCAPE const struct HFSPlusVolumeHeader *const vhPtr) {
+		ImpPrintf(@"Volume attributes: 0x%08x", L(vhPtr->attributes));
+		ImpPrintf(@"Creation date: %u", L(vhPtr->createDate));
+		ImpPrintf(@"Modification date: %u", L(vhPtr->modifyDate));
+		ImpPrintf(@"Space remaining (from volume header): %u blocks (0x%llx bytes)", L(vhPtr->freeBlocks), L(vhPtr->freeBlocks) * (u_int64_t)hfsPlusVol.numberOfBytesPerBlock);
+		u_int32_t const numBitsFreeInBitmap = [srcVol numberOfBlocksFreeAccordingToBitmap];
+		ImpPrintf(@"Space remaining (from allocations bitmap): %u blocks (0x%llx bytes)", numBitsFreeInBitmap, numBitsFreeInBitmap * (u_int64_t)hfsPlusVol.numberOfBytesPerBlock);
+		ImpPrintf(@"Clump size for data forks is 0x%llx (0x200 * %.1f; ABS * %.1f)", (u_int64_t)L(vhPtr->dataClumpSize), L(vhPtr->dataClumpSize) / (double)kISOStandardBlockSize, L(vhPtr->dataClumpSize) / (double)hfsPlusVol.numberOfBytesPerBlock);
+		ImpPrintf(@"Clump size for resource forks is 0x%llx (0x200 * %.1f; ABS * %.1f)", (u_int64_t)L(vhPtr->dataClumpSize), L(vhPtr->dataClumpSize) / (double)kISOStandardBlockSize, L(vhPtr->dataClumpSize) / (double)hfsPlusVol.numberOfBytesPerBlock);
+		logFork("", "Allocations file", &(vhPtr->allocationFile));
+		logFork("", "Extents overflow file", &(vhPtr->extentsFile));
+		logFork("", "Catalog file", &(vhPtr->catalogFile));
+	}];
+	[hfsVol peekAtHFSVolumeHeader:^(NS_NOESCAPE struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr) {
+		ImpPrintf(@"Creation date: %u", L(mdbPtr->drCrDate));
+		ImpPrintf(@"First allocation block: 0x%llx", (u_int64_t)(L(mdbPtr->drAlBlSt) * kISOStandardBlockSize));
+		ImpPrintf(@"Space remaining: %u blocks (0x%llx bytes)", L(mdbPtr->drFreeBks), (u_int64_t)(L(mdbPtr->drFreeBks) * L(mdbPtr->drAlBlkSiz)));
+		ImpPrintf(@"Clump size is 0x%llx (0x200 * %.1f; ABS * %.1f)", (u_int64_t)L(mdbPtr->drClpSiz), L(mdbPtr->drClpSiz) / (double)kISOStandardBlockSize, L(mdbPtr->drClpSiz) / (double)L(mdbPtr->drAlBlkSiz));
+	}];
+
 	ImpPrintf(@"Volume size is %@; %@ in use, %@ free", [bcf stringFromByteCount:blockSize * srcVol.numberOfBlocksTotal], [bcf stringFromByteCount:blockSize * srcVol.numberOfBlocksUsed], [bcf stringFromByteCount:blockSize * srcVol.numberOfBlocksFree]);
 
 	ImpBTreeFile *_Nonnull const catalog = srcVol.catalogBTree;
@@ -331,27 +336,55 @@
 					return byteCount;
 				};
 
-				[srcVol forEachExtentInFileWithID:L(fileRec->fileID)
+				char const *_Nonnull const indentString = "\t";
+
+				char const *_Nonnull forkName = "DF";
+				u_int64_t lsize = L(fileRec->dataLogicalSize);
+				u_int64_t psize = L(fileRec->dataPhysicalSize);
+				[hfsVol forEachExtentInFileWithID:L(fileRec->fileID)
 					fork:ImpForkTypeData
-					forkLogicalLength:L(fileRec->dataLogicalSize)
+					forkLogicalLength:lsize
 					startingWithExtentsRecord:fileRec->dataExtents
 					block:checkExtentValidity];
-				ImpPrintf(@"	Data fork lengths: %@ bytes physical, %@ bytes logical", [nf stringFromNumber:@(L(fileRec->dataPhysicalSize))], [nf stringFromNumber:@(L(fileRec->dataLogicalSize))]);
-				ImpPrintf(@"	Data fork extents: %@ (%@ blocks = %@ bytes)", [extentDescriptions componentsJoinedByString:@", "], [nf stringFromNumber:@(totalBlockCount)], [nf stringFromNumber:@(totalPhysicalLength)]);
-				ImpPrintf(@"	Data fork blocks: %@", blockCheckResults);
+				ImpPrintf(@"%s%s: lsize %@ (mod blocksize = %llu), psize %@ bytes, extent sum %@ blocks (%@ bytes)",
+					indentString, forkName,
+					[nf stringFromNumber:@(lsize)], lsize % blockSize,
+					[nf stringFromNumber:@(psize)],
+					[nf stringFromNumber:@(totalBlockCount)], [nf stringFromNumber:@(totalPhysicalLength)]
+				);
+				if (lsize > psize) {
+					ImpPrintf(@"%s🚨 %s: lsize is greater than psize. Likely causes: Endianness issue; stale/incorrect psize.", indentString, forkName);
+				}
+				if (psize != totalPhysicalLength) {
+					ImpPrintf(@"%s🚨 %s: psize (totalBlocks) does not match sum of extent blockCounts. Likely causes: Endianness issue; one or both are stale/incorrect.", indentString, forkName);
+				}
+				ImpPrintf(@"%s%s blocks: %@", indentString, forkName, blockCheckResults);
 
 				[extentDescriptions removeAllObjects];
 				totalBlockCount = totalPhysicalLength = 0;
 				blockCheckResults = [NSMutableString stringWithCapacity:ImpCeilingDivide(L(fileRec->rsrcPhysicalSize), blockSize) + numExtraCharacters];
 
-				[srcVol forEachExtentInFileWithID:L(fileRec->fileID)
+				forkName = "RF";
+				lsize = L(fileRec->rsrcLogicalSize);
+				psize = L(fileRec->rsrcPhysicalSize);
+				[hfsVol forEachExtentInFileWithID:L(fileRec->fileID)
 					fork:ImpForkTypeResource
-					forkLogicalLength:L(fileRec->rsrcLogicalSize)
+					forkLogicalLength:lsize
 					startingWithExtentsRecord:fileRec->rsrcExtents
 					block:checkExtentValidity];
-				ImpPrintf(@"	Rsrc fork lengths: %@ bytes physical, %@ bytes logical", [nf stringFromNumber:@(L(fileRec->rsrcPhysicalSize))], [nf stringFromNumber:@(L(fileRec->rsrcLogicalSize))]);
-				ImpPrintf(@"	Rsrc fork extents: %@ (%@ blocks = %@ bytes)", [extentDescriptions componentsJoinedByString:@", "], [nf stringFromNumber:@(totalBlockCount)], [nf stringFromNumber:@(totalPhysicalLength)]);
-				ImpPrintf(@"	Rsrc fork blocks: %@", blockCheckResults);
+				ImpPrintf(@"%s%s: lsize %@ (mod blocksize = %llu), psize %@ bytes, extent sum %@ blocks (%@ bytes)",
+					indentString, forkName,
+					[nf stringFromNumber:@(lsize)], lsize % blockSize,
+					[nf stringFromNumber:@(psize)],
+					[nf stringFromNumber:@(totalBlockCount)], [nf stringFromNumber:@(totalPhysicalLength)]
+				);
+				if (lsize > psize) {
+					ImpPrintf(@"%s🚨 %s: lsize is greater than psize. Likely causes: Endianness issue; stale/incorrect psize.", indentString, forkName);
+				}
+				if (psize != totalPhysicalLength) {
+					ImpPrintf(@"%s🚨 %s: psize (totalBlocks) does not match sum of extent blockCounts. Likely causes: Endianness issue; one or both are stale/incorrect.", indentString, forkName);
+				}
+				ImpPrintf(@"%s%s blocks: %@", indentString, forkName, blockCheckResults);
 
 				++numFiles;
 			} folder:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRec) {
@@ -374,18 +407,18 @@
 				//avbstclinmedz (order used by GetFileInfo(1))
 				return [NSString stringWithFormat:@"%c%c%c%c%c%c%c%c%c%c%c%c%c",
 					finderFlags & kIsAlias ? 'A' : 'a',
-						finderFlags & kIsInvisible ? 'V' : 'v',
-						finderFlags & kHasBundle ? 'B' : 'b',
-						finderFlags & kNameLocked ? 'S' : 's',
-						finderFlags & kIsStationery ? 'T' : 't',
-						finderFlags & kHasCustomIcon ? 'C' : 'c',
-						itemFlags & kHFSFileLockedMask  ? 'L' : 'l',
-						finderFlags & kHasBeenInited ? 'I' : 'i',
-						finderFlags & kHasNoINITs ? 'N' : 'n',
-						finderFlags & kIsShared ? 'M' : 'm',
-						'.', //extension hidden—not sure how to get this
-						finderFlags & kIsOnDesk ? 'D' : 'd',
-						extFinderFlags & kExtendedFlagObjectIsBusy ? 'Z' : 'z'
+					finderFlags & kIsInvisible ? 'V' : 'v',
+					finderFlags & kHasBundle ? 'B' : 'b',
+					finderFlags & kNameLocked ? 'S' : 's',
+					finderFlags & kIsStationery ? 'T' : 't',
+					finderFlags & kHasCustomIcon ? 'C' : 'c',
+					itemFlags & kHFSFileLockedMask  ? 'L' : 'l',
+					finderFlags & kHasBeenInited ? 'I' : 'i',
+					finderFlags & kHasNoINITs ? 'N' : 'n',
+					finderFlags & kIsShared ? 'M' : 'm',
+					'.', //extension hidden—not sure how to get this
+					finderFlags & kIsOnDesk ? 'D' : 'd',
+					extFinderFlags & kExtendedFlagObjectIsBusy ? 'Z' : 'z'
 				];
 			};
 			[node forEachHFSPlusCatalogRecord_file:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSPlusCatalogFile *const _Nonnull fileRec) {

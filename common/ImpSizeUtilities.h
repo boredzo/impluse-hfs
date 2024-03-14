@@ -34,8 +34,12 @@ static inline size_t ImpNextMultipleOfSize(size_t const size, size_t const facto
 #pragma mark Extent utilities
 
 u_int32_t ImpNumberOfBlocksInHFSExtent(struct HFSExtentDescriptor const *_Nonnull const extRec);
+u_int32_t ImpNumberOfBlocksInHFSPlusExtent(struct HFSPlusExtentDescriptor const *_Nonnull const extRec);
+
 ///Returns a string concisely describing one extent.
 NSString *_Nonnull ImpDescribeHFSExtent(struct HFSExtentDescriptor const *_Nonnull const extRec);
+///Returns a string concisely describing one extent.
+NSString *_Nonnull ImpDescribeHFSPlusExtent(struct HFSPlusExtentDescriptor const *_Nonnull const extRec);
 
 ///Call a block with every block number covered by one extent.
 void ImpIterateHFSExtent(struct HFSExtentDescriptor const *_Nonnull const extRec, void (^_Nonnull const block)(u_int32_t const blockNumber));

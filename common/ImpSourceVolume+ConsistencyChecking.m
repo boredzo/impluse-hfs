@@ -1,17 +1,17 @@
 //
-//  ImpHFSVolume+ConsistencyChecking.m
+//  ImpSourceVolume+ConsistencyChecking.m
 //  impluse-hfs
 //
 //  Created by Peter Hosey on 2023-12-23.
 //
 
-#import "ImpHFSVolume+ConsistencyChecking.h"
+#import "ImpSourceVolume+ConsistencyChecking.h"
 
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
 #import "ImpBTreeHeaderNode.h"
 
-@implementation ImpHFSVolume (ConsistencyChecking)
+@implementation ImpSourceVolume (ConsistencyChecking)
 
 - (bool) checkBTreeFile:(ImpBTreeFile *_Nonnull const)bTreeFile failureDescriptions:(NSMutableArray <NSString *> *_Nonnull const)failureDescriptions {
 	NSMutableArray *_Nonnull const thisCheckFailures = [NSMutableArray array];

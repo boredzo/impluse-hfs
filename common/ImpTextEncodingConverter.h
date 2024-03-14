@@ -9,10 +9,12 @@
 
 @interface ImpTextEncodingConverter : NSObject
 
+#pragma mark Text encoding names
+
 ///Given a text encoding in the type used by the Text Encoding Converter, return its name. Returns nil if TEC does not return a name for this encoding.
 + (NSString *_Nullable) nameOfTextEncoding:(TextEncoding const)hfsTextEncoding;
 
-#pragma mark -
+#pragma mark Finder flags parsing
 
 ///Given the extended flags from an ExtendedFileInfo or ExtendedFileInfo structure, return the script code embedded there if it has one, or the supplied default if not.
 + (TextEncoding) textEncodingFromExtendedFinderFlags:(UInt16 const)extFinderFlags defaultEncoding:(TextEncoding const)defaultEncoding;
@@ -22,7 +24,7 @@
 ///Assuming these extended Finder flags contain an embedded script code, return it. The return value is undefined if the extended Finder flags do not contain an embedded script code.
 + (TextEncoding) textEncodingFromExtendedFinderFlags:(UInt16 const)extFinderFlags;
 
-#pragma mark -
+#pragma mark Conveniences for catalog records
 
 ///If this file has a script code in its extended Finder flags, creates a converter for that encoding. Otherwise, returns the fallback converter.
 + (instancetype _Nullable) converterForHFSFile:(struct HFSCatalogFile const *_Nonnull const)filePtr fallback:(ImpTextEncodingConverter *_Nonnull const)fallbackConverter;
@@ -34,7 +36,7 @@
 ///If this folder has a script code in its extended Finder flags, creates a converter for that encoding. Otherwise, returns the fallback converter.
 + (instancetype _Nullable) converterForHFSPlusFolder:(struct HFSPlusCatalogFolder const *_Nonnull const)folderPtr fallback:(ImpTextEncodingConverter *_Nonnull const)fallbackConverter;
 
-#pragma mark -
+#pragma mark Factories
 
 ///Returns an object that (hopefully) can convert filenames from the given encoding into Unicode.
 + (instancetype _Nullable) converterWithHFSTextEncoding:(TextEncoding const)hfsTextEncoding;
@@ -44,12 +46,14 @@
 ///The encoding this converter was created to convert.
 @property(readonly) TextEncoding hfsTextEncoding;
 
-#pragma mark -
+#pragma mark Size estimation
 
 ///Obtain an estimate of how many bytes might be needed to hold the Unicode conversion of this string, including 2 bytes for the length.
 - (ByteCount) estimateSizeOfHFSUniStr255NeededForPascalString:(ConstStr31Param _Nonnull const)pascalString;
 ///Obtain an estimate of how many bytes might be needed to hold the Unicode conversion of this string, including 2 bytes for the length. If length is not 0, it is the maximum length of the string in source bytes (i.e., if the string's length is greater than this limit, the limit should be used instead).
 - (ByteCount) estimateSizeOfHFSUniStr255NeededForPascalString:(ConstStr31Param _Nonnull const)pascalString maxLength:(u_int8_t const)maxLength;
+
+#pragma mark Conversion
 
 ///Returns true if the characters were successfully converted; returns false if some characters could not be converted or there wasn't enough space.
 - (bool) convertPascalString:(ConstStr31Param _Nonnull const)pascalString intoHFSUniStr255:(HFSUniStr255 *_Nonnull const)outUnicode bufferSize:(ByteCount)outputBufferSizeInBytes;
@@ -67,10 +71,12 @@
 
 - (NSString *_Nonnull const) stringFromHFSUniStr255:(ConstHFSUniStr255Param _Nonnull const)unicodeName;
 
+#pragma mark Conversion from NSString
+
 ///Convert a string to an HFSUniStr255 Pascal-style string. Returns whether the string was completely copied.
 - (bool) convertString:(NSString *_Nonnull const)inStr toHFSUniStr255:(struct HFSUniStr255 *_Nonnull const)outUnicodeName;
 
-#pragma mark -
+#pragma mark String escaping
 
 - (NSString *_Nonnull const) stringByEscapingString:(NSString *_Nonnull const)inStr;
 

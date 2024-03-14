@@ -7,8 +7,8 @@
 
 #import <Foundation/Foundation.h>
 
-@class ImpHFSVolume;
-@class ImpHFSPlusVolume;
+@class ImpSourceVolume;
+@class ImpDestinationVolume;
 
 @interface ImpVolumeProbe : NSObject
 
@@ -19,7 +19,7 @@
 
 @property bool verbose;
 
-///Call this block with each volume found in the backing device/image. For bare, single-volume storages, this will call the block once. For partitioned storages, this will call the block exactly once per interesting volume. volumeClass, if not Nil, may be ImpHFSVolume or ImpHFSPlusVolume.
+///Call this block with each volume found in the backing device/image. For bare, single-volume storages, this will call the block once. For partitioned storages, this will call the block exactly once per interesting volume. volumeClass, if not Nil, may be ImpSourceVolume or ImpDestinationVolume.
 - (void) findVolumes:(void (^_Nonnull const)(u_int64_t const startOffsetInBytes, u_int64_t const lengthInBytes, Class _Nullable const volumeClass))block;
 
 @end

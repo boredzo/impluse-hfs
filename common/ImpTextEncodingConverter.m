@@ -45,6 +45,8 @@ enum {
 	}
 }
 
+#pragma mark Finder flags parsing
+
 + (TextEncoding) textEncodingFromExtendedFinderFlags:(UInt16 const)extFinderFlags defaultEncoding:(TextEncoding const)defaultEncoding {
 	if ([self hasTextEncodingInExtendedFinderFlags:extFinderFlags]) {
 		return [self textEncodingFromExtendedFinderFlags:extFinderFlags];
@@ -59,6 +61,8 @@ enum {
 + (TextEncoding) textEncodingFromExtendedFinderFlags:(UInt16 const)extFinderFlags {
 	return (extFinderFlags & ImpExtFinderFlagsScriptCodeMask) >> 8;
 }
+
+#pragma mark Conveniences for catalog records
 
 + (instancetype _Nullable) converterForExtendedFileInfo:(struct ExtendedFileInfo const *_Nonnull const)extFilePtr fallback:(ImpTextEncodingConverter *_Nonnull const)fallbackConverter {
 	TextEncoding const fallbackEncoding = fallbackConverter->_hfsTextEncoding;
@@ -96,6 +100,8 @@ enum {
 + (instancetype _Nullable) converterForHFSPlusFolder:(struct HFSPlusCatalogFolder const *_Nonnull const)folderPtr fallback:(ImpTextEncodingConverter *_Nonnull const)fallbackConverter {
 	return [self converterForExtendedFolderInfo:(struct ExtendedFolderInfo const *)&(folderPtr->finderInfo) fallback:fallbackConverter];
 }
+
+#pragma mark Factories
 
 + (instancetype _Nullable) converterWithHFSTextEncoding:(TextEncoding const)hfsTextEncoding {
 	static NSMutableDictionary <NSNumber *, ImpTextEncodingConverter *> *_Nullable converterCache = nil;
@@ -142,6 +148,8 @@ enum {
 	DisposeTextToUnicodeInfo(&_ttui);
 }
 
+#pragma mark Size estimation
+
 - (ByteCount) estimateSizeOfHFSUniStr255NeededForPascalString:(ConstStr31Param _Nonnull const)pascalString maxLength:(u_int8_t const)maxLength {
 	u_int8_t const srcLength = *pascalString;
 	u_int8_t const workingLength = (
@@ -161,6 +169,8 @@ enum {
 - (ByteCount) estimateSizeOfHFSUniStr255NeededForPascalString:(ConstStr31Param _Nonnull const)pascalString {
 	return [self estimateSizeOfHFSUniStr255NeededForPascalString:pascalString maxLength:0];
 }
+
+#pragma mark Conversion
 
 - (bool) convertPascalString:(ConstStr31Param _Nonnull const)pascalString maxLength:(u_int8_t const)maxInputLength intoHFSUniStr255:(HFSUniStr255 *_Nonnull const)outUnicode bufferSize:(ByteCount)outputBufferSizeInBytes {
 	UniChar *_Nonnull const outputBuf = outUnicode->unicode;
@@ -270,6 +280,8 @@ enum {
 	return str;
 }
 
+#pragma mark Conversion from NSString
+
 - (bool) convertString:(NSString *_Nonnull const)inStr toHFSUniStr255:(struct HFSUniStr255 *_Nonnull const)outUnicodeName {
 	NSUInteger const actualStringLength = inStr.length;
 	u_int16_t const cappedStringLength = actualStringLength > 255 ? 255 : (u_int16_t)actualStringLength;
@@ -281,7 +293,7 @@ enum {
 	return cappedStringLength == actualStringLength;
 }
 
-#pragma mark -
+#pragma mark String escaping
 
 - (NSString *_Nonnull const) stringByEscapingString:(NSString *_Nonnull const)inString {
 	unichar escapedBuf[1024];

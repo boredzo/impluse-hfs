@@ -1,5 +1,5 @@
 //
-//  ImpHFSVolume.h
+//  ImpSourceVolume.h
 //  impluse-hfs
 //
 //  Created by Peter Hosey on 2022-11-26.
@@ -12,12 +12,17 @@
 
 #import "ImpForkUtilities.h"
 
-@interface ImpHFSVolume : NSObject
+@interface ImpSourceVolume : NSObject
 {
+	NSMutableData *_bootBlocksData;
+	CFBitVectorRef _bitVector;
+	CFMutableBitVectorRef _blocksThatAreAllocatedButWereNotAccessed;
+
 	u_int64_t _startOffsetInBytes, _lengthInBytes;
 	int _fileDescriptor;
 }
 
+///Initializer to be overridden by subclasses. Do not use to directly instantiate the abstract class.
 ///startOffset should be 0 for volumes from bare-volume images. For volumes found in a partition map, startOffset should be the offset into the device/image in bytes where the preamble starts.
 ///lengthInBytes can be 0, in which case the whole device/image should be used.
 - (instancetype _Nonnull) initWithFileDescriptor:(int const)readFD
@@ -58,8 +63,6 @@
 - (NSData *_Nonnull)bootBlocks;
 ///The last block in the volume, immediately following the alternate volume header. Always 0x200 bytes.
 - (NSData *_Nonnull)lastBlock;
-- (void) getVolumeHeader:(void *_Nonnull const)outMDB;
-- (void) peekAtHFSVolumeHeader:(void (^_Nonnull const)(struct HFSMasterDirectoryBlock const *_Nonnull const mdbPtr NS_NOESCAPE))block;
 
 - (NSData *_Nonnull)volumeBitmap;
 ///Calculate the number of bits in the bitmap that are zero. Should match the drFreeBks/freeBlocks value in the volume header.
@@ -68,10 +71,14 @@
 - (bool) isBlockInBounds:(u_int32_t const)blockNumber;
 ///Returns whether a block is marked as in use according to the volume bitmap. Does not guarantee that the block is actually referred to by an extent in the catalog or extents overflow trees.
 - (bool) isBlockAllocated:(u_int32_t const)blockNumber;
+
+///Abstract method for subclasses.
+- (void) findExtents:(void (^_Nonnull const)(NSRange))block inBitVector:(CFBitVectorRef _Nonnull const)bitVector;
+
 ///Identify which blocks are marked as allocated in the volume bitmap but have not been read from, and print those to the log.
 - (void) reportBlocksThatAreAllocatedButHaveNotBeenAccessed;
 ///Count how many blocks are marked as allocated in the volume bitmap but have not been read from. Use this method after all files have been copied when identifying orphaned blocks for recovery.
-- (NSUInteger) numberOfBlocksThatAreAllocatedButHaveNotBeenAccessed;
+- (u_int32_t) numberOfBlocksThatAreAllocatedButHaveNotBeenAccessed;
 ///Call the block with an NSRange containing each contiguous extent of blocks that are marked as allocated in the volume bitmap but have not been read from. Use this method after all files have been copied when identifying orphaned blocks for recovery.
 - (void) findExtentsThatAreAllocatedButHaveNotBeenAccessed:(void (^_Nonnull const)(NSRange))block;
 
@@ -81,7 +88,10 @@
 @property(strong) ImpBTreeFile *_Nonnull extentsOverflowBTree;
 
 - (NSString *_Nonnull) volumeName;
-- (NSUInteger) numberOfBytesPerBlock;
+- (u_int32_t) firstPhysicalBlockOfFirstAllocationBlock;
+///The offset in bytes at which the first allocation block begins. (I.e., firstPhysicalBlockOfFirstAllocationBlock converted to a byte offset.)
+- (off_t) offsetOfFirstAllocationBlock;
+- (u_int32_t) numberOfBytesPerBlock;
 ///The total number of allocation blocks in the volume, according to the volume header.
 - (NSUInteger) numberOfBlocksTotal;
 - (NSUInteger) numberOfBlocksUsed;
@@ -94,14 +104,7 @@
 - (NSUInteger) catalogSizeInBytes;
 - (NSUInteger) extentsOverflowSizeInBytes;
 
-#pragma mark -
-
-///Read fork contents from the sections of the volume indicated by the given extents.
-- (NSData *_Nullable) readDataFromFileDescriptor:(int const)readFD
-	logicalLength:(u_int64_t const)numBytes
-	extents:(struct HFSExtentDescriptor const *_Nonnull const)hfsExtRec
-	numExtents:(NSUInteger const)numExtents
-	error:(NSError *_Nullable *_Nonnull const)outError;
+#pragma mark Reading fork contents
 
 ///Low-level method intended for subclasses implementing their own versions of the higher-level readDataFromFileDescriptor:logicalLength:… method. This effectively takes one extent, using HFS+'s larger type for block numbers.
 ///Returns intoData on success; nil on failure. The copy's destination starts offset bytes into the data.
@@ -112,23 +115,5 @@
 	blockCount:(u_int32_t const)blockCount
 	actualAmountRead:(u_int64_t *_Nonnull const)outAmtRead
 	error:(NSError *_Nullable *_Nonnull const)outError;
-
-///Returns true if none of the extents in this record overlap. Returns false if there are overlapping extents, which may jeopardize user data or lead to volume corruption. Ignores any extents after an empty extent.
-- (bool) checkHFSExtentRecord:(HFSExtentRecord const *_Nonnull const)hfsExtRec;
-
-///For every extent in the file (the initial three plus any overflow records) until an empty extent, call the block with that extent and the number of bytes remaining in the file. The block should return the number of bytes it consumed (e.g., read from the file descriptor). Returns the total number of bytes consumed.
-- (u_int64_t) forEachExtentInFileWithID:(HFSCatalogNodeID)cnid
-	fork:(ImpForkType)forkType
-	forkLogicalLength:(u_int64_t const)forkLength
-	startingWithExtentsRecord:(struct HFSExtentDescriptor const *_Nonnull const)hfsExtRec
-	readDataOrReturnError:(NSError *_Nullable *_Nonnull const)outError
-	block:(bool (^_Nonnull const)(NSData *_Nonnull const fileData, u_int64_t const logicalLength))block;
-
-///More general method for doing something with every extent, mainly exposed for the sake of analyze.
-- (u_int64_t) forEachExtentInFileWithID:(HFSCatalogNodeID)cnid
-	fork:(ImpForkType)forkType
-	forkLogicalLength:(u_int64_t const)forkLength
-	startingWithExtentsRecord:(struct HFSExtentDescriptor const *_Nonnull const)initialExtRec
-	block:(u_int64_t (^_Nonnull const)(struct HFSExtentDescriptor const *_Nonnull const oneExtent, u_int64_t logicalBytesRemaining))block;
 
 @end

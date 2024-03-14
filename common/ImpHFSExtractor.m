@@ -7,7 +7,9 @@
 
 #import "ImpHFSExtractor.h"
 
-#import "ImpHFSVolume.h"
+#import "ImpSourceVolume.h"
+#import "ImpHFSSourceVolume.h"
+#import "ImpHFSPlusSourceVolume.h"
 #import "ImpVolumeProbe.h"
 #import "ImpBTreeFile.h"
 #import "ImpBTreeNode.h"
@@ -114,14 +116,17 @@
 
 	ImpVolumeProbe *_Nonnull const probe = [[ImpVolumeProbe alloc] initWithFileDescriptor:readFD];
 	[probe findVolumes:^(const u_int64_t startOffsetInBytes, const u_int64_t lengthInBytes, Class  _Nullable const __unsafe_unretained volumeClass) {
-		if (volumeClass != Nil && volumeClass != [ImpHFSVolume class]) {
+		if (volumeClass != Nil && ! ([volumeClass isSubclassOfClass:[ImpHFSSourceVolume class]] || [volumeClass isSubclassOfClass:[ImpHFSPlusSourceVolume class]])) {
 			//We only extract from HFS volumes. Skip.
 			return;
 		}
 
-		ImpHFSVolume *_Nonnull const srcVol = [[ImpHFSVolume alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
+		ImpSourceVolume *_Nonnull const srcVol = [[volumeClass alloc] initWithFileDescriptor:readFD startOffsetInBytes:startOffsetInBytes lengthInBytes:lengthInBytes textEncoding:self.hfsTextEncoding];
 		if (! [srcVol loadAndReturnError:&volumeLoadError])
 			return;
+
+		ImpHFSSourceVolume *_Nullable const hfsVol = [srcVol isKindOfClass:[ImpHFSSourceVolume class]] ? (ImpHFSSourceVolume *)srcVol : nil;
+		ImpHFSPlusSourceVolume *_Nullable const hfsPlusVol = [srcVol isKindOfClass:[ImpHFSPlusSourceVolume class]] ? (ImpHFSPlusSourceVolume *)srcVol : nil;
 
 		bool const grabEverything = (self.quarryNameOrPath == nil);
 		if (grabEverything) {
@@ -139,8 +144,11 @@
 		[catalog walkLeafNodes:^bool(ImpBTreeNode *_Nonnull const node) {
 			@autoreleasepool {
 				[node forEachHFSCatalogRecord_file:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFile *const _Nonnull fileRec) {
-					ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSVolume:srcVol catalogNodeID:L(fileRec->fileID) key:catalogKeyPtr fileRecord:fileRec];
-		//				ImpPrintf(@"We're looking for “%@” and found a file named “%@”", self.quarryName, dehydratedFile.name);
+					ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSSourceVolume:hfsVol
+						catalogNodeID:L(fileRec->fileID)
+						key:catalogKeyPtr
+						fileRecord:fileRec];
+	//				ImpPrintf(@"We're looking for “%@” and found a file named “%@”", self.quarryName, dehydratedFile.name);
 					bool const nameIsEqual = [dehydratedFile.name isEqualToString:self.quarryName];
 					bool const shouldRehydrateBecauseName = (grabAnyFileWithThisName && nameIsEqual);
 					bool const shouldRehydrateBecausePath = [self isQuarryPath:parsedPath isEqualToCatalogPath:dehydratedFile.path];
@@ -151,8 +159,11 @@
 						matchedByPath = dehydratedFile;
 					}
 				} folder:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRec) {
-					ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSVolume:srcVol catalogNodeID:L(folderRec->folderID) key:catalogKeyPtr folderRecord:folderRec];
-		//				ImpPrintf(@"We're looking for “%@” and found a file named “%@”", self.quarryName, dehydratedFile.name);
+					ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSSourceVolume:hfsVol
+						catalogNodeID:L(folderRec->folderID)
+						key:catalogKeyPtr
+						folderRecord:folderRec];
+	//				ImpPrintf(@"We're looking for “%@” and found a file named “%@”", self.quarryName, dehydratedFile.name);
 					bool const nameIsEqual = [dehydratedFolder.name isEqualToString:self.quarryName];
 					bool const shouldRehydrateBecauseName = (grabAnyFileWithThisName && nameIsEqual);
 					bool const shouldRehydrateBecausePath = [self isQuarryPath:parsedPath isEqualToCatalogPath:dehydratedFolder.path];
@@ -163,6 +174,39 @@
 						matchedByPath = dehydratedFolder;
 					}
 				} thread:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogThread *const _Nonnull threadRec) {
+					//Ignore thread records.
+				}];
+				[node forEachHFSPlusCatalogRecord_file:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSPlusCatalogFile const *_Nonnull const fileRec) {
+					ImpDehydratedItem *_Nonnull const dehydratedFile = [[ImpDehydratedItem alloc] initWithHFSPlusSourceVolume:hfsPlusVol
+						catalogNodeID:L(fileRec->fileID)
+						key:catalogKeyPtr
+						fileRecord:fileRec];
+	//				ImpPrintf(@"We're looking for “%@” and found a file named “%@”", self.quarryName, dehydratedFile.name);
+					bool const nameIsEqual = [dehydratedFile.name isEqualToString:self.quarryName];
+					bool const shouldRehydrateBecauseName = (grabAnyFileWithThisName && nameIsEqual);
+					bool const shouldRehydrateBecausePath = [self isQuarryPath:parsedPath isEqualToCatalogPath:dehydratedFile.path];
+					if (shouldRehydrateBecauseName) {
+						[matchedByName addObject:dehydratedFile];
+					}
+					if (shouldRehydrateBecausePath) {
+						matchedByPath = dehydratedFile;
+					}
+				} folder:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSPlusCatalogFolder const *_Nonnull const folderRec) {
+					ImpDehydratedItem *_Nonnull const dehydratedFolder = [[ImpDehydratedItem alloc] initWithHFSPlusSourceVolume:hfsPlusVol
+						catalogNodeID:L(folderRec->folderID)
+						key:catalogKeyPtr
+						folderRecord:folderRec];
+	//				ImpPrintf(@"We're looking for “%@” and found a file named “%@”", self.quarryName, dehydratedFile.name);
+					bool const nameIsEqual = [dehydratedFolder.name isEqualToString:self.quarryName];
+					bool const shouldRehydrateBecauseName = (grabAnyFileWithThisName && nameIsEqual);
+					bool const shouldRehydrateBecausePath = [self isQuarryPath:parsedPath isEqualToCatalogPath:dehydratedFolder.path];
+					if (shouldRehydrateBecauseName) {
+						[matchedByName addObject:dehydratedFolder];
+					}
+					if (shouldRehydrateBecausePath) {
+						matchedByPath = dehydratedFolder;
+					}
+				} thread:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, struct HFSPlusCatalogThread const *_Nonnull const threadRec) {
 					//Ignore thread records.
 				}];
 			}
@@ -196,7 +240,11 @@
 
 	if (! rehydrated) {
 		if (outError != NULL) {
-			*outError = volumeLoadError ?: rehydrationError;
+			NSError *_Nullable error = volumeLoadError ?: rehydrationError;
+			if (error == nil) {
+				error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadCorruptFileError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"No eligible source volumes found in %@.", self.sourceDevice.path] }];
+			}
+			*outError = error;
 		}
 	}
 
