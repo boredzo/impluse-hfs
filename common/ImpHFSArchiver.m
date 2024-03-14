@@ -539,8 +539,8 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 				}
 				return false;
 			}
-			memcpy(fileRecPtr->resourceFork.extents, extents, sizeof(fileRecPtr->resourceFork.extents));
-			S(fileRecPtr->resourceFork.totalBlocks, (u_int32_t)ImpNumberOfBlocksInHFSPlusExtentRecord(extents));
+//			memcpy(fileRecPtr->resourceFork.extents, extents, sizeof(fileRecPtr->resourceFork.extents));
+//			S(fileRecPtr->resourceFork.totalBlocks, (u_int32_t)ImpNumberOfBlocksInHFSPlusExtentRecord(extents));
 			if (file.assignedItemID == 41) {
 				ImpPrintf(@"Beep boop!");
 			}
