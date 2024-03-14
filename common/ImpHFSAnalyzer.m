@@ -145,9 +145,9 @@
 		u_int64_t const lsize = L(forkPtr->logicalSize);
 		u_int64_t const psize = L(forkPtr->totalBlocks) * blockSize;
 		u_int64_t const esize = numBlocksFromExtentRec * blockSize;
-		ImpPrintf(@"%s%s: lsize %llu, psize %u blocks (%llu bytes), extent sum %llu blocks (%llu bytes)",
+		ImpPrintf(@"%s%s: lsize %llu (mod blocksize = %llu), psize %u blocks (%llu bytes), extent sum %llu blocks (%llu bytes)",
 			indentString, forkName,
-			lsize,
+			lsize, lsize % blockSize,
 			L(forkPtr->totalBlocks), psize,
 			numBlocksFromExtentRec, esize
 		);
@@ -336,27 +336,55 @@
 					return byteCount;
 				};
 
+				char const *_Nonnull const indentString = "\t";
+
+				char const *_Nonnull forkName = "DF";
+				u_int64_t lsize = L(fileRec->dataLogicalSize);
+				u_int64_t psize = L(fileRec->dataPhysicalSize);
 				[hfsVol forEachExtentInFileWithID:L(fileRec->fileID)
 					fork:ImpForkTypeData
-					forkLogicalLength:L(fileRec->dataLogicalSize)
+					forkLogicalLength:lsize
 					startingWithExtentsRecord:fileRec->dataExtents
 					block:checkExtentValidity];
-				ImpPrintf(@"	Data fork lengths: %@ bytes physical, %@ bytes logical", [nf stringFromNumber:@(L(fileRec->dataPhysicalSize))], [nf stringFromNumber:@(L(fileRec->dataLogicalSize))]);
-				ImpPrintf(@"	Data fork extents: %@ (%@ blocks = %@ bytes)", [extentDescriptions componentsJoinedByString:@", "], [nf stringFromNumber:@(totalBlockCount)], [nf stringFromNumber:@(totalPhysicalLength)]);
-				ImpPrintf(@"	Data fork blocks: %@", blockCheckResults);
+				ImpPrintf(@"%s%s: lsize %@ (mod blocksize = %llu), psize %@ bytes, extent sum %@ blocks (%@ bytes)",
+					indentString, forkName,
+					[nf stringFromNumber:@(lsize)], lsize % blockSize,
+					[nf stringFromNumber:@(psize)],
+					[nf stringFromNumber:@(totalBlockCount)], [nf stringFromNumber:@(totalPhysicalLength)]
+				);
+				if (lsize > psize) {
+					ImpPrintf(@"%s🚨 %s: lsize is greater than psize. Likely causes: Endianness issue; stale/incorrect psize.", indentString, forkName);
+				}
+				if (psize != totalPhysicalLength) {
+					ImpPrintf(@"%s🚨 %s: psize (totalBlocks) does not match sum of extent blockCounts. Likely causes: Endianness issue; one or both are stale/incorrect.", indentString, forkName);
+				}
+				ImpPrintf(@"%s%s blocks: %@", indentString, forkName, blockCheckResults);
 
 				[extentDescriptions removeAllObjects];
 				totalBlockCount = totalPhysicalLength = 0;
 				blockCheckResults = [NSMutableString stringWithCapacity:ImpCeilingDivide(L(fileRec->rsrcPhysicalSize), blockSize) + numExtraCharacters];
 
+				forkName = "RF";
+				lsize = L(fileRec->rsrcLogicalSize);
+				psize = L(fileRec->rsrcPhysicalSize);
 				[hfsVol forEachExtentInFileWithID:L(fileRec->fileID)
 					fork:ImpForkTypeResource
-					forkLogicalLength:L(fileRec->rsrcLogicalSize)
+					forkLogicalLength:lsize
 					startingWithExtentsRecord:fileRec->rsrcExtents
 					block:checkExtentValidity];
-				ImpPrintf(@"	Rsrc fork lengths: %@ bytes physical, %@ bytes logical", [nf stringFromNumber:@(L(fileRec->rsrcPhysicalSize))], [nf stringFromNumber:@(L(fileRec->rsrcLogicalSize))]);
-				ImpPrintf(@"	Rsrc fork extents: %@ (%@ blocks = %@ bytes)", [extentDescriptions componentsJoinedByString:@", "], [nf stringFromNumber:@(totalBlockCount)], [nf stringFromNumber:@(totalPhysicalLength)]);
-				ImpPrintf(@"	Rsrc fork blocks: %@", blockCheckResults);
+				ImpPrintf(@"%s%s: lsize %@ (mod blocksize = %llu), psize %@ bytes, extent sum %@ blocks (%@ bytes)",
+					indentString, forkName,
+					[nf stringFromNumber:@(lsize)], lsize % blockSize,
+					[nf stringFromNumber:@(psize)],
+					[nf stringFromNumber:@(totalBlockCount)], [nf stringFromNumber:@(totalPhysicalLength)]
+				);
+				if (lsize > psize) {
+					ImpPrintf(@"%s🚨 %s: lsize is greater than psize. Likely causes: Endianness issue; stale/incorrect psize.", indentString, forkName);
+				}
+				if (psize != totalPhysicalLength) {
+					ImpPrintf(@"%s🚨 %s: psize (totalBlocks) does not match sum of extent blockCounts. Likely causes: Endianness issue; one or both are stale/incorrect.", indentString, forkName);
+				}
+				ImpPrintf(@"%s%s blocks: %@", indentString, forkName, blockCheckResults);
 
 				++numFiles;
 			} folder:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRec) {
