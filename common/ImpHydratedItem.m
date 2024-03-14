@@ -15,7 +15,7 @@
 
 @interface ImpHydratedItem ()
 
-- (instancetype _Nonnull) initWithRealWorldURL:(NSURL *_Nonnull const)fileURL;
+- (instancetype _Nullable) initWithRealWorldURL:(NSURL *_Nonnull const)fileURL;
 
 @property(readonly, nonatomic, copy) NSString *_Nonnull emojiIcon;
 
@@ -92,7 +92,7 @@ static NSUInteger originalItemCount = 0;
 	}
 }
 
-- (instancetype _Nonnull)initWithRealWorldURL:(NSURL *_Nonnull const)fileURL {
+- (instancetype _Nullable)initWithRealWorldURL:(NSURL *_Nonnull const)fileURL {
 	NSParameterAssert(! [self isMemberOfClass:[ImpHydratedItem class]]);
 
 	if ((self = [super init])) {
@@ -600,7 +600,7 @@ static NSUInteger originalItemCount = 0;
 	HFSPlusExtentRecord _hfsPlusDataForkExtents, _hfsPlusRsrcForkExtents;
 }
 
-- (instancetype)initWithRealWorldURL:(NSURL *const)fileURL {
+- (instancetype _Nullable)initWithRealWorldURL:(NSURL *_Nonnull const)fileURL {
 	if ((self = [super initWithRealWorldURL:fileURL])) {
 		_resourceForkURL = [self.realWorldURL URLByAppendingPathComponent:@"..namedfork/rsrc" isDirectory:false];
 
