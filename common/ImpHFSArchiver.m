@@ -213,8 +213,8 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 			}
 
 			if (needsBlocksCounted) {
-				numBlocksInVolume += ImpNextMultipleOfSize(dataForkLogicalLength, blockSize);
-				numBlocksInVolume += ImpNextMultipleOfSize(rsrcForkLogicalLength, blockSize);
+				numBlocksInVolume += ImpCeilingDivide(dataForkLogicalLength, blockSize);
+				numBlocksInVolume += ImpCeilingDivide(rsrcForkLogicalLength, blockSize);
 			}
 
 			NSMutableData *_Nonnull const fileKey = [NSMutableData dataWithLength:isHFSPlus ? sizeof(struct HFSPlusCatalogKey) : sizeof(struct HFSCatalogKey)];
