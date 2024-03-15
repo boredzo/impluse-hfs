@@ -243,6 +243,8 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 		}
 	}
 
+#pragma mark Estimating what space is needed where in the volume
+
 	ImpMutableBTreeFile *_Nonnull const catTree = [[ImpMutableBTreeFile alloc] initWithVersion:catalogVersion bytesPerNode:catBytesPerNode nodeCount:catBuilder.totalNodeCount];
 //	[catBuilder populateTree:catTree];
 	u_int32_t const catalogBlockCount = (u_int32_t)ImpCeilingDivide([catTree lengthInBytes], (u_int64_t)blockSize);
@@ -257,6 +259,12 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 
 	u_int32_t const extentsOverflowBlockCount = (u_int32_t)([extentsOverflowTree lengthInBytes] / (u_int64_t)blockSize);
 
+	NSByteCountFormatter *_Nonnull const bcf = [NSByteCountFormatter new];
+	bcf.countStyle = NSByteCountFormatterCountStyleFile;
+	u_int64_t const numBlocksInPreamble = 3;
+	u_int64_t numBlocksInAllocationsFile = 0;
+	u_int64_t const numBlocksInPostamble = 2;
+
 	if (needsBlocksCounted) {
 		/*We need to finish up our arithmetic. We now know the total physical length of all forks; we also need to add:
 		 *- the allocations file
@@ -270,19 +278,39 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 		 *(Complicating this math is the fact that the amount of spare space in the allocations file might not be enough to cover its own size.)
 		 */
 		u_int64_t const numBlocksInForks = numBlocksInVolume;
-		u_int64_t const numBlocksInPreamble = 3;
-		u_int64_t const numBlocksInPostamble = 2;
 		//The 0 represents numBlocksInAllocations, which we're about to calculate.
-		numBlocksInVolume = numBlocksInPreamble + 0 + extentsOverflowBlockCount + catalogBlockCount + numBlocksInForks + numBlocksInPostamble;
-		u_int64_t numBlocksInAllocations = ImpCeilingDivide(numBlocksInVolume, 8);
-		u_int64_t prevNumBlocksInAllocations = numBlocksInAllocations;
+		numBlocksInVolume = numBlocksInPreamble + /*numBlocksInAllocationsFile*/ 0 + extentsOverflowBlockCount + catalogBlockCount + numBlocksInForks + numBlocksInPostamble;
+
+		u_int64_t numBytesInAllocationsBitmap = ImpCeilingDivide(numBlocksInVolume, 8);
+		numBlocksInAllocationsFile = ImpCeilingDivide(numBytesInAllocationsBitmap, blockSize);
+		u_int64_t prevNumBlocksInAllocations = numBlocksInAllocationsFile;
 		do {
-			prevNumBlocksInAllocations = numBlocksInAllocations;
-			numBlocksInAllocations = ImpCeilingDivide(numBlocksInVolume + numBlocksInAllocations, 8);
-		} while (numBlocksInAllocations != prevNumBlocksInAllocations);
-		numBlocksInVolume += numBlocksInAllocations;
+			prevNumBlocksInAllocations = numBlocksInAllocationsFile;
+			numBytesInAllocationsBitmap = ImpCeilingDivide(numBlocksInVolume + numBlocksInAllocationsFile, 8);
+			numBlocksInAllocationsFile = ImpCeilingDivide(numBytesInAllocationsBitmap, blockSize);
+		} while (numBlocksInAllocationsFile != prevNumBlocksInAllocations);
+
+		numBlocksInVolume += numBlocksInAllocationsFile;
 		volumeLength = numBlocksInVolume * blockSize;
+//		ImpPrintf(@"Volume space breakdown:\n"
+//			@"\tPreamble:"         @"\t%llu (%@)\n"
+//			@"\tAllocations:"      @"\t%llu (%@)\n"
+//			@"\tExtents overflow:" @"\t%llu (%@)\n"
+//			@"\tCatalog:"          @"\t%llu (%@)\n"
+//			@"\tFork contents:"    @"\t%llu (%@)\n"
+//			@"\tPostamble:"        @"\t%llu (%@)\n"
+//			@"\tTotal:"            @"\t%llu (%@)\n",
+//			numBlocksInPreamble, [bcf stringFromByteCount:numBlocksInPreamble * blockSize],
+//			numBlocksInAllocationsFile, [bcf stringFromByteCount:numBlocksInAllocationsFile * blockSize],
+//			(u_int64_t)extentsOverflowBlockCount, [bcf stringFromByteCount:extentsOverflowBlockCount * blockSize],
+//			(u_int64_t)catalogBlockCount, [bcf stringFromByteCount:catalogBlockCount * blockSize],
+//			numBlocksInForks, [bcf stringFromByteCount:numBlocksInForks * blockSize],
+//			numBlocksInPostamble, [bcf stringFromByteCount:numBlocksInPostamble * blockSize],
+//			numBlocksInVolume, [bcf stringFromByteCount:numBlocksInVolume * blockSize]
+//		);
 	}
+
+	u_int64_t numBlocksCopied = 0;
 
 #pragma mark Creating the destination volume
 
@@ -483,7 +511,7 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 	for (ImpHydratedItem *_Nonnull const item in allItems) {
 		if ([item isKindOfClass:[ImpHydratedFile class]]) {
 			ImpHydratedFile *_Nonnull const file = (ImpHydratedFile *)item;
-			[self deliverProgressUpdate:0.0 operationDescription:[NSString stringWithFormat:@"Copying %@…", file.realWorldURL.relativePath]];
+			[self deliverProgressUpdate:numBlocksCopied / (double)numBlocksInVolume operationDescription:[NSString stringWithFormat:@"Copying %@…", file.realWorldURL.relativePath]];
 
 			HFSPlusExtentRecord extents;
 			__block NSError *_Nullable copyError = nil;
@@ -512,6 +540,7 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 				}
 				return false;
 			}
+			numBlocksCopied += ImpNumberOfBlocksInHFSPlusExtentRecord(extents);
 //			memcpy(fileRecPtr->dataFork.extents, extents, sizeof(fileRecPtr->dataFork.extents));
 //			S(fileRecPtr->dataFork.totalBlocks, (u_int32_t)ImpNumberOfBlocksInHFSPlusExtentRecord(extents));
 
@@ -539,6 +568,7 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 				}
 				return false;
 			}
+			numBlocksCopied += ImpNumberOfBlocksInHFSPlusExtentRecord(extents);
 //			memcpy(fileRecPtr->resourceFork.extents, extents, sizeof(fileRecPtr->resourceFork.extents));
 //			S(fileRecPtr->resourceFork.totalBlocks, (u_int32_t)ImpNumberOfBlocksInHFSPlusExtentRecord(extents));
 			if (file.assignedItemID == 41) {
@@ -549,6 +579,8 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 	}
 
 #pragma mark Writing the special files
+
+	[self deliverProgressUpdate:numBlocksCopied / (double)numBlocksInVolume operationDescription:@"Writing the special files…"];
 
 	//We need to repopulate the tree since we've just been changing files' catalog records.
 	[catBuilder catalogItemsAreDirty];
@@ -566,6 +598,9 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 		}
 		return false;
 	}
+	numBlocksCopied += catalogBlockCount;
+	[self deliverProgressUpdate:numBlocksCopied / (double)numBlocksInVolume operationDescription:@"Wrote the catalog"];
+
 	__block bool wroteExtentsOverflow = false;
 	__block NSError *_Nullable extWriteError = nil;
 	[extentsOverflowTree serializeToData:^(NSData *const  _Nonnull data) {
@@ -578,6 +613,8 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 		}
 		return false;
 	}
+	numBlocksCopied += extentsOverflowBlockCount;
+	[self deliverProgressUpdate:numBlocksCopied / (double)numBlocksInVolume operationDescription:@"Wrote the extents overflow tree"];
 
 #pragma mark Filling out the volume header, part 2
 
@@ -600,6 +637,11 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 #pragma mark Flushing to disk
 
 	[hfsPlusVol flushVolumeStructures:outError];
+	numBlocksCopied += L(vh->allocationFile.totalBlocks);
+	[self deliverProgressUpdate:numBlocksCopied / (double)numBlocksInVolume operationDescription:@"Wrote the allocations file"];
+	numBlocksCopied += numBlocksInPreamble + numBlocksInPostamble;
+	[self deliverProgressUpdate:numBlocksCopied / (double)numBlocksInVolume operationDescription:@"Wrote the volume headers"];
+	[self deliverProgressUpdate:numBlocksCopied / (double)numBlocksInVolume operationDescription:@"Archive created: %@", self.destinationDevice.path];
 
 	return true;
 }
