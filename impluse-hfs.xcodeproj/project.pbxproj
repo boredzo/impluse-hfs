@@ -23,6 +23,7 @@
 		313662682B37742100931CF4 /* ImpSourceVolume+ConsistencyChecking.m in Sources */ = {isa = PBXBuildFile; fileRef = 313662672B37742100931CF4 /* ImpSourceVolume+ConsistencyChecking.m */; };
 		313662692B37742100931CF4 /* ImpSourceVolume+ConsistencyChecking.m in Sources */ = {isa = PBXBuildFile; fileRef = 313662672B37742100931CF4 /* ImpSourceVolume+ConsistencyChecking.m */; };
 		313CF74A29C8415D00CAA05E /* ImpDehydratedResourceFork.m in Sources */ = {isa = PBXBuildFile; fileRef = 313CF74929C8415D00CAA05E /* ImpDehydratedResourceFork.m */; };
+		313FE6622BAFDB4E0083B123 /* ImpByteOrder.m in Sources */ = {isa = PBXBuildFile; fileRef = 313FE6612BAFDB4E0083B123 /* ImpByteOrder.m */; };
 		314EFFDB2932CF3700CE74E9 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFDA2932CF3700CE74E9 /* main.m */; };
 		314EFFE4293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFE3293301BB00CE74E9 /* ImpHFSToHFSPlusConverter.m */; };
 		314EFFE72933160800CE74E9 /* ImpSourceVolume.m in Sources */ = {isa = PBXBuildFile; fileRef = 314EFFE62933160800CE74E9 /* ImpSourceVolume.m */; };
@@ -111,6 +112,7 @@
 		313662672B37742100931CF4 /* ImpSourceVolume+ConsistencyChecking.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "ImpSourceVolume+ConsistencyChecking.m"; sourceTree = "<group>"; };
 		313CF74829C8415D00CAA05E /* ImpDehydratedResourceFork.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImpDehydratedResourceFork.h; sourceTree = "<group>"; };
 		313CF74929C8415D00CAA05E /* ImpDehydratedResourceFork.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpDehydratedResourceFork.m; sourceTree = "<group>"; };
+		313FE6612BAFDB4E0083B123 /* ImpByteOrder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImpByteOrder.m; sourceTree = "<group>"; };
 		314EFFD72932CF3700CE74E9 /* impluse-hfs */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "impluse-hfs"; sourceTree = BUILT_PRODUCTS_DIR; };
 		314EFFDA2932CF3700CE74E9 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		314EFFE12932CF5B00CE74E9 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
@@ -209,6 +211,7 @@
 			children = (
 				31C6E9D72939CF1A000A87D8 /* Prefix.h */,
 				314EFFF829370DF700CE74E9 /* ImpByteOrder.h */,
+				313FE6612BAFDB4E0083B123 /* ImpByteOrder.m */,
 				31077ACE2937C5E500066789 /* ImpSizeUtilities.h */,
 				31FD38C32978E29D00B44404 /* ImpSizeUtilities.m */,
 				31F719B9293AF1F40055EEA3 /* ImpForkUtilities.h */,
@@ -421,6 +424,7 @@
 				31F719B5293ABAAB0055EEA3 /* ImpDehydratedItem.m in Sources */,
 				31F719B8293AC4230055EEA3 /* ImpTextEncodingConverter.m in Sources */,
 				314EFFEA29332FEA00CE74E9 /* ImpDestinationVolume.m in Sources */,
+				313FE6622BAFDB4E0083B123 /* ImpByteOrder.m in Sources */,
 				3105F1C3293FE8B30062C6F8 /* ImpHFSLister.m in Sources */,
 				31108C7D2B9AEA0900C7D59B /* ImpHFSPlusDestinationVolume.m in Sources */,
 				314EFFF3293510CE00CE74E9 /* ImpBTreeHeaderNode.m in Sources */,
