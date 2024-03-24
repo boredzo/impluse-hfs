@@ -249,6 +249,10 @@
 	[self impluseBugDetected_messageSentToAbstractClass];
 	return -1;
 }
+- (HFSCatalogNodeID) nextCatalogNodeID {
+	[self impluseBugDetected_messageSentToAbstractClass];
+	return 0;
+}
 - (NSString *_Nonnull) volumeName {
 	[self impluseBugDetected_messageSentToAbstractClass];
 	return @"Unknown volume";

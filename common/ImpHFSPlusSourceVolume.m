@@ -68,6 +68,9 @@
 - (off_t) offsetOfFirstAllocationBlock {
 	return 0;
 }
+- (HFSCatalogNodeID) nextCatalogNodeID {
+	return L(_vh->nextCatalogID);
+}
 
 - (u_int32_t) numberOfBytesPerBlock {
 	NSAssert(_hasVolumeHeader, @"Can't get the HFS+ volume's block size before the HFS+ volume's volume header has been populated");

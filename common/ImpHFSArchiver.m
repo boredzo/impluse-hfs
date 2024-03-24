@@ -366,7 +366,6 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 	S(vh->nextAllocation, (u_int32_t)[hfsPlusVol firstUnusedBlockInWorkingBitmap]);
 	S(vh->rsrcClumpSize, blockSize);
 	S(vh->dataClumpSize, blockSize * 4);
-	S(vh->nextCatalogID, catBuilder.nextCatalogNodeID);
 	 */
 	S(vh->writeCount, (u_int32_t)1);
 	S(vh->encodingsBitmap, encodingsBitmap);
@@ -618,6 +617,8 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 	[self deliverProgressUpdate:numBlocksCopied / (double)numBlocksInVolume operationDescription:@"Wrote the extents overflow tree"];
 
 #pragma mark Filling out the volume header, part 2
+
+	S(vh->nextCatalogID, catBuilder.nextCatalogNodeID);
 
 	//The volume initialized the allocationFile member on its own when creating the allocations bitmap.
 	memcpy(vh->extentsFile.extents, extentsOverflowExtents, sizeof(vh->extentsFile.extents));

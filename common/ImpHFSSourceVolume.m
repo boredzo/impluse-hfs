@@ -34,6 +34,9 @@
 - (u_int32_t) firstPhysicalBlockOfFirstAllocationBlock {
 	return L(_mdb->drAlBlSt);
 }
+- (HFSCatalogNodeID) nextCatalogNodeID {
+	return L(_mdb->drNxtCNID);
+}
 - (u_int32_t) numberOfBytesPerBlock {
 	return L(_mdb->drAlBlkSiz);
 }

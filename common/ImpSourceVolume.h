@@ -91,6 +91,7 @@
 - (u_int32_t) firstPhysicalBlockOfFirstAllocationBlock;
 ///The offset in bytes at which the first allocation block begins. (I.e., firstPhysicalBlockOfFirstAllocationBlock converted to a byte offset.)
 - (off_t) offsetOfFirstAllocationBlock;
+- (HFSCatalogNodeID) nextCatalogNodeID;
 - (u_int32_t) numberOfBytesPerBlock;
 ///The total number of allocation blocks in the volume, according to the volume header.
 - (NSUInteger) numberOfBlocksTotal;
