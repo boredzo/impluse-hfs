@@ -121,21 +121,16 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 	}
 
 	//This array contains every single item to be added to the catalog, regardless of its position in the folder hierarchy. As such, the number of items in the root is not relevant; we cannot easily produce an estimate of the number of items with which to guess the capacity needed.
-	//Note that numFolders does *not* get the root directory added to it. fsck_hfs confirms that counting the root directory in numFolders is incorrect.
 	NSMutableArray <ImpHydratedItem *> *_Nonnull const allItems = [NSMutableArray array];
 	[allItems addObject:rootDirItem];
 	for (ImpHydratedItem *_Nonnull const item in itemsInsideTheRootFolder) {
 		if ([item isKindOfClass:[ImpHydratedFolder class]]) {
-			++numFolders;
-
 			ImpHydratedFolder *_Nonnull const folder = (ImpHydratedFolder *)item;
 			NSArray <ImpHydratedItem *> *_Nonnull const children = [folder gatherChildrenOrReturnError:outError];
 			if (! children) {
 				return false;
 			}
 			folder.contents = children;
-		} else {
-			++numFiles;
 		}
 
 		[item recursivelyAddItemsToArray:allItems];
@@ -166,7 +161,7 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 	HFSCatalogNodeID cnidCounter = kHFSFirstUserCatalogNodeID;
 
 	NSMutableDictionary <ImpHydratedFile *, ImpCatalogItem *> *_Nonnull const catalogItemsForFiles = [NSMutableDictionary dictionaryWithCapacity:allItems.count];
-	NSMutableArray <ImpHydratedFile *> *_Nonnull const allFiles = [NSMutableArray arrayWithCapacity:numFiles];
+	NSMutableArray <ImpHydratedFile *> *_Nonnull const allFiles = [NSMutableArray arrayWithCapacity:allItems.count];
 	for (ImpHydratedItem *_Nonnull const item in allItems) {
 		item.textEncodingConverter = tec;
 		//This has to be conditional because the root item already has a CNID.
@@ -176,6 +171,7 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 		if ([item isKindOfClass:[ImpHydratedFolder class]]) {
 #pragma mark — Folder catalog records
 			ImpHydratedFolder *_Nonnull const folder = (ImpHydratedFolder *)item;
+			++numFolders;
 
 			NSMutableData *_Nonnull const folderKey = [NSMutableData dataWithLength:isHFSPlus ? sizeof(struct HFSPlusCatalogKey) : sizeof(struct HFSCatalogKey)];
 			NSMutableData *_Nonnull const folderRec = [NSMutableData dataWithLength:isHFSPlus ? sizeof(struct HFSPlusCatalogFolder) : sizeof(struct HFSCatalogFolder)];
@@ -201,6 +197,7 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 		} else {
 #pragma mark — File catalog records
 			ImpHydratedFile *_Nonnull const file = (ImpHydratedFile *)item;
+			++numFiles;
 
 			u_int64_t dataForkLogicalLength = 0, rsrcForkLogicalLength = 0;
 			bool const gotDFLength = [file getDataForkLength:&dataForkLogicalLength error:outError];
@@ -242,6 +239,10 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 			[allFiles addObject:file];
 		}
 	}
+
+	//Note that numFolders must *not* count the root directory. fsck_hfs confirms that counting the root directory in numFolders is incorrect.
+	NSAssert(numFolders >= 1, @"Somehow created a volume with no root directory!");
+	--numFolders;
 
 #pragma mark Estimating what space is needed where in the volume
 
