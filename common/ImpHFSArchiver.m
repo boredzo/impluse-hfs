@@ -126,11 +126,10 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 	for (ImpHydratedItem *_Nonnull const item in itemsInsideTheRootFolder) {
 		if ([item isKindOfClass:[ImpHydratedFolder class]]) {
 			ImpHydratedFolder *_Nonnull const folder = (ImpHydratedFolder *)item;
-			NSArray <ImpHydratedItem *> *_Nonnull const children = [folder gatherChildrenOrReturnError:outError];
-			if (! children) {
+			bool const gotChildren = [folder recursivelyGatherChildrenOrReturnError:outError];
+			if (! gotChildren) {
 				return false;
 			}
-			folder.contents = children;
 		}
 
 		[item recursivelyAddItemsToArray:allItems];

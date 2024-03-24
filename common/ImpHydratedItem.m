@@ -615,6 +615,28 @@ static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', '
 
 	return children;
 }
+- (bool) recursivelyGatherChildrenOrReturnError:(out NSError *_Nullable *_Nullable const)outError {
+	NSArray <ImpHydratedItem *> *_Nonnull children = self.contents;
+	if (children == nil) {
+		children = [self gatherChildrenOrReturnError:outError];
+		self.contents = children;
+	}
+
+	bool gotChildren = children != nil;
+	if (gotChildren) {
+		for (ImpHydratedItem *_Nonnull const item in children) {
+			if ([item isKindOfClass:[ImpHydratedFolder class]]) {
+				ImpHydratedFolder *_Nonnull const folder = (ImpHydratedFolder *)item;
+				gotChildren = gotChildren && [folder recursivelyGatherChildrenOrReturnError:outError];
+			}
+			if (! gotChildren) {
+				break;
+			}
+		}
+	}
+
+	return gotChildren;
+}
 
 @end
 

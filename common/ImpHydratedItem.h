@@ -133,6 +133,9 @@ typedef NS_ENUM(NSUInteger, ImpItemClassification) {
 ///Instantiates a ImpHydratedItem for every item inside the folder. Returns nil if the folder no longer exists, isn't accessible, or some other error occurs. This result is not reused; you will need to store it somewhere (e.g., the contents property).
 - (NSArray <ImpHydratedItem *> *_Nullable) gatherChildrenOrReturnError:(out NSError *_Nullable *_Nullable const)outError;
 
+///Uses gatherChildrenOrReturnError:, sets self.contents, and then instructs every hydrated folder in that array to do the same.
+- (bool) recursivelyGatherChildrenOrReturnError:(out NSError *_Nullable *_Nullable const)outError;
+
 @property(copy) NSArray <ImpHydratedItem *> *_Nonnull contents;
 
 @end
