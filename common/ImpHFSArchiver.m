@@ -641,7 +641,7 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 	[self deliverProgressUpdate:numBlocksCopied / (double)numBlocksInVolume operationDescription:@"Wrote the allocations file"];
 	numBlocksCopied += numBlocksInPreamble + numBlocksInPostamble;
 	[self deliverProgressUpdate:numBlocksCopied / (double)numBlocksInVolume operationDescription:@"Wrote the volume headers"];
-	[self deliverProgressUpdate:numBlocksCopied / (double)numBlocksInVolume operationDescription:@"Archive created: %@", self.destinationDevice.path];
+	[self deliverProgressUpdate:numBlocksCopied / (double)numBlocksInVolume operationDescription:[NSString stringWithFormat:@"Archive created: %@", self.destinationDevice.path]];
 
 	return true;
 }
