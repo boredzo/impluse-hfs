@@ -557,6 +557,7 @@ static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', '
 	ImpHydratedFolder *_Nullable const parentFolder = self.parentFolder;
 	HFSCatalogNodeID const parentID = parentFolder != nil ? parentFolder.assignedItemID : kHFSRootParentID;
 	S(threadRecPtr->parentID, parentID);
+	NSParameterAssert(self.textEncodingConverter != nil);
 	[self.textEncodingConverter convertString:self.name toHFSUniStr255:&threadRecPtr->nodeName];
 	S(threadRecPtr->reserved, 0);
 }
@@ -888,6 +889,7 @@ static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', '
 	ImpHydratedFolder *_Nullable const parentFolder = self.parentFolder;
 	HFSCatalogNodeID const parentID = parentFolder != nil ? parentFolder.assignedItemID : kHFSRootParentID;
 	S(threadRecPtr->parentID, parentID);
+	NSParameterAssert(self.textEncodingConverter != nil);
 	[self.textEncodingConverter convertString:self.name toHFSUniStr255:&threadRecPtr->nodeName];
 	S(threadRecPtr->reserved, 0);
 }
