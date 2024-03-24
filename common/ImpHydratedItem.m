@@ -575,6 +575,7 @@ static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', '
 	NSParameterAssert(self.textEncodingConverter != nil);
 	[self.textEncodingConverter convertString:self.name toHFSUniStr255:&threadRecPtr->nodeName];
 	S(threadRecPtr->reserved, 0);
+	payloadData.length = sizeof(threadRecPtr->recordType) + sizeof(threadRecPtr->parentID) + sizeof(threadRecPtr->nodeName.length) + L(threadRecPtr->nodeName.length) * sizeof(UniChar) + sizeof(threadRecPtr->reserved);
 }
 
 #pragma mark Populating arrays
@@ -902,6 +903,7 @@ static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', '
 	NSParameterAssert(self.textEncodingConverter != nil);
 	[self.textEncodingConverter convertString:self.name toHFSUniStr255:&threadRecPtr->nodeName];
 	S(threadRecPtr->reserved, 0);
+	payloadData.length = sizeof(threadRecPtr->recordType) + sizeof(threadRecPtr->parentID) + sizeof(threadRecPtr->nodeName.length) + L(threadRecPtr->nodeName.length) * sizeof(UniChar) + sizeof(threadRecPtr->reserved);
 }
 
 #pragma mark Populating arrays
