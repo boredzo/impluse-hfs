@@ -847,9 +847,9 @@ static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', '
 	S(fileRecPtr->bsdInfo.adminFlags, 0);
 	S(fileRecPtr->bsdInfo.special.linkCount, 0);
 
-	memcpy(&(fileRecPtr->userInfo), &(catInfo.finderInfo), sizeof(fileRecPtr->userInfo));
+	ImpSwapFinderFileInfo(&(catInfo.finderInfo), &(fileRecPtr->userInfo));
 	struct FXInfo extInfo = { 0 };
-	memcpy(&extInfo, &(catInfo.extFinderInfo), sizeof(extInfo));
+	ImpSwapFinderFileExtendedInfo(&(catInfo.extFinderInfo), &extInfo);
 	ScriptCode script;
 	err = RevertTextEncodingToScriptInfo(self.textEncodingConverter.hfsTextEncoding, &script, /*outLanguageID*/ NULL, /*outFontName*/ NULL);
 	if (err != noErr) {

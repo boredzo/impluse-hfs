@@ -52,4 +52,15 @@ static inline int8_t ImpSwapInt8BigToHost(int8_t x) {
 #define S32(x) CFSwapInt32HostToBig(x)
 #define S64(x) CFSwapInt64HostToBig(x)
 
+//TODO: Do these as proper type-generic macros.
+#define ImpSwapFinderFileInfo(srcPtr, dstPtr) _ImpSwapFinderFileInfoA((struct FInfo const *_Nonnull const)(srcPtr), (struct FInfo *_Nonnull const)(dstPtr))
+#define ImpSwapFinderFileExtendedInfo(srcPtr, dstPtr) _ImpSwapFinderFileExtendedInfoA((struct FXInfo const *_Nonnull const)(srcPtr), (struct FXInfo *_Nonnull const)(dstPtr))
+#define ImpSwapFinderFolderInfo(srcPtr, dstPtr) _ImpSwapFinderFolderInfoA((struct DInfo const *_Nonnull const)(srcPtr), (struct DInfo const *_Nonnull const)(dstPtr))
+#define ImpSwapFinderFolderExtendedInfo(srcPtr, dstPtr) _ImpSwapFinderFolderExtendedInfoA((struct DXInfo const *_Nonnull const)(srcPtr), (struct DXInfo *_Nonnull const)(dstPtr))
+
+extern void _ImpSwapFinderFileInfoA(struct FInfo const *_Nonnull const srcPtr, struct FInfo *_Nonnull const dstPtr);
+extern void _ImpSwapFinderFileExtendedInfoA(struct FXInfo const *_Nonnull const srcPtr, struct FXInfo *_Nonnull const dstPtr);
+extern void _ImpSwapFinderFolderInfoA(struct DInfo const *_Nonnull const srcPtr, struct DInfo *_Nonnull const dstPtr);
+extern void _ImpSwapFinderFolderExtendedInfoA(struct DXInfo const *_Nonnull const srcPtr, struct DXInfo *_Nonnull const dstPtr);
+
 #endif /* ImpByteOrder_h */
