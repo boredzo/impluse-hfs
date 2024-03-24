@@ -18,6 +18,7 @@
 - (instancetype _Nullable) initWithRealWorldURL:(NSURL *_Nonnull const)fileURL;
 
 @property(readonly, nonatomic, copy) NSString *_Nonnull emojiIcon;
+@property(readonly, nonatomic) FSRef *_Nonnull fsRef NS_RETURNS_INNER_POINTER;
 
 @end
 
@@ -29,6 +30,9 @@ static struct HFSUniStr255 dataForkName = { .length = 0 };
 static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', 'E', 'S', 'O', 'U', 'R', 'C', 'E' } };
 
 @implementation ImpHydratedItem
+{
+	FSRef _ref;
+}
 
 + (void) initialize {
 	FSGetDataForkName(&dataForkName);
@@ -105,7 +109,14 @@ static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', '
 
 	if ((self = [super init])) {
 		_realWorldURL = [fileURL copy];
-		_name = _realWorldURL.lastPathComponent;
+
+		if (! CFURLGetFSRef((__bridge CFURLRef)_realWorldURL, &_ref)) {
+			self = nil;
+		}
+
+		struct HFSUniStr255 name = { 0 };
+		FSGetCatalogInfo(&_ref, kFSCatInfoNone, /*catalogInfo*/ NULL, &name, /*fsSpec*/ NULL, /*parentRef*/ NULL);
+		self.name = [ImpTextEncodingConverter stringFromHFSUniStr255:&name swapBytes:false];
 	}
 	return self;
 }
@@ -122,6 +133,10 @@ static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', '
 - (NSString *_Nonnull const) description {
 	NSString *_Nonnull const quotedName = self.name ? [NSString stringWithFormat:@"“%@”", self.name] : @"(unnamed)";
 	return [NSString stringWithFormat:@"<%@ %p %@ #%u %@>", self.class, self, self.emojiIcon, self.assignedItemID, quotedName];
+}
+
+- (FSRef *_Nonnull const) fsRef {
+	return &_ref;
 }
 
 #pragma mark Collection necessities
@@ -604,17 +619,12 @@ static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', '
 
 @implementation ImpHydratedFile
 {
-	FSRef _ref;
 	HFSExtentRecord _hfsDataForkExtents, _hfsRsrcForkExtents;
 	HFSPlusExtentRecord _hfsPlusDataForkExtents, _hfsPlusRsrcForkExtents;
 }
 
 - (instancetype _Nullable)initWithRealWorldURL:(NSURL *_Nonnull const)fileURL {
 	if ((self = [super initWithRealWorldURL:fileURL])) {
-		if (! CFURLGetFSRef((__bridge CFURLRef)self.realWorldURL, &_ref)) {
-			self = nil;
-		}
-
 		_numberOfBytesPerBlock = kISOStandardBlockSize;
 		_numberOfBlocksPerDataClump = 4;
 		_numberOfBlocksPerResourceClump = 1;
@@ -817,7 +827,7 @@ static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', '
 		nodeName:self.name];
 
 	struct FSCatalogInfo catInfo = { 0 };
-	OSStatus err = FSGetCatalogInfo(&_ref, kFSCatInfoAllDates | kFSCatInfoNodeFlags | kFSCatInfoFinderInfo | kFSCatInfoFinderXInfo | kFSCatInfoTextEncoding | kFSCatInfoDataSizes | kFSCatInfoRsrcSizes | kFSCatInfoPermissions, &catInfo, /*outUnicodeName*/ NULL, /*outFSSpec*/ NULL, /*outParentRef*/ NULL);
+	OSStatus err = FSGetCatalogInfo(self.fsRef, kFSCatInfoAllDates | kFSCatInfoNodeFlags | kFSCatInfoFinderInfo | kFSCatInfoFinderXInfo | kFSCatInfoTextEncoding | kFSCatInfoDataSizes | kFSCatInfoRsrcSizes | kFSCatInfoPermissions, &catInfo, /*outUnicodeName*/ NULL, /*outFSSpec*/ NULL, /*outParentRef*/ NULL);
 
 	u_int32_t const blockSize = self.numberOfBytesPerBlock;
 
@@ -931,7 +941,7 @@ static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', '
 }
 - (bool) getDataForkLength:(out u_int64_t *_Nonnull const)outLength error:(out NSError *_Nullable *_Nullable const)outError {
 	struct FSCatalogInfo catInfo = { 0 };
-	OSStatus const err = FSGetCatalogInfo(&_ref, kFSCatInfoDataSizes, &catInfo, /*outUnicodeName*/ NULL, /*outFSSpec*/ NULL, /*outParentRef*/ NULL);
+	OSStatus const err = FSGetCatalogInfo(self.fsRef, kFSCatInfoDataSizes, &catInfo, /*outUnicodeName*/ NULL, /*outFSSpec*/ NULL, /*outParentRef*/ NULL);
 	bool const success = (err == noErr);
 	if (success) {
 		*outLength = catInfo.dataLogicalSize;
@@ -945,7 +955,7 @@ static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', '
 }
 - (bool) getResourceForkLength:(out u_int64_t *_Nonnull const)outLength error:(out NSError *_Nullable *_Nullable const)outError {
 	struct FSCatalogInfo catInfo = { 0 };
-	OSStatus const err = FSGetCatalogInfo(&_ref, kFSCatInfoRsrcSizes, &catInfo, /*outUnicodeName*/ NULL, /*outFSSpec*/ NULL, /*outParentRef*/ NULL);
+	OSStatus const err = FSGetCatalogInfo(self.fsRef, kFSCatInfoRsrcSizes, &catInfo, /*outUnicodeName*/ NULL, /*outFSSpec*/ NULL, /*outParentRef*/ NULL);
 	bool const success = (err == noErr);
 	if (success) {
 		*outLength = catInfo.rsrcLogicalSize;
@@ -964,7 +974,7 @@ static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', '
 	error:(out NSError *_Nullable *_Nullable const)outError
 {
 	FSIORefNum fileRefNum = -1;
-	OSStatus err = FSOpenFork(&_ref, forkName->length, forkName->unicode, fsRdPerm, &fileRefNum);
+	OSStatus err = FSOpenFork(self.fsRef, forkName->length, forkName->unicode, fsRdPerm, &fileRefNum);
 	if (err == eofErr) {
 		//No/empty resource fork. This is an immediate success condition.
 		return true;
