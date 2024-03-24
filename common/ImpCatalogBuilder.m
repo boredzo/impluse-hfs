@@ -127,9 +127,9 @@ static ImpBTreeVersion ImpGetCatalogKeyVersion(NSData *_Nonnull const keyData) {
 	NSMutableSet <ImpCatalogItem *> *_Nonnull _sourceItemsThatNeedThreadRecords;
 	NSMutableArray <ImpCatalogItem *> *_Nonnull _allSourceItems;
 
-	NSMutableArray <NSArray <ImpMockNode *> *> *_Nonnull _mockRows;
-	NSMutableArray <ImpMockIndexNode *> *_Nonnull _allMockIndexNodes;
-	NSMutableArray <ImpCatalogKeyValuePair *> *_Nonnull _allKeyValuePairs;
+	NSMutableArray <NSArray <ImpMockNode *> *> *_Nullable _mockRows;
+	NSMutableArray <ImpMockIndexNode *> *_Nullable _allMockIndexNodes;
+	NSMutableArray <ImpCatalogKeyValuePair *> *_Nullable _allKeyValuePairs;
 
 	ImpBTreeVersion _version;
 	__block HFSCatalogNodeID _largestCNIDYet;
@@ -421,7 +421,7 @@ static ImpBTreeVersion ImpGetCatalogKeyVersion(NSData *_Nonnull const keyData) {
 		ImpMockNode *_Nullable thisMockNode = nil;
 
 		//1 for the header node
-		++_numLiveNodes;
+		_numLiveNodes = 1;
 
 		for (ImpCatalogKeyValuePair *_Nonnull const kvp in _allKeyValuePairs) {
 			if (thisMockNode == nil) {
@@ -486,6 +486,9 @@ static ImpBTreeVersion ImpGetCatalogKeyVersion(NSData *_Nonnull const keyData) {
 }
 - (void) invalidateMockTree {
 	_treeIsBuilt = false;
+	_mockRows = nil;
+	_allMockIndexNodes = nil;
+	_allKeyValuePairs = nil;
 }
 
 - (void) catalogItemsAreDirty {
