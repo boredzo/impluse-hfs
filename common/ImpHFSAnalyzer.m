@@ -288,6 +288,7 @@
 	nf.hasThousandSeparators = true;
 
 	__block NSUInteger numFiles = 0, numFolders = 0, numThreads = 0;
+	NSCountedSet <NSNumber *> *_Nonnull catalogNodeIDsEncountered = [NSCountedSet setWithCapacity:srcVol.numberOfFiles + srcVol.numberOfFolders];
 
 	[catalog walkBreadthFirst:^bool(ImpBTreeNode *_Nonnull const node) {
 		if (node.nodeType == kBTLeafNode) {
@@ -387,6 +388,7 @@
 				ImpPrintf(@"%s%s blocks: %@", indentString, forkName, blockCheckResults);
 
 				++numFiles;
+				[catalogNodeIDsEncountered addObject:@(L(fileRec->fileID))];
 			} folder:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogFolder *const _Nonnull folderRec) {
 				ImpTextEncodingConverter *_Nonnull const tec = [ImpTextEncodingConverter converterForHFSFolder:folderRec fallback:srcVol.textEncodingConverter];
 				struct ExtendedFolderInfo const *_Nonnull const extFinderInfo = (struct ExtendedFolderInfo const *)&(folderRec->finderInfo);
@@ -397,6 +399,7 @@
 				ImpPrintf(@"    Finder flags: 0x%04x + 0x%04x", L(folderRec->userInfo.frFlags), L(extFinderInfo->extendedFinderFlags));
 				ImpPrintf(@"    Creation date: %u", L(folderRec->createDate));
 				++numFolders;
+				[catalogNodeIDsEncountered addObject:@(L(folderRec->folderID))];
 			} thread:^(struct HFSCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSCatalogThread *const _Nonnull threadRec) {
 				u_int32_t const ownID = L(catalogKeyPtr->parentID);
 				u_int32_t const parentID = L(threadRec->parentID);
@@ -431,6 +434,7 @@
 				logFork("    ", "DF", &(fileRec->dataFork));
 				logFork("    ", "RF", &(fileRec->resourceFork));
 				++numFiles;
+				[catalogNodeIDsEncountered addObject:@(L(fileRec->fileID))];
 			} folder:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSPlusCatalogFolder *const _Nonnull folderRec) {
 				struct FndrExtendedFileInfo const *_Nonnull const extFinderInfo = (struct FndrExtendedFileInfo const *)&(folderRec->finderInfo);
 				TextEncoding const enc = L(folderRec->textEncoding);
@@ -440,6 +444,7 @@
 				ImpPrintf(@"    Finder flags: 0x%04x + 0x%04x", L(folderRec->userInfo.frFlags), L(extFinderInfo->extended_flags));
 				ImpPrintf(@"    Creation date: %u", L(folderRec->createDate));
 				++numFolders;
+				[catalogNodeIDsEncountered addObject:@(L(folderRec->folderID))];
 			} thread:^(struct HFSPlusCatalogKey const *_Nonnull const catalogKeyPtr, const struct HFSPlusCatalogThread *const _Nonnull threadRec) {
 				u_int32_t const ownID = L(catalogKeyPtr->parentID);
 				u_int32_t const parentID = L(threadRec->parentID);
@@ -450,6 +455,11 @@
 		return true;
 	}];
 	ImpPrintf(@"Encountered %lu nodes", numNodes);
+
+	NSMutableArray <NSNumber *> *_Nonnull const cnidsInOrder = [[catalogNodeIDsEncountered allObjects] mutableCopy];
+	[cnidsInOrder sortUsingSelector:@selector(compare:)];
+	ImpPrintf(@"Next catalog node ID is %u", srcVol.nextCatalogNodeID);
+	ImpPrintf(@"Highest CNID in catalog is %u", cnidsInOrder.lastObject.unsignedIntValue);
 
 	//The actual intent here is “numFolders != srcVol.numberOfFolders”, but the former needs 1 subtracted (or the latter needs 1 added) and that risks under/overflow.
 	//So instead we check that numFolders > srcVol.numberOfFolders (i.e., we can subtract the latter from the former) and that the former minus the latter is 1.
