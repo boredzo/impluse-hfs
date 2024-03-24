@@ -926,19 +926,6 @@ static struct HFSUniStr255 resourceForkName = { .length = 8, .unicode = { 'R', '
 		ImpPrintf(@"Weighing the %@ fork of the Desktop: %llu", forkName, theEnd);
 	}
 	return true;
-
-	struct stat sb;
-	int const statResult = fstat(fd, &sb);
-	if (statResult < 0) {
-		int const statErrno = errno;
-		NSError *_Nonnull const statError = [NSError errorWithDomain:NSPOSIXErrorDomain code:statErrno userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to get %@ fork length for %@: %s", forkName, path, strerror(statErrno)] }];
-		if (outError != NULL) {
-			*outError = statError;
-		}
-		return false;
-	}
-	*outLength = sb.st_size;
-	return true;
 }
 - (bool) getDataForkLength:(out u_int64_t *_Nonnull const)outLength error:(out NSError *_Nullable *_Nullable const)outError {
 	struct FSCatalogInfo catInfo = { 0 };
