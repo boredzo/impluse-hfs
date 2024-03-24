@@ -464,8 +464,8 @@
 	//The actual intent here is “numFolders != srcVol.numberOfFolders”, but the former needs 1 subtracted (or the latter needs 1 added) and that risks under/overflow.
 	//So instead we check that numFolders > srcVol.numberOfFolders (i.e., we can subtract the latter from the former) and that the former minus the latter is 1.
 	bool const numItemsDiffered = numFiles != srcVol.numberOfFiles || (
-		(numFolders > srcVol.numberOfFolders)
-		&& ((numFolders - srcVol.numberOfFolders) == 1)
+		(numFolders <= srcVol.numberOfFolders)
+		|| ((numFolders - srcVol.numberOfFolders) != 1)
 	);
 	ImpPrintf(@"Encountered %lu files, %lu folders (including root directory), %lu threads", numFiles, numFolders, numThreads);
 	ImpPrintf(@"%@Volume header says it has %lu files, %lu folders (excluding root directory)", numItemsDiffered ? @"🚨 " : @"", (unsigned long)srcVol.numberOfFiles, (unsigned long)srcVol.numberOfFolders);
