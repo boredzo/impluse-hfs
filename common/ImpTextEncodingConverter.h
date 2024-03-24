@@ -78,7 +78,13 @@
 ///Equivalent to stringForPascalString:pascalString maxLength:31.
 - (NSString *_Nonnull const) stringForPascalString:(ConstStr31Param _Nonnull const)pascalString;
 
+///Create an NSString from UTF-16 bytes in an HFSUniStr255 structure. If shouldSwap, then the length and each character in unicodeName->unicode is byte-swapped.
+- (NSString *_Nonnull const) stringFromHFSUniStr255:(ConstHFSUniStr255Param _Nonnull const)unicodeName swapBytes:(bool const)shouldSwap;
+///Create an NSString from an HFSUniStr255 in big-endian byte order. Uses stringFromHFSUniStr255:swapBytes:, instructing it to swap if the native byte order is not big-endian.
 - (NSString *_Nonnull const) stringFromHFSUniStr255:(ConstHFSUniStr255Param _Nonnull const)unicodeName;
+
+///Conversion of a Unicode name to an NSString doesn't require an HFS text encoding, so this method enables doing that conversion without needing to create a text encoding converter.
++ (NSString *_Nonnull const) stringFromHFSUniStr255:(ConstHFSUniStr255Param)unicodeName swapBytes:(bool const)shouldSwap;
 
 #pragma mark Conversion from NSString
 
