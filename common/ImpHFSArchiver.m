@@ -168,6 +168,7 @@ ImpArchiveVolumeFormat _Nullable const ImpArchiveVolumeFormatFromString(NSString
 		if (item.assignedItemID == 0) {
 			item.assignedItemID = cnidCounter++;
 		}
+
 		if ([item isKindOfClass:[ImpHydratedFolder class]]) {
 #pragma mark — Folder catalog records
 			ImpHydratedFolder *_Nonnull const folder = (ImpHydratedFolder *)item;
