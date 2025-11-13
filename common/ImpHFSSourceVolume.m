@@ -91,7 +91,7 @@
 	return true;
 }
 
-- (bool)readAllocationBitmapFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
+- (bool)readAllocationBitmapFromFileDescriptor:(int const)readFD tapURL:(NSURL *_Nullable const)tapURL error:(NSError *_Nullable *_Nonnull const)outError {
 	//Volume bitmap immediately follows MDB. We could look at drVBMSt, but it should always be 3.
 	//Volume bitmap *size* is drNmAlBlks bits, or (drNmAlBlks / 8) bytes.
 	size_t const vbmMinimumNumBytes = ImpNextMultipleOfSize(L(_mdb->drNmAlBlks), 8) / 8;
@@ -126,13 +126,14 @@
 		if (outError != NULL) *outError = underrunError;
 		return false;
 	}
+	if (tapURL != nil) [volumeBitmap writeToURL:tapURL options:0 error:NULL];
 
 	[self setAllocationBitmapData:volumeBitmap numberOfBits:L(_mdb->drNmAlBlks)];
 
 	return true;
 }
 
-- (bool)readCatalogFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
+- (bool)readCatalogFileFromFileDescriptor:(int const)readFD tapURL:(NSURL *_Nullable const)tapURL error:(NSError *_Nullable *_Nonnull const)outError {
 	//IM:F says:
 	//>All the areas on a volume are of fixed size and location, except for the catalog file and the extents overflow file. These two files can appear anywhere between the volume bitmap and the alternate master directory block (MDB). They can appear in any order and are not necessarily contiguous.
 	//So we essentially have to treat the cat file as a file.
@@ -151,6 +152,7 @@
 		++numExtents;
 		return true;
 	}];
+	if (tapURL != nil) [catalogFileData writeToURL:tapURL options:0 error:NULL];
 
 	bool const successfullyReadCatalog = catalogFileData != nil && catalogFileData.length > 0;
 	if (successfullyReadCatalog) {
@@ -167,7 +169,7 @@
 	return successfullyReadCatalog;
 }
 
-- (bool)readExtentsOverflowFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
+- (bool)readExtentsOverflowFileFromFileDescriptor:(int const)readFD tapURL:(NSURL *_Nullable const)tapURL error:(NSError *_Nullable *_Nonnull const)outError {
 	//IM:F says:
 	//>All the areas on a volume are of fixed size and location, except for the catalog file and the extents overflow file. These two files can appear anywhere between the volume bitmap and the alternate master directory block (MDB). They can appear in any order and are not necessarily contiguous.
 	//So we essentially have to treat the extents overflow file as a file.
@@ -176,6 +178,7 @@
 	NSData *_Nullable const extentsFileData = [self readDataFromFileDescriptor:readFD logicalLength:L(_mdb->drXTFlSize) extents:eoExtDescs numExtents:kHFSExtentDensity error:outError];
 //	ImpPrintf(@"Extents file logical length from MDB: 0x%x bytes (must be at least %lu a-blocks)", L(_mdb->drXTFlSize), ImpCeilingDivide(extentsFileData.length, L(_mdb->drAlBlkSiz)));
 //	ImpPrintf(@"Extents file data: 0x%lx bytes (enough to fill %lu a-blocks)", extentsFileData.length, ImpCeilingDivide(extentsFileData.length, L(_mdb->drAlBlkSiz)));
+	if (tapURL != nil) [extentsFileData writeToURL:tapURL options:0 error:NULL];
 
 	if (extentsFileData != nil) {
 		self.extentsOverflowBTree = [[ImpBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSExtentsOverflow data:extentsFileData];

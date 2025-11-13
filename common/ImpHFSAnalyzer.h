@@ -13,6 +13,7 @@
 
 @property(copy) NSURL *_Nonnull sourceDevice;
 @property TextEncoding hfsTextEncoding;
+@property(copy) NSURL *_Nullable extentsFileTapURL;
 
 @property ImpSourceVolume *_Nonnull sourceVolume;
 

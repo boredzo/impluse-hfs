@@ -49,11 +49,11 @@
 ///Finer-grained method intended specifically for the analyze command. Most other uses should use loadAndReturnError:.
 - (bool) readVolumeHeaderFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
 ///Finer-grained method intended specifically for the analyze command. Most other uses should use loadAndReturnError:.
-- (bool)readAllocationBitmapFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
+- (bool) readAllocationBitmapFromFileDescriptor:(int const)readFD tapURL:(NSURL *_Nullable const)tapURL error:(NSError *_Nullable *_Nonnull const)outError;
 ///Finer-grained method intended specifically for the analyze command. Most other uses should use loadAndReturnError:.
-- (bool)readCatalogFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
+- (bool) readCatalogFileFromFileDescriptor:(int const)readFD tapURL:(NSURL *_Nullable const)tapURL error:(NSError *_Nullable *_Nonnull const)outError;
 ///Finer-grained method intended specifically for the analyze command. Most other uses should use loadAndReturnError:.
-- (bool)readExtentsOverflowFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
+- (bool) readExtentsOverflowFileFromFileDescriptor:(int const)readFD tapURL:(NSURL *_Nullable const)tapURL error:(NSError *_Nullable *_Nonnull const)outError;
 ///Finer-grained method intended specifically for the analyze command. Most other uses should use loadAndReturnError:.
 - (bool) readLastBlockFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError;
 

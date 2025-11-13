@@ -82,15 +82,15 @@
 	_blocksThatAreAllocatedButWereNotAccessed = CFBitVectorCreateMutableCopy(kCFAllocatorDefault, numBits, _bitVector);
 }
 
-- (bool)readAllocationBitmapFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
+- (bool)readAllocationBitmapFromFileDescriptor:(int const)readFD tapURL:(NSURL *_Nullable const)tapURL error:(NSError *_Nullable *_Nonnull const)outError {
 	[self impluseBugDetected_messageSentToAbstractClass];
 	return false;
 }
-- (bool)readCatalogFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
+- (bool)readCatalogFileFromFileDescriptor:(int const)readFD tapURL:(NSURL *_Nullable const)tapURL error:(NSError *_Nullable *_Nonnull const)outError {
 	[self impluseBugDetected_messageSentToAbstractClass];
 	return false;
 }
-- (bool)readExtentsOverflowFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
+- (bool)readExtentsOverflowFileFromFileDescriptor:(int const)readFD tapURL:(NSURL *_Nullable const)tapURL error:(NSError *_Nullable *_Nonnull const)outError {
 	[self impluseBugDetected_messageSentToAbstractClass];
 	return false;
 }
@@ -119,11 +119,11 @@
 		&&
 		[self readVolumeHeaderFromFileDescriptor:readFD error:outError]
 		&&
-		[self readAllocationBitmapFromFileDescriptor:readFD error:outError]
+		[self readAllocationBitmapFromFileDescriptor:readFD tapURL:nil error:outError]
 		&&
-		[self readExtentsOverflowFileFromFileDescriptor:readFD error:outError]
+		[self readExtentsOverflowFileFromFileDescriptor:readFD tapURL:nil error:outError]
 		&&
-		[self readCatalogFileFromFileDescriptor:readFD error:outError]
+		[self readCatalogFileFromFileDescriptor:readFD tapURL:nil error:outError]
 		&&
 		[self readLastBlockFromFileDescriptor:readFD error:outError]
 	);

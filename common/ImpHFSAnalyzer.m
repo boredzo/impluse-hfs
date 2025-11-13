@@ -114,12 +114,12 @@
 		ImpPrintf(@"Extents overflow extent the third: start block #%@, length %@ blocks", [fmtr stringFromNumber:@(L(eoExtDescs[2].startBlock))], [fmtr stringFromNumber:@(L(eoExtDescs[2].blockCount))]);
 	}];
 
-	if (! [srcVol readAllocationBitmapFromFileDescriptor:srcVol.fileDescriptor error:outError]) {
+	if (! [srcVol readAllocationBitmapFromFileDescriptor:srcVol.fileDescriptor tapURL:nil error:outError]) {
 		ImpPrintf(@"Failed to read allocation bitmap: %@", (*outError).localizedDescription);
 		return false;
 	}
 
-	if (! [srcVol readExtentsOverflowFileFromFileDescriptor:srcVol.fileDescriptor error:outError]) {
+	if (! [srcVol readExtentsOverflowFileFromFileDescriptor:srcVol.fileDescriptor tapURL:self.extentsFileTapURL error:outError]) {
 		ImpPrintf(@"Failed to read extents overflow file: %@", (*outError).localizedDescription);
 		return false;
 	}
@@ -127,7 +127,7 @@
 	ImpPrintf(@"Extents file is using %lu nodes out of an allocated %lu (%.2f%% utilization)", extTree.numberOfLiveNodes, extTree.numberOfPotentialNodes, extTree.numberOfPotentialNodes > 0 ? (extTree.numberOfLiveNodes / (double)extTree.numberOfPotentialNodes) * 100.0 : 1.0);
 	ImpPrintf(@"Extents file has a max depth of %u; its root node is at height %u while its first leaf is at height %u and its last leaf is at height %u (those three may all be the same node)", extTree.headerNode.treeDepth, extTree.headerNode.rootNode.nodeHeight, extTree.headerNode.firstLeafNode.nodeHeight, extTree.headerNode.lastLeafNode.nodeHeight);
 
-	if (! [srcVol readCatalogFileFromFileDescriptor:srcVol.fileDescriptor error:outError]) {
+	if (! [srcVol readCatalogFileFromFileDescriptor:srcVol.fileDescriptor tapURL:nil error:outError]) {
 		ImpPrintf(@"Failed to read catalog file: %@", (*outError).localizedDescription);
 		return false;
 	}

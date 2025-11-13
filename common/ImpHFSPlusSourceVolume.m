@@ -151,12 +151,13 @@
 	return true;
 }
 
-- (bool)readAllocationBitmapFromFileDescriptor:(const int)readFD error:(NSError * _Nullable __autoreleasing *const)outError {
+- (bool)readAllocationBitmapFromFileDescriptor:(const int)readFD tapURL:(NSURL *_Nullable const)tapURL tapURL:(NSURL *_Nullable const)tapURL error:(NSError * _Nullable __autoreleasing *const)outError {
 	NSData *_Nonnull const bitmapData = [self readDataFromFileDescriptor:readFD
 		logicalLength:L(_vh->allocationFile.logicalSize)
 		bigExtents:_vh->allocationFile.extents
 		numExtents:kHFSPlusExtentDensity
 		error:outError];
+	if (tapURL != nil) [bitmapData writeToURL:tapURL options:0 error:NULL];
 	if (bitmapData != nil) {
 		[self setAllocationBitmapData:[bitmapData mutableCopy] numberOfBits:L(_vh->totalBlocks)];
 		return true;
@@ -164,7 +165,7 @@
 	return false;
 }
 
-- (bool)readCatalogFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
+- (bool)readCatalogFileFromFileDescriptor:(int const)readFD tapURL:(NSURL *_Nullable const)tapURL error:(NSError *_Nullable *_Nonnull const)outError {
 	//TODO: We may also need to load further extents from the extents overflow file, if the catalog is particularly fragmented. Only using the extent record in the volume header may lead to only having part of the catalog.
 
 	NSData *_Nullable const catalogFileData = [self readDataFromFileDescriptor:readFD
@@ -173,6 +174,7 @@
 		numExtents:kHFSPlusExtentDensity
 		error:outError];
 //	ImpPrintf(@"Catalog file data: logical length 0x%llx bytes (%u a-blocks); read 0x%lx bytes", L(_vh->catalogFile.logicalSize), L(_vh->catalogFile.totalBlocks), catalogFileData.length);
+	if (tapURL != nil) [catalogFileData writeToURL:tapURL options:0 error:NULL];
 
 	if (catalogFileData != nil) {
 		self.catalogBTree = [[ImpBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSPlusCatalog data:catalogFileData];
@@ -187,7 +189,7 @@
 	return (self.catalogBTree != nil);
 }
 
-- (bool)readExtentsOverflowFileFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
+- (bool)readExtentsOverflowFileFromFileDescriptor:(int const)readFD tapURL:(NSURL *_Nullable const)tapURL error:(NSError *_Nullable *_Nonnull const)outError {
 	//IM:F says:
 	//>All the areas on a volume are of fixed size and location, except for the catalog file and the extents overflow file. These two files can appear anywhere between the volume bitmap and the alternate master directory block (MDB). They can appear in any order and are not necessarily contiguous.
 	//So we essentially have to treat the extents overflow file as a file.
@@ -198,6 +200,7 @@
 		numExtents:kHFSPlusExtentDensity
 		error:outError];
 //	ImpPrintf(@"Extents overflow file data: logical length 0x%llx bytes (%u a-blocks); read 0x%lx bytes", L(_vh->extentsFile.logicalSize), L(_vh->extentsFile.totalBlocks), extentsFileData.length);
+	if (tapURL != nil) [extentsFileData writeToURL:tapURL options:0 error:NULL];
 	if (extentsFileData != nil) {
 		self.extentsOverflowBTree = [[ImpBTreeFile alloc] initWithVersion:ImpBTreeVersionHFSPlusExtentsOverflow data:extentsFileData];
 		if (self.extentsOverflowBTree == nil) {

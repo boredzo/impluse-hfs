@@ -518,11 +518,16 @@ int main(int argc, const char * argv[]) {
 - (void) analyze:(NSEnumerator <NSString *> *_Nonnull const)argsEnum {
 	NSString *_Nullable srcDevPath = nil;
 	NSNumber *_Nullable defaultEncoding = nil;
+	NSString *_Nullable extentsFilePath = nil;
 	bool expectsEncoding = false;
+	bool expectsExtentsFilePath = false;
 	for (NSString *_Nonnull const arg in argsEnum) {
 		if (expectsEncoding) {
 			defaultEncoding = @([arg integerValue]);
 			expectsEncoding = false;
+		} else if (expectsExtentsFilePath) {
+			extentsFilePath = arg;
+			expectsExtentsFilePath = false;
 		} else if ((defaultEncoding == nil) && [arg hasPrefix:@"--encoding"]) {
 			if ([arg hasPrefix:@"--encoding="]) {
 				//--encoding=42
@@ -530,6 +535,14 @@ int main(int argc, const char * argv[]) {
 			} else {
 				//--encoding 42
 				expectsEncoding = true;
+			}
+		} else if ((extentsFilePath == nil) && [arg hasPrefix:@"--dump-extents-file"]) {
+			if ([arg hasPrefix:@"--dump-extents-file="]) {
+				//--dump-extents-file=extents.out
+				extentsFilePath = [arg substringFromIndex:@"--dump-extents-file=".length];
+			} else {
+				//--dump-extents-file extents.out
+				expectsExtentsFilePath = true;
 			}
 		} else if (srcDevPath != nil) {
 			[self printUsageToFile:stderr];
@@ -549,6 +562,9 @@ int main(int argc, const char * argv[]) {
 	analyzer.sourceDevice = [NSURL fileURLWithPath:srcDevPath isDirectory:false];
 	if (defaultEncoding != nil) {
 		analyzer.hfsTextEncoding = (TextEncoding)defaultEncoding.integerValue;
+	}
+	if (extentsFilePath != nil) {
+		analyzer.extentsFileTapURL = [NSURL fileURLWithPath:extentsFilePath isDirectory:false];
 	}
 
 	NSError *_Nullable error = nil;
