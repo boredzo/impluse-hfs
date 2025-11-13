@@ -120,7 +120,8 @@
 	bool copyData = false;
 
 	struct BTNodeDescriptor const *_Nonnull const nodes = bTreeFileContents.bytes;
-	if (L(nodes[0].kind) == kBTHeaderNode) {
+	BTreeNodeKind const thisNodeKind = L(nodes[0].kind);
+	if (thisNodeKind == kBTHeaderNode) {
 		//This is data from an HFS volume (rather than blank data we've been given by our mutable subclass).
 		copyData = true;
 
