@@ -62,7 +62,7 @@ Use `diskutil list` to find which device is the one you've just connected. One w
 
 All of the devices have identifiers like “diskX”, “diskXsY”, or “diskXsYsZ”, where X is the top-level device number and Y and Z are subdevice numbers. “diskXsY” is subdevice Y of device X, and “diskXsYsZ” is a subdevice of a subdevice.
 
-You'll see devices of type “`CD_partition_scheme`” (if the device is a physical CD-ROM), “`Apple_partition_scheme`” (if the device is formatted with an Apple Partition Map), “`Apple_HFS`”, and some others. You want “`Apple_partition_scheme`” if that's present, or “`Apple_HFS`” if not.
+You'll see devices of type “`CD_partition_scheme`” (if the device is a physical CD-ROM), “`Apple_partition_scheme`” (if the device is formatted with an Apple Partition Map), “`Apple_HFS`”, and some others. **You want “`Apple_partition_scheme`” if that's present, or “`Apple_HFS`” if not.**
 
 (Imaging the `Apple_HFS` device will give you a raw HFS image that impluse can read from directly, but this is not as good for preservation. I recommend imaging the `Apple_partition_scheme` device for a more complete original, and then attaching the image in the subsequent step.)
 
@@ -70,7 +70,7 @@ To image the device, use:
 
 - `hdiutil create -format UDBZ -srcdevice /dev/diskXsY -o "My Image.dmg"`
 
-For CD-ROMs, you'll typically want the first subdevice, diskXs1. For hard drives and most other devices, you're more likely to want the top-level device, diskX. (Each of these is most likely to be the one labeled “`Apple_partition_scheme`” as noted above, though if there's only a bare HFS volume with no partition map, the device may have no type label at all.)
+For CD-ROMs, you'll typically want the first subdevice, diskXs0 or diskXs1. For hard drives and most other devices, you're more likely to want the top-level device, diskX. (Each of these is most likely to be the one labeled “`Apple_partition_scheme`” as noted above, though if there's only a bare HFS volume with no partition map, the device may have no type label at all.)
 
 ### If you get a “permission denied” error when attempting to image a device
 
@@ -84,17 +84,22 @@ My recommendation is to create a UDIF image. You can use `hdiutil create` as des
 
 ### Attaching an image
 
-If you have a raw image (a file containing bytes directly copied from a device), you can attach it using `hdiutil`:
+If you have a raw image (a file containing bytes directly copied from a device), impluse will generally work with it as-is. You can, for example, do:
 
-- `hdiutil attach -nomount -readonly path/to/image.img`
+- `impluse convert path/to/image.img path/to/image-HFS+.img`
+- `impluse list path/to/image.img`
+- `impluse extract path/to/image.img 'Applications:ResEdit Folder:ResEdit'`
 
-Raw images are the kind you typically use with emulators such as Mini vMac and SheepShaver. Note that if the image uses some other filename extension, such as .dsk, you'll need to rename or hard-link it to .img for the disk image engine to recognize it as a raw image.
+If there's only one HFS volume, which is usually the case, this will Just Work.
 
-If you have a wrapped disk image such as a UDIF (.dmg) image, you will need to attach it. Use this hdiutil command:
+If there are multiple HFS volumes, impluse currently doesn't have an affordance for you to specify which one(s) you're interested in, so you'll need to extract the bare volume you're interested in to a separate disk image. Start by attaching the full disk image using `hdiutil`:
 
-- `hdiutil attach -nomount -readonly path/to/image.dmg`
+- If it's a UDIF image: `hdiutil attach -nomount -readonly path/to/image.dmg`
+- If it's a raw image: `hdiutil attach -nomount -readonly path/to/image.img`
 
-Now the image is attached as a device, and hdiutil has printed a list of one or more devices.
+Raw images are the kind you typically use with emulators such as Mini vMac and SheepShaver. Note that if the image uses some other filename extension, such as .dsk, you'll need to rename or hard-link it to .img for the disk image engine to recognize it as a raw image. The disk image engine does recognize .iso, but may do the wrong thing if it is an actual ISO 9660 image (it will mount the ISO 9660 side rather than the Mac side for many true ISOs); renaming it to .img may help avoid this.
+
+When you attach the image as a device, hdiutil will print a list of one or more devices it has created that are attached to that file.
 
 If it gave you only one device path with no further description, use that.
 
@@ -112,13 +117,13 @@ If it gave you a list like:
 /dev/diskXs8        	Apple_Driver43                 	
 ```
 
-You want the one labeled “`Apple_HFS`”.
+You want the one (or one of the ones) labeled “`Apple_HFS`”. Unfortunately, volume names are not shown in this output, so if you're looking at multiple HFS volumes, you may have to try each one in turn.
 
-From this point, you can use the good-old-fashioned `cp` command to copy the indicated device to a raw HFS image file, or you can point impluse to that device directly.
+From this point, you can use the good-old-fashioned `cp` command to copy the indicated device to a raw HFS image file.  impluse _should_ be able to read from a subdevice directly, but this currently doesn't work (#71).
 
 If you get a list of partitions but there is no “`Apple_HFS`” partition, then it's not an HFS volume and impluse cannot do anything with it.
 
-If you get a list with multiple “`Apple_HFS`” partitions, then there are multiple HFS partitions (most likely for a partitioned hard drive). You can create a raw HFS image file from, or use impluse directly with, each partition separately.
+If you get a list with multiple “`Apple_HFS`” partitions, then there are multiple HFS partitions (most likely for a partitioned hard drive). You can create a raw HFS image file from each partition separately.
 
 ### On bare HFS volumes, such as floppies
 A storage device that isn't big enough to make sense to partition will often omit the partition map entirely, containing only a bare HFS volume. Often these are floppy disks, or images thereof.
@@ -131,13 +136,13 @@ If you have a raw bare-HFS disk image file, impluse can read directly from it—
 
 If you try to use impluse with a file you think is an image of an HFS volume, but it doesn't work, there are several possible reasons why:
 
-- impluse can only read from raw _HFS_ images, where the image file contains only the volume with no partition map around it. impluse does not currently know how to read a partition map. If you have an image file containing a partition map, you'll need to follow the steps above to attach the image and expose any HFS volumes that might be present.
-- impluse also does not know how to read wrapped (non-raw) images. You'll need to attach these using the disk images system as described above.
-- If you imaged a CD-ROM using its top-level device (`CD_partition_scheme`), that won't work—the data is wrapped in thousands of CD-ROM frame headers. These can be stripped out (with some other program), but it's safer to re-image the disc from the original physical copy.
+
+- impluse does not know how to read wrapped (non-raw) images. You'll need to attach these using the disk images system as described above.
+- If you imaged a CD-ROM using its top-level device (`CD_partition_scheme`), that won't work—the data is wrapped in thousands of CD-ROM frame headers. These can be stripped out (with some other program), but it's safer to re-image the disc from the original physical copy. It might also be possible to MacGyver a cue sheet (.cue file) that treats the raw-CD-ROM image as a .bin file, and then convert that to a proper raw-bytes image—but doing that successfully and correctly is left as an exercise for the reader.
 
 ## Using impluse
 
-Once you have either an attached device that contains an HFS volume (see mentions of “`Apple_HFS`” above) or a raw bare-HFS image file, you can then feed that volume to impluse.
+Once you have either an attached device that contains an HFS volume (see mentions of “`Apple_HFS`” above) or a raw-bytes image file, you can then feed that volume/image to impluse.
 
 All of these operations are quite fast; they will typically be limited by the speed of I/O (e.g., if you're reading directly from a CD, they will be limited by the speed of your CD drive).
 
