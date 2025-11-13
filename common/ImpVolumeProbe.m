@@ -124,6 +124,12 @@ struct APMPartitionRecord_IM5 {
 	return self;
 }
 
+- (bool) isDeviceFile {
+	struct stat sb;
+	int const statResult = fstat(_readFD, &sb);
+	return sb.st_mode & (S_IFCHR | S_IFBLK);
+}
+
 - (u_int64_t) sizeInBytesAccordingToStat {
 	u_int64_t sizeInBytes = 0;
 	struct stat sb;
@@ -134,6 +140,48 @@ struct APMPartitionRecord_IM5 {
 			sizeInBytes = (u_int64_t)sizeAccordingToStat;
 		}
 	}
+	return sizeInBytes;
+}
+
+- (u_int64_t) sizeInBytesAccordingToSeek OS_UNUSED {
+	u_int64_t sizeInBytes = 0;
+
+	off_t const previousPosition = lseek(_readFD, 0, SEEK_CUR);
+	off_t const sizeAccordingToSeek = lseek(_readFD, 0, SEEK_END);
+	lseek(_readFD, previousPosition, SEEK_SET);
+
+	if (sizeAccordingToSeek > 0) {
+		sizeInBytes = (u_int64_t)sizeAccordingToSeek;
+	}
+	return sizeInBytes;
+}
+
+//This is, AFAICT, the only reliable way to tell the partition size of a subdevice: Read at various locations until you find a location that reads somewhere between 0 and the request size, preferably neither.
+// If the partition size is a multiple of the request size, you want the lowest offset that returns zero bytes (which is exactly equivalent to a read at the end of the file). Otherwise, it's enough to find the highest offset that returns less than the request size; that offset plus the return size is the partition size.
+- (u_int64_t) sizeInBytesAccordingToPread {
+	u_int64_t sizeInBytes = 0;
+
+	enum {
+		bufSize = 1048576UL,
+		offsetIncrement = bufSize * 1024UL,
+		initialOffset = offsetIncrement * 20UL,
+	};
+	off_t offset = initialOffset;
+	void *_Nullable const buf = malloc(bufSize);
+	ssize_t amtRead = pread(_readFD, buf, bufSize, offset);
+	while (amtRead == bufSize) {
+		offset += offsetIncrement;
+		amtRead = pread(_readFD, buf, bufSize, offset);
+	}
+	if (amtRead == 0) {
+		while (amtRead == 0) {
+			offset -= bufSize;
+			amtRead = pread(_readFD, buf, bufSize, offset);
+		}
+	}
+
+	sizeInBytes = offset + amtRead;
+	free(buf);
 	return sizeInBytes;
 }
 
@@ -370,7 +418,8 @@ struct APMPartitionRecord_IM5 {
 }
 
 - (void) scan {
-	[self scanApplePartitionMap] || [self scanBareVolumeStartingAtBlock:0 blockCount:self.sizeInBytesAccordingToStat / kISOStandardBlockSize];
+	u_int64_t const sizeInBytes = [self isDeviceFile] ? self.sizeInBytesAccordingToPread : self.sizeInBytesAccordingToStat;
+	[self scanApplePartitionMap] || [self scanBareVolumeStartingAtBlock:0 blockCount:sizeInBytes / kISOStandardBlockSize];
 	_hasScanned = true;
 }
 
