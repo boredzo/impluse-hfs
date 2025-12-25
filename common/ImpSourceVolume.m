@@ -30,8 +30,8 @@
 	NSMutableData *_volumeBitmapData;
 }
 
-- (void) impluseBugDetected_messageSentToAbstractClass {
-	NSAssert(false, @"Message %s sent to instance of class %@, which hasn't implemented it (instance of abstract class, method not overridden, or super called when it shouldn't have been)", sel_getName(_cmd), [self class]);
+- (void) impluseBugDetected_messageSentToAbstractClass:(SEL _Nonnull const)msg {
+	NSAssert(false, @"Message %s sent to instance of class %@, which hasn't implemented it (instance of abstract class, method not overridden, or super called when it shouldn't have been)", sel_getName(msg), [self class]);
 }
 
 - (instancetype _Nonnull) initWithFileDescriptor:(int const)readFD
@@ -71,7 +71,7 @@
 }
 
 - (bool) readVolumeHeaderFromFileDescriptor:(int const)readFD error:(NSError *_Nullable *_Nonnull const)outError {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 	return false;
 }
 
@@ -83,15 +83,15 @@
 }
 
 - (bool)readAllocationBitmapFromFileDescriptor:(int const)readFD tapURL:(NSURL *_Nullable const)tapURL error:(NSError *_Nullable *_Nonnull const)outError {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 	return false;
 }
 - (bool)readCatalogFileFromFileDescriptor:(int const)readFD tapURL:(NSURL *_Nullable const)tapURL error:(NSError *_Nullable *_Nonnull const)outError {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 	return false;
 }
 - (bool)readExtentsOverflowFileFromFileDescriptor:(int const)readFD tapURL:(NSURL *_Nullable const)tapURL error:(NSError *_Nullable *_Nonnull const)outError {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 	return false;
 }
 
@@ -218,7 +218,7 @@
 	[self findExtents:block inBitVector:_blocksThatAreAllocatedButWereNotAccessed];
 }
 - (void) findExtentsThatAreAllocatedButAreNotReferencedInTheBTrees:(void (^_Nonnull const)(NSRange))block {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 }
 - (NSUInteger) numberOfBlocksThatAreAllocatedButAreNotReferencedInTheBTrees {
 	__block NSUInteger numOrphanedBlocks = 0;
@@ -242,51 +242,51 @@
 }
 
 - (u_int32_t) firstPhysicalBlockOfFirstAllocationBlock {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 	return 0;
 }
 - (off_t) offsetOfFirstAllocationBlock {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 	return -1;
 }
 - (HFSCatalogNodeID) nextCatalogNodeID {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 	return 0;
 }
 - (NSString *_Nonnull) volumeName {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 	return @"Unknown volume";
 }
 - (u_int32_t) numberOfBytesPerBlock {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 	return 0;
 }
 - (NSUInteger) numberOfBlocksTotal {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 	return 0;
 }
 - (NSUInteger) numberOfBlocksUsed {
 	return self.numberOfBlocksTotal - self.numberOfBlocksFree;
 }
 - (NSUInteger) numberOfBlocksFree {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 	return 0;
 }
 - (NSUInteger) numberOfFiles {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 	return 0;
 }
 - (NSUInteger) numberOfFolders {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 	return 0;
 }
 
 - (NSUInteger) catalogSizeInBytes {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 	return 0;
 }
 - (NSUInteger) extentsOverflowSizeInBytes {
-	[self impluseBugDetected_messageSentToAbstractClass];
+	[self impluseBugDetected_messageSentToAbstractClass:_cmd];
 	return 0;
 }
 
