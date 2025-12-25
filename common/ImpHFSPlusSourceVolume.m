@@ -151,7 +151,7 @@
 	return true;
 }
 
-- (bool)readAllocationBitmapFromFileDescriptor:(const int)readFD tapURL:(NSURL *_Nullable const)tapURL tapURL:(NSURL *_Nullable const)tapURL error:(NSError * _Nullable __autoreleasing *const)outError {
+- (bool)readAllocationBitmapFromFileDescriptor:(const int)readFD tapURL:(NSURL *_Nullable const)tapURL error:(NSError * _Nullable __autoreleasing *const)outError {
 	NSData *_Nonnull const bitmapData = [self readDataFromFileDescriptor:readFD
 		logicalLength:L(_vh->allocationFile.logicalSize)
 		bigExtents:_vh->allocationFile.extents
